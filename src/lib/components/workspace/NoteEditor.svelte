@@ -22,7 +22,6 @@
 	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned' | 'overlay'>>;
 
@@ -251,68 +250,47 @@
 					</button>
 				</div>
 			{:else if settings.focusMode}
-				<div class="flex h-11 shrink-0 items-center justify-between gap-3 px-4 @container">
+				<div class="flex h-11 shrink-0 items-center justify-between px-4">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 						>Focus mode</span
 					>
-					<div class="flex items-center gap-3">
-						<EditorStatus {note} />
-						<button
-							class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
-							onclick={() => updateSettings({ focusMode: false })}
-						>
-							<X size={13} /> Exit
-						</button>
-					</div>
+					<button
+						class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
+						onclick={() => updateSettings({ focusMode: false })}
+					>
+						<X size={13} /> Exit
+					</button>
 				</div>
 			{:else}
-				<div class="flex h-12 shrink-0 items-center justify-between gap-3 px-4 @container">
-					<Breadcrumb.Root class="min-w-0">
-						<Breadcrumb.List
-							class="gap-1.5 text-label-md font-label text-on-surface-variant sm:gap-1.5"
-						>
-							<Breadcrumb.Item>
-								<button
-									type="button"
-									class="text-primary capitalize transition-colors hover:brightness-110"
-									onclick={() => onselectfolder?.(note.folder)}
-								>
-									{folderLabel}
-								</button>
-							</Breadcrumb.Item>
-							<Breadcrumb.Separator class="text-outline [&>svg]:size-3.5" />
-							<Breadcrumb.Item>
-								<Breadcrumb.Page class="truncate text-on-surface">
-									{note.title || 'Untitled'}
-								</Breadcrumb.Page>
-							</Breadcrumb.Item>
-						</Breadcrumb.List>
-					</Breadcrumb.Root>
-
-					<div class="flex shrink-0 items-center gap-3">
-						<EditorStatus {note} />
-						<NoteToolbar
-							{view}
-							pinned={note.pinned}
-							docked={note.overlay}
-							{archived}
-							onview={changeView}
-							ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
-							ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
-							ontogglearchive={toggleArchive}
-							onopenwindow={() => void openNoteWindow(note.id)}
-							onprint={() => onprint?.(note)}
-							onexport={() => onexport?.(note)}
-							oncopy={() => oncopy?.(note)}
-							ondelete={() => ondelete(note.id)}
-							onfullpreview={() => ontogglefullpreview?.()}
-						/>
-					</div>
+				<div class="flex h-10 shrink-0 items-center justify-end px-4">
+					<NoteToolbar
+						{view}
+						pinned={note.pinned}
+						docked={note.overlay}
+						{archived}
+						onview={changeView}
+						ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
+						ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
+						ontogglearchive={toggleArchive}
+						onopenwindow={() => void openNoteWindow(note.id)}
+						onprint={() => onprint?.(note)}
+						onexport={() => onexport?.(note)}
+						oncopy={() => oncopy?.(note)}
+						ondelete={() => ondelete(note.id)}
+						onfullpreview={() => ontogglefullpreview?.()}
+					/>
 				</div>
 			{/if}
 
 			{#if !fullPreview}
-				<div class="flex shrink-0 flex-col gap-1 px-6 pt-1 pb-3">
+				<div class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
+					<button
+						type="button"
+						class="w-fit max-w-full truncate text-label-sm font-label tracking-wide text-primary capitalize transition-colors hover:brightness-110"
+						onclick={() => onselectfolder?.(note.folder)}
+					>
+						{folderLabel}
+					</button>
 					<input
 						class="w-full bg-transparent text-headline-xl font-headline font-bold tracking-tight text-on-surface placeholder:text-outline/60 focus:outline-none"
 						type="text"
@@ -320,7 +298,7 @@
 						bind:value={title}
 						oninput={() => onupdate(note.id, { title })}
 					/>
-					<div class="flex flex-wrap items-center gap-1.5 pt-1">
+					<div class="flex flex-wrap items-center gap-1.5">
 						{#each note.tags as tag (tag)}
 							<span
 								class="glass-chip group flex items-center gap-1 rounded-full px-2.5 py-1 text-code-sm font-code text-secondary"
@@ -342,7 +320,10 @@
 						>
 							+ Tag
 						</button>
-						<span class="ml-1 text-code-sm font-code text-outline">{note.updated}</span>
+						<span class="text-code-sm font-code text-outline">{note.updated}</span>
+						<span class="ml-auto">
+							<EditorStatus {note} />
+						</span>
 					</div>
 				</div>
 			{/if}
