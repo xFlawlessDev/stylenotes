@@ -34,6 +34,7 @@
 	type="single"
 	{disabled}
 	value={value}
+	items={options}
 	onValueChange={(next) => change(next)}
 >
 	<Select.Trigger

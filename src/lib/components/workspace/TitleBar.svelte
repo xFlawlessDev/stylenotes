@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { Search, Moon, Sun, PanelRight } from '@lucide/svelte';
+	import {
+		Search,
+		Moon,
+		Sun,
+		PanelRight,
+		NotebookPen,
+		ListTodo,
+		FolderTree,
+		Rows3,
+	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
@@ -9,20 +18,35 @@
 	let {
 		title = 'StyleNotes',
 		mode = 'dark',
+		section = 'notes',
+		showpanelbuttons = false,
 		onpalette,
 		onsettings,
 		ontogglemode,
 		ontoggledock,
+		onsection,
+		onopenfolders,
+		onopennotes,
 		notifications,
 	}: {
 		title?: string;
 		mode?: ThemeMode;
+		section?: 'notes' | 'tasks';
+		showpanelbuttons?: boolean;
 		onpalette?: () => void;
 		onsettings?: () => void;
 		ontogglemode?: () => void;
 		ontoggledock?: () => void;
+		onsection?: (section: 'notes' | 'tasks') => void;
+		onopenfolders?: () => void;
+		onopennotes?: () => void;
 		notifications?: Snippet;
 	} = $props();
+
+	const sections = [
+		{ id: 'notes' as const, label: 'Notes', icon: NotebookPen },
+		{ id: 'tasks' as const, label: 'Tasks', icon: ListTodo },
+	];
 
 	function win() {
 		return getCurrentWindow();
@@ -69,12 +93,46 @@
 			/>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
 		</div>
+
+		<div class="glass-well ml-1 hidden items-center rounded-full p-0.5 sm:flex">
+			{#each sections as item (item.id)}
+				{@const Icon = item.icon}
+				<button
+					class="flex items-center gap-1.5 rounded-full px-3 py-1 text-label-md font-label transition-all {section ===
+					item.id
+						? 'glass-chip font-medium text-on-surface'
+						: 'text-outline hover:text-on-surface'}"
+					aria-pressed={section === item.id}
+					onclick={() => onsection?.(item.id)}
+				>
+					<Icon size={14} /> {item.label}
+				</button>
+			{/each}
+		</div>
 	</div>
 
 	<!-- Controls -->
 	<div class="flex items-center gap-1.5">
+		{#if section === 'notes' && showpanelbuttons}
+			<div class="flex items-center gap-0.5">
+				<button
+					class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface lg:hidden"
+					aria-label="Open folders"
+					onclick={onopenfolders}
+				>
+					<FolderTree size={16} />
+				</button>
+				<button
+					class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface md:hidden"
+					aria-label="Open notes list"
+					onclick={onopennotes}
+				>
+					<Rows3 size={16} />
+				</button>
+			</div>
+		{/if}
 		<button
-			class="glass-well flex h-8 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-left transition-colors hover:border-primary/30 md:w-72 lg:w-80"
+			class="glass-well flex h-8 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-left transition-all hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-72 lg:w-80"
 			aria-label="Open command palette"
 			onclick={onpalette}
 		>

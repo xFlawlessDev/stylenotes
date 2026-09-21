@@ -1,15 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Search,
-		FilePlus2,
-		FolderPlus,
-		Settings as SettingsIcon,
-		Contrast,
-		Pin,
-		Download,
-	} from '@lucide/svelte';
 	import { buildExcerpt, countWords, createNote as makeNote } from '$lib/content/content';
+	import { createNoteActions } from '$lib/content/note-actions';
 	import type { Note } from '$lib/content/content';
 	import {
 		foldersFor,
@@ -20,7 +12,6 @@
 		removeNote,
 		clearNotes,
 		resetNotesToSeed,
-		exportNotes,
 		loadFolders,
 		uniqueFolderId,
 		reorderFolders,
@@ -48,13 +39,14 @@
 	import VaultRail from '$lib/components/workspace/VaultRail.svelte';
 	import NotesFeed from '$lib/components/workspace/NotesFeed.svelte';
 	import NoteEditor from '$lib/components/workspace/NoteEditor.svelte';
-	import CommandPalette from '$lib/components/workspace/CommandPalette.svelte';
 	import NotificationPanel from '$lib/components/workspace/NotificationPanel.svelte';
-	import SettingsPanel from '$lib/components/workspace/SettingsPanel.svelte';
-	import CreateNoteDialog from '$lib/components/dialogs/CreateNoteDialog.svelte';
-	import AddFolderDialog from '$lib/components/dialogs/AddFolderDialog.svelte';
-	import ConfirmDialog from '$lib/components/dialogs/ConfirmDialog.svelte';
-	import { Trash2, RotateCcw } from '@lucide/svelte';
+	import WorkspaceOverlays from '$lib/components/workspace/WorkspaceOverlays.svelte';
+	import TaskBoard from '$lib/components/tasks/TaskBoard.svelte';
+	import {
+		hydrateTasks,
+		clearTasks,
+	} from '$lib/stores/tasks.svelte';
+	import type { Task } from '$lib/stores/tasks';
 	import { toggleOverlay } from '$lib/windows';
 
 	let items = $state<Note[]>([]);
@@ -76,10 +68,12 @@
 	let toast = $state('');
 	let newNoteToken = $state(0);
 	let fullPreview = $state(false);
-
-	function toggleFullPreview() {
-		fullPreview = !fullPreview;
-	}
+	let section = $state<'notes' | 'tasks'>('notes');
+	let tasks = $state<Task[]>([]);
+	let selectedTaskId = $state('');
+	let taskFocusToken = $state(0);
+	let railOpen = $state(false);
+	let feedOpen = $state(false);
 
 	const folders = $derived(foldersFor(items, customFolders));
 	const folderLabelMap = $derived(
@@ -102,14 +96,16 @@
 	onMount(() => {
 		void hydrateSettings();
 		void (async () => {
-			const [storedNotes, storedFolders, storedNotifications] = await Promise.all([
+			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),
 				loadFolders(),
 				loadNotifications(),
+				hydrateTasks(),
 			]);
 			items = storedNotes;
 			customFolders = storedFolders;
 			notifications = storedNotifications;
+			tasks = storedTasks;
 			if (!selectedId && items.length) selectedId = items[0].id;
 		})();
 	});
@@ -120,6 +116,8 @@
 			if (toast === message) toast = '';
 		}, 2200);
 	}
+
+	const noteActions = createNoteActions(showToast);
 
 	function createNote() {
 		createOpen = true;
@@ -249,34 +247,10 @@
 		if (next && !pool.some((note) => note.id === selectedId)) selectedId = pool[0]?.id ?? '';
 	}
 
-	async function shareNote(note: Note) {
-		const text = `${note.title}\n\n${note.body}`;
-		try {
-			await navigator.clipboard.writeText(text);
-			showToast('Note copied to clipboard');
-		} catch {
-			showToast('Could not copy note');
-		}
-	}
-
-	function exportAll() {
-		const blob = new Blob([exportNotes(items)], { type: 'text/markdown' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = 'stylenotes.md';
-		link.click();
-		URL.revokeObjectURL(url);
-		showToast('Exported notes');
-	}
-
-	function askResetData() {
-		resetOpen = true;
-	}
-
 	async function resetData() {
 		await clearNotes();
 		await resetStoredSettings();
+		await clearTasks();
 		const [fresh, freshNotifications] = await Promise.all([
 			resetNotesToSeed(),
 			resetNotifications(),
@@ -285,6 +259,7 @@
 		customFolders = [];
 		selectedId = items[0]?.id ?? '';
 		notifications = freshNotifications;
+		tasks = [];
 		activeFolder = 'all';
 		activeTag = null;
 		showToast('Data reset to samples');
@@ -302,48 +277,6 @@
 		settingsOpen = false;
 		notificationsOpen = false;
 	}
-
-	const actions = [
-		{
-			id: 'new',
-			label: 'New note',
-			hint: 'Ctrl N',
-			icon: FilePlus2,
-			run: createNote,
-		},
-		{
-			id: 'new-folder',
-			label: 'New folder',
-			icon: FolderPlus,
-			run: openAddFolder,
-		},
-		{
-			id: 'theme',
-			label: 'Toggle light and dark',
-			hint: 'Ctrl /',
-			icon: Contrast,
-			run: toggleMode,
-		},
-		{
-			id: 'settings',
-			label: 'Open settings',
-			hint: 'Ctrl ,',
-			icon: SettingsIcon,
-			run: () => (settingsOpen = true),
-		},
-		{
-			id: 'export',
-			label: 'Export all notes',
-			icon: Download,
-			run: exportAll,
-		},
-		{
-			id: 'pinned',
-			label: 'Show pinned notes',
-			icon: Pin,
-			run: () => (activeFolder = 'all'),
-		},
-	];
 
 	function onGlobalKeydown(event: KeyboardEvent) {
 		if (event.defaultPrevented) return;
@@ -407,139 +340,158 @@
 			settingsOpen = true;
 		}}
 		mode={settings.mode}
+		{section}
+		showpanelbuttons={!fullPreview}
+		onsection={(next) => {
+			section = next;
+			fullPreview = false;
+		}}
+		onopenfolders={() => {
+			railOpen = true;
+			feedOpen = false;
+		}}
+		onopennotes={() => {
+			feedOpen = true;
+			railOpen = false;
+		}}
 		ontogglemode={toggleMode}
 		ontoggledock={toggleOverlay}
 		notifications={notificationsSlot}
 	/>
 
-	<div class="ws-grid relative flex min-h-0 flex-1">
-		{#if !fullPreview}
-			<VaultRail
+	{#if section === 'tasks'}
+		<div class="ws-grid relative flex min-h-0 flex-1">
+			<TaskBoard
+				bind:tasks
+				bind:selectedId={selectedTaskId}
+				focusToken={taskFocusToken}
 				{folders}
-				{tags}
-				active={activeFolder}
-				{activeTag}
-				onselect={selectFolder}
-				oncreate={createNote}
-				onaddfolder={openAddFolder}
-				onrenamefolder={renameFolder}
-				onfoldericon={setFolderIcon}
-				ondeletedfolder={deleteFolder}
-				onreorder={reorderFolder}
-				onselecttag={selectTag}
+				notes={items}
+				onnotify={showToast}
 			/>
+		</div>
+	{:else}
+		<div class="ws-grid relative flex min-h-0 flex-1">
+			{#if railOpen}
+				<button
+					class="fixed inset-0 z-30 cursor-default bg-scrim/40 lg:hidden"
+					aria-label="Close folders"
+					onclick={() => (railOpen = false)}
+				></button>
+			{/if}
+			{#if feedOpen}
+				<button
+					class="fixed inset-0 z-30 cursor-default bg-scrim/40 md:hidden"
+					aria-label="Close notes list"
+					onclick={() => (feedOpen = false)}
+				></button>
+			{/if}
+			{#if !fullPreview}
+				<VaultRail
+					{folders}
+					{tags}
+					active={activeFolder}
+					{activeTag}
+					open={railOpen}
+					onclose={() => (railOpen = false)}
+					onselect={(id) => {
+						selectFolder(id);
+						feedOpen = true;
+					}}
+					oncreate={createNote}
+					onaddfolder={openAddFolder}
+					onrenamefolder={renameFolder}
+					onfoldericon={setFolderIcon}
+					ondeletedfolder={deleteFolder}
+					onreorder={reorderFolder}
+					onselecttag={selectTag}
+				/>
 
-			<NotesFeed
-				notes={visible}
-				{selectedId}
-				total={items.length}
-				folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
-				resetToken={newNoteToken}
-				showFolder={activeFolder === 'all'}
-				folderLabels={folderLabelMap}
-				{activeTag}
-				onselect={(id) => (selectedId = id)}
-				onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
-				onselecttag={selectTag}
-				oncleartag={() => selectTag(null)}
+				<NotesFeed
+					notes={visible}
+					{selectedId}
+					total={items.length}
+					folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
+					resetToken={newNoteToken}
+					showFolder={activeFolder === 'all'}
+					folderLabels={folderLabelMap}
+					{activeTag}
+					open={feedOpen}
+					onclose={() => (feedOpen = false)}
+					onselect={(id) => {
+						selectedId = id;
+						feedOpen = false;
+					}}
+					onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
+					onselecttag={selectTag}
+					oncleartag={() => selectTag(null)}
+					onselectfolder={selectFolder}
+				/>
+			{/if}
+
+			<NoteEditor
+				note={selected}
+				{folders}
+				focusToken={newNoteToken}
+				{fullPreview}
+				ontogglefullpreview={() => (fullPreview = !fullPreview)}
+				onupdate={updateNote}
+				ondelete={deleteNote}
+				onprint={noteActions.print}
+				onexport={noteActions.export}
+				oncopy={noteActions.copy}
 				onselectfolder={selectFolder}
 			/>
-		{/if}
-
-		<NoteEditor
-			note={selected}
-			{folders}
-			focusToken={newNoteToken}
-			{fullPreview}
-			ontogglefullpreview={toggleFullPreview}
-			onupdate={updateNote}
-			ondelete={deleteNote}
-			onshare={shareNote}
-			onselectfolder={selectFolder}
-		/>
-	</div>
-
-	{#if toast}
-		<div
-			class="glass-solid pointer-events-none fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 rounded-full px-4 py-2 text-label-md font-label text-on-surface"
-		>
-			{toast}
 		</div>
 	{/if}
 
-	<CommandPalette
-		open={paletteOpen}
-		notes={items}
+	<WorkspaceOverlays
+		{toast}
+		bind:createOpen
+		bind:folderOpen
+		bind:deleteOpen
+		bind:folderDeleteOpen
+		bind:resetOpen
+		{paletteOpen}
+		onpaletteclose={() => (paletteOpen = false)}
+		{items}
 		{folders}
-		{actions}
+		{tasks}
 		onselectnote={(id) => (selectedId = id)}
+		onselecttask={(id) => {
+			selectedTaskId = id;
+			taskFocusToken += 1;
+			section = 'tasks';
+		}}
 		onselectfolder={selectFolder}
-		onclose={() => (paletteOpen = false)}
-	/>
-
-	<SettingsPanel
-		open={settingsOpen}
-		onclose={() => (settingsOpen = false)}
-		onexport={exportAll}
-		onresetdata={askResetData}
+		{settingsOpen}
+		onsettingsclose={() => (settingsOpen = false)}
+		onexport={() => noteActions.exportAll(items)}
+		onresetdata={() => (resetOpen = true)}
 		notecount={items.length}
-	/>
-
-	<CreateNoteDialog bind:open={createOpen} {folders} onsubmit={commitNewNote} />
-
-	<AddFolderDialog
-		bind:open={folderOpen}
-		labels={folders.map((folder) => folder.label)}
-		onsubmit={commitNewFolder}
-	/>
-
-	<ConfirmDialog
-		bind:open={deleteOpen}
-		title="Delete this note?"
-		description="This permanently removes the note and its content. This action cannot be undone."
-		confirmLabel="Delete note"
-		confirmVariant="destructive"
-		onconfirm={() => {
+		onnewnote={createNote}
+		onnewfolder={openAddFolder}
+		ontogglemode={toggleMode}
+		onopensettings={() => {
+			closePanels();
+			settingsOpen = true;
+		}}
+		onopentasks={() => (section = 'tasks')}
+		oncreatenote={commitNewNote}
+		folderLabels={folders.map((folder) => folder.label)}
+		oncreatefolder={commitNewFolder}
+		{pendingDelete}
+		onconfirmdelete={() => {
 			if (pendingDelete) performDelete(pendingDelete.id);
 			pendingDelete = null;
 		}}
-		oncancel={() => (pendingDelete = null)}
-	>
-		{#snippet icon()}
-			<Trash2 size={18} />
-		{/snippet}
-	</ConfirmDialog>
-
-	<ConfirmDialog
-		bind:open={folderDeleteOpen}
-		title="Delete this folder?"
-		description="The folder “{pendingFolder?.label ?? ''}” will be removed. Its {(pendingFolder?.count ??
-		0) === 1
-			? 'note'
-			: 'notes'} will move to Personal. This action cannot be undone."
-		confirmLabel="Delete folder"
-		confirmVariant="destructive"
-		onconfirm={() => {
+		oncanceldelete={() => (pendingDelete = null)}
+		{pendingFolder}
+		onconfirmfolderdelete={() => {
 			if (pendingFolder) performDeleteFolder(pendingFolder.id);
 			pendingFolder = null;
 		}}
-		oncancel={() => (pendingFolder = null)}
-	>
-		{#snippet icon()}
-			<Trash2 size={18} />
-		{/snippet}
-	</ConfirmDialog>
-
-	<ConfirmDialog
-		bind:open={resetOpen}
-		title="Reset all data?"
-		description="Restores the sample notes and clears your local changes and preferences."
-		confirmLabel="Reset everything"
-		confirmVariant="destructive"
-		onconfirm={resetData}
-	>
-		{#snippet icon()}
-			<RotateCcw size={18} />
-		{/snippet}
-	</ConfirmDialog>
+		oncancelfolderdelete={() => (pendingFolder = null)}
+		onreset={resetData}
+	/>
 </div>

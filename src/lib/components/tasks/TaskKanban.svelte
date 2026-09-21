@@ -1,0 +1,141 @@
+<script lang="ts">
+	import { Plus } from '@lucide/svelte';
+	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
+	import { pointerReorder } from '$lib/content/pointer-reorder';
+	import {
+		statusMeta,
+		tasksByStatus,
+		taskStatus,
+		TASK_STATUSES,
+		type Task,
+		type TaskStatus
+	} from '$lib/stores/tasks';
+
+	let {
+		tasks,
+		selectedId,
+		noteTitles = {},
+		onselect,
+		onedit,
+		onmove,
+		onadd
+	}: {
+		tasks: Task[];
+		selectedId: string;
+		noteTitles?: Record<string, string>;
+		onselect: (id: string) => void;
+		onedit: (task: Task) => void;
+		onmove: (id: string, status: TaskStatus, beforeId: string | null) => void;
+		onadd: (status: TaskStatus) => void;
+	} = $props();
+
+	const groups = $derived(tasksByStatus(tasks));
+
+	let draggingId = $state<string | null>(null);
+	let overColumn = $state<TaskStatus | null>(null);
+
+	function statusAt(x: number, y: number): TaskStatus | null {
+		const el = document.elementFromPoint(x, y);
+		return (el?.closest<HTMLElement>('[data-task-status]')?.dataset.taskStatus ??
+			null) as TaskStatus | null;
+	}
+
+	function taskAt(x: number, y: number): string | null {
+		const el = document.elementFromPoint(x, y);
+		return el?.closest<HTMLElement>('[data-task-id]')?.dataset.taskId ?? null;
+	}
+
+	function endTaskDrag(x: number, y: number) {
+		const status = statusAt(x, y);
+		const beforeId = taskAt(x, y);
+		const id = draggingId;
+		draggingId = null;
+		overColumn = null;
+		if (!id || !status) return;
+		const task = tasks.find((item) => item.id === id);
+		if (task && taskStatus(task) === status && (!beforeId || beforeId === id)) return;
+		onmove(id, status, beforeId === id ? null : beforeId);
+	}
+
+	const kanban = (node: HTMLElement) =>
+		pointerReorder(node, {
+			handleSelector: '[data-task-handle]',
+			idAttribute: 'data-task-id',
+			onStart: (id) => (draggingId = id),
+			onMove: (_id, event) => (overColumn = statusAt(event.clientX, event.clientY)),
+			onEnd: (_id, event) => endTaskDrag(event.clientX, event.clientY),
+		});
+</script>
+
+<section class="@container flex min-h-0 flex-1 flex-col pb-1" use:kanban>
+	<div
+		class="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 @[420px]:grid-cols-2 @[820px]:grid-cols-4"
+	>
+		{#each TASK_STATUSES as status (status)}
+			{@const column = groups[status]}
+			<div
+				role="list"
+				aria-label={statusMeta[status].label}
+				data-task-status={status}
+				class="glass-panel flex min-h-0 min-w-0 flex-col gap-2.5 rounded-2xl p-2.5 transition-all {overColumn ===
+				status
+					? 'ring-1 ring-inset ring-primary/50'
+					: ''}"
+			>
+				<div class="flex items-center justify-between px-1 pt-0.5">
+					<div class="flex items-center gap-2">
+						<span class="text-label-md font-label font-semibold {statusMeta[status].tone}">
+							{statusMeta[status].label}
+						</span>
+						<span
+							class="rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code text-outline"
+						>
+							{column.length}
+						</span>
+					</div>
+					<button
+						type="button"
+						class="flex size-6 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+						aria-label="Add task to {statusMeta[status].label}"
+						onclick={() => onadd(status)}
+					>
+						<Plus size={15} />
+					</button>
+				</div>
+
+				<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
+					{#each column as task (task.id)}
+						<div
+							data-task-id={task.id}
+							data-task-handle
+							role="listitem"
+						>
+							<TaskCard
+								{task}
+								selected={selectedId === task.id}
+								noteTitle={task.noteId ? (noteTitles[task.noteId] ?? null) : null}
+								dragging={draggingId === task.id}
+								onselect={() => onselect(task.id)}
+								onedit={() => onedit(task)}
+							/>
+						</div>
+					{/each}
+
+					{#if column.length === 0}
+						<p class="px-2 py-6 text-center text-code-sm font-code text-outline/70">
+							Drop tasks here
+						</p>
+					{/if}
+				</div>
+
+				<button
+					type="button"
+					class="flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-label-md font-label text-outline transition-colors hover:bg-surface-container/50 hover:text-on-surface"
+					onclick={() => onadd(status)}
+				>
+					<Plus size={14} /> Add task
+				</button>
+			</div>
+		{/each}
+	</div>
+</section>

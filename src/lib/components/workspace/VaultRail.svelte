@@ -80,7 +80,11 @@
 	const chipTone = ['text-primary', 'text-secondary', 'text-tertiary'];
 </script>
 
-<aside class="glass-panel flex w-[248px] shrink-0 flex-col overflow-hidden rounded-2xl p-2.5">
+<aside
+	class="glass-panel flex w-[248px] shrink-0 flex-col overflow-hidden rounded-2xl p-2.5 max-lg:fixed max-lg:inset-y-2.5 max-lg:left-2.5 max-lg:z-40 max-lg:max-h-[calc(100vh-1.25rem)] max-lg:shadow-2xl max-lg:transition-transform {open
+		? 'max-lg:translate-x-0'
+		: 'max-lg:-translate-x-[120%]'}"
+>
 	<div class="flex min-h-0 flex-col gap-3">
 		<div class="flex items-center gap-2.5 px-1 py-1">
 			<div
@@ -96,10 +100,17 @@
 				<span class="text-headline-sm font-headline leading-tight text-on-surface">StyleNotes</span>
 				<span class="text-label-sm font-label truncate text-outline">Your private notebook</span>
 			</div>
+			<button
+				class="ml-auto flex size-7 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface lg:hidden"
+				aria-label="Close folders"
+				onclick={onclose}
+			>
+				<X size={16} />
+			</button>
 		</div>
 
 		<button
-			class="flex h-10 w-full items-center justify-between rounded-xl bg-primary-container px-3 text-on-primary-container transition-all hover:bg-primary-container/80 active:scale-[0.99]"
+			class="emphasis-container flex h-10 w-full items-center justify-between rounded-2xl px-3 text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
 			onclick={oncreate}
 		>
 			<span class="flex items-center gap-2">
@@ -183,7 +194,10 @@
 								? 'text-on-surface ring-1 ring-inset ring-primary/60'
 								: chipTone[i % chipTone.length]}"
 							aria-pressed={activeTag === tag}
-							onclick={() => onselecttag?.(activeTag === tag ? null : tag)}
+							onclick={() => {
+							onselecttag?.(activeTag === tag ? null : tag);
+							onclose?.();
+						}}
 						>
 							#{tag}
 						</button>

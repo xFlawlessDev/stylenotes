@@ -42,16 +42,20 @@ export async function openOverlay() {
   return focusOrCreate(OVERLAY_LABEL, {
     url: "/",
     title: "StyleNotes Dock",
-    width: 64,
-    height: 560,
-    minWidth: 64,
-    minHeight: 320,
+    width: 360,
+    height: 304,
+    minWidth: 28,
+    minHeight: 96,
+    maxWidth: 360,
+    maxHeight: 304,
     resizable: false,
     decorations: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     shadow: false,
+    focus: false,
+    focusable: false,
   });
 }
 

@@ -3,6 +3,7 @@ import type { Note } from '$lib/content/content';
 import type { CustomFolder } from '$lib/stores/notes';
 import type { AppNotification } from '$lib/stores/notifications';
 import type { Settings } from '$lib/stores/settings.svelte';
+import type { Task } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 
 export const DB_URL = 'sqlite:stylenotes.db';
@@ -267,6 +268,126 @@ export const metaRepo = {
 			 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 			[key, value]
 		);
+	},
+};
+
+type TaskRow = {
+	id: string;
+	title: string;
+	notes: string;
+	status: string;
+	priority: string;
+	folder: string;
+	note_id: string | null;
+	start_at: string | null;
+	due_at: string | null;
+	position: number;
+	completed: number;
+	overlay: number;
+};
+
+function toTask(row: TaskRow): Task {
+	return {
+		id: row.id,
+		title: row.title,
+		notes: row.notes,
+		status: row.status as Task['status'],
+		priority: row.priority as Task['priority'],
+		folder: row.folder,
+		noteId: row.note_id ?? null,
+		startAt: row.start_at ?? null,
+		dueAt: row.due_at ?? null,
+		position: Number(row.position) || 0,
+		completed: Boolean(row.completed),
+		overlay: Boolean(row.overlay),
+	};
+}
+
+export const tasksRepo = {
+	async list(): Promise<Task[]> {
+		const db = await getDb();
+		const rows = await db.select<TaskRow[]>(
+			'SELECT * FROM tasks ORDER BY position ASC, created_at ASC'
+		);
+		return rows.map(toTask);
+	},
+
+	async count(): Promise<number> {
+		const db = await getDb();
+		const rows = await db.select<{ total: number }[]>('SELECT COUNT(*) AS total FROM tasks');
+		return Number(rows[0]?.total ?? 0);
+	},
+
+	async upsert(task: Task): Promise<void> {
+		const db = await getDb();
+		await db.execute(
+			`INSERT INTO tasks
+				(id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'))
+			 ON CONFLICT(id) DO UPDATE SET
+				title = excluded.title,
+				notes = excluded.notes,
+				status = excluded.status,
+				priority = excluded.priority,
+				folder = excluded.folder,
+				note_id = excluded.note_id,
+				start_at = excluded.start_at,
+				due_at = excluded.due_at,
+				position = excluded.position,
+				completed = excluded.completed,
+				overlay = excluded.overlay,
+				updated_at = datetime('now')`,
+			[
+				task.id,
+				task.title,
+				task.notes,
+				task.status,
+				task.priority,
+				task.folder,
+				task.noteId,
+				task.startAt,
+				task.dueAt,
+				task.position,
+				task.completed ? 1 : 0,
+				task.overlay ? 1 : 0,
+			]
+		);
+	},
+
+	async remove(id: string): Promise<void> {
+		const db = await getDb();
+		await db.execute('DELETE FROM tasks WHERE id = $1', [id]);
+	},
+
+	async clear(): Promise<void> {
+		const db = await getDb();
+		await db.execute('DELETE FROM tasks');
+	},
+
+	async replaceAll(tasks: Task[]): Promise<void> {
+		const db = await getDb();
+		await db.execute('DELETE FROM tasks');
+		for (const task of tasks) {
+			await db.execute(
+				`INSERT INTO tasks
+					(id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+				[
+					task.id,
+					task.title,
+					task.notes,
+					task.status,
+					task.priority,
+					task.folder,
+					task.noteId,
+					task.startAt,
+					task.dueAt,
+					task.position,
+					task.completed ? 1 : 0,
+					task.overlay ? 1 : 0,
+				]
+			);
+		}
 	},
 };
 

@@ -17,6 +17,7 @@
 		Trash2,
 		HardDrive,
 		ShieldCheck,
+		PictureInPicture2,
 	} from '@lucide/svelte';
 	import {
 		settings,
@@ -26,6 +27,7 @@
 		type Density,
 		type EditorView,
 	} from '$lib/stores/settings.svelte';
+	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 
 	let {
 		open = false,
@@ -41,12 +43,13 @@
 		notecount: number;
 	} = $props();
 
-	type Section = 'appearance' | 'editor' | 'data' | 'about';
+	type Section = 'appearance' | 'editor' | 'dock' | 'data' | 'about';
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
 		{ id: 'appearance', label: 'Appearance', icon: Sun },
 		{ id: 'editor', label: 'Editor', icon: Type },
+		{ id: 'dock', label: 'Overlay', icon: PictureInPicture2 },
 		{ id: 'data', label: 'Data', icon: HardDrive },
 		{ id: 'about', label: 'About', icon: Sparkles },
 	];
@@ -80,7 +83,7 @@
 		></button>
 
 		<aside
-			class="glass-solid relative flex h-full w-full max-w-[520px] flex-col overflow-hidden rounded-l-2xl"
+			class="glass-solid relative flex h-full w-full max-w-[520px] flex-col overflow-hidden rounded-l-2xl max-sm:max-w-full max-sm:rounded-l-none"
 		>
 			<div class="flex items-center justify-between px-5 py-4">
 				<div class="flex flex-col">
@@ -99,23 +102,28 @@
 			<div class="glass-divider h-px"></div>
 
 			<div class="flex min-h-0 flex-1">
-				<nav class="flex w-40 shrink-0 flex-col gap-1 p-2.5">
+				<div class="flex min-h-0 flex-1 flex-col sm:flex-row">
+				<nav class="scrollbar-none flex w-full shrink-0 flex-row gap-1 overflow-x-auto p-2.5 sm:w-40 sm:flex-col sm:overflow-visible">
 					{#each nav as item (item.id)}
 						{@const Icon = item.icon}
 						<button
-							class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-body-md font-body transition-colors {section ===
+							class="flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-body-md font-body transition-all {section ===
 							item.id
-								? 'glass-chip text-on-surface'
+								? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 								: 'text-on-surface-variant hover:bg-surface-container/50'}"
 							onclick={() => (section = item.id)}
 						>
-							<Icon size={16} class={section === item.id ? 'text-primary' : 'text-outline'} />
+							<Icon
+								size={16}
+								class={section === item.id ? 'text-on-primary-container' : 'text-outline'}
+							/>
 							{item.label}
 						</button>
 					{/each}
 				</nav>
 
-				<div class="glass-divider w-px"></div>
+				<div class="glass-divider hidden w-px shrink-0 sm:block"></div>
+				<div class="glass-divider h-px w-full shrink-0 sm:hidden"></div>
 
 				<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
 					{#if section === 'appearance'}
@@ -292,6 +300,10 @@
 						</div>
 					{/if}
 
+					{#if section === 'dock'}
+						<DockSettings />
+					{/if}
+
 					{#if section === 'data'}
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
@@ -380,6 +392,7 @@
 					{/if}
 				</div>
 			</div>
+		</div>
 		</aside>
 	</div>
 {/if}

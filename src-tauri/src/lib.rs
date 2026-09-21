@@ -68,6 +68,37 @@ fn migrations() -> Vec<Migration> {
             sql: "ALTER TABLE folders ADD COLUMN position INTEGER;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "create_tasks",
+            sql: "
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL DEFAULT 'Untitled task',
+                    notes TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'todo',
+                    priority TEXT NOT NULL DEFAULT 'medium',
+                    folder TEXT NOT NULL DEFAULT 'personal',
+                    note_id TEXT,
+                    start_at TEXT,
+                    due_at TEXT,
+                    position INTEGER NOT NULL DEFAULT 0,
+                    completed INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
+                CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks (due_at);
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "add_task_overlay",
+            sql: "ALTER TABLE tasks ADD COLUMN overlay INTEGER NOT NULL DEFAULT 0;",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

@@ -13,6 +13,8 @@
 		resetToken = 0,
 		showFolder = false,
 		folderLabels = {},
+		open = false,
+		onclose,
 		onselect,
 		onpin,
 		onselecttag,
@@ -27,6 +29,8 @@
 		resetToken?: number;
 		showFolder?: boolean;
 		folderLabels?: Record<string, string>;
+		open?: boolean;
+		onclose?: () => void;
 		onselect: (id: string) => void;
 		onpin: (id: string) => void;
 		onselecttag?: (tag: string) => void;
@@ -53,8 +57,12 @@
 	);
 </script>
 
-<section class="glass-panel flex w-[300px] shrink-0 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
-	<div class="flex flex-col gap-2">
+<section
+	class="glass-panel flex w-[300px] shrink-0 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5 max-lg:w-[256px] max-md:fixed max-md:inset-y-2.5 max-md:left-2.5 max-md:z-40 max-md:max-h-[calc(100vh-1.25rem)] max-md:shadow-2xl max-md:transition-transform {open
+		? 'max-md:translate-x-0'
+		: 'max-md:-translate-x-[120%]'}"
+>
+	<div class="relative flex flex-col gap-2">
 		<Breadcrumb.Root class="px-1 pt-1">
 			<Breadcrumb.List class="text-label-sm font-label text-outline uppercase">
 				<Breadcrumb.Item>
@@ -77,6 +85,13 @@
 				{/if}
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
+		<button
+			class="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface md:hidden"
+			aria-label="Close notes list"
+			onclick={onclose}
+		>
+			<X size={15} />
+		</button>
 
 		<div class="relative w-full">
 			<Search size={16} class="pointer-events-none absolute top-2.5 left-3 text-outline" />

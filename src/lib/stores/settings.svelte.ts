@@ -1,5 +1,8 @@
 import { browser } from '$app/environment';
+import { emit } from '@tauri-apps/api/event';
 import { settingsRepo } from '$lib/db';
+import type { OverlaySort, TaskPriorityFilter, TaskStatus } from '$lib/stores/tasks';
+import { isTauri } from '$lib/windows';
 
 export type ThemeMode = 'dark' | 'light';
 export type Accent = 'steel' | 'sage' | 'sand' | 'rose';
@@ -16,6 +19,9 @@ export type Settings = {
 	spellcheck: boolean;
 	showWordCount: boolean;
 	confirmDelete: boolean;
+	overlayStatus: TaskStatus | 'all';
+	overlayPriority: TaskPriorityFilter;
+	overlaySort: OverlaySort;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -35,6 +41,9 @@ const defaults: Settings = {
 	spellcheck: true,
 	showWordCount: true,
 	confirmDelete: true,
+	overlayStatus: 'all',
+	overlayPriority: 'all',
+	overlaySort: 'smart',
 };
 
 export function defaultSettings(): Settings {
@@ -43,18 +52,46 @@ export function defaultSettings(): Settings {
 
 export const settings = $state<Settings>({ ...defaults });
 
+export const SETTINGS_CHANGED = 'settings:changed';
+
 let hydrated = false;
+
+// Bumped on every local or remote change so in-flight database reads cannot
+// overwrite newer state with a stale snapshot.
+let revision = 0;
+
+function notifySettingsChanged() {
+	if (!browser || !isTauri) return;
+	// Send the snapshot with the event: the database write is debounced, so
+	// listeners that re-read it would apply the previous state.
+	void emit(SETTINGS_CHANGED, { ...settings }).catch(() => undefined);
+}
+
+export function applySettingsSnapshot(snapshot: Partial<Settings> | null | undefined) {
+	if (!browser || !snapshot || typeof snapshot !== 'object') return;
+	revision++;
+	Object.assign(settings, defaults, snapshot);
+	applySettings();
+}
 
 export async function hydrateSettings() {
 	if (hydrated || !browser) return;
 	hydrated = true;
+	await refreshSettings();
+}
+
+export async function refreshSettings(): Promise<Settings> {
+	if (!browser) return settings;
+	const startedAt = revision;
 	try {
 		const stored = await settingsRepo.load();
-		if (stored) Object.assign(settings, defaults, stored);
+		if (stored && startedAt === revision) Object.assign(settings, defaults, stored);
 	} catch {
-		/* keep defaults when the database is unavailable */
+		/* keep the current settings when the database is unavailable */
 	}
-	applySettings();
+	hydrated = true;
+	if (startedAt === revision) applySettings();
+	return settings;
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -95,9 +132,11 @@ export function applySettings() {
 }
 
 export function updateSettings(patch: Partial<Settings>) {
+	revision++;
 	Object.assign(settings, patch);
 	persistSettings();
 	applySettings();
+	notifySettingsChanged();
 }
 
 export function toggleMode() {
@@ -105,9 +144,11 @@ export function toggleMode() {
 }
 
 export function resetSettings() {
+	revision++;
 	Object.assign(settings, defaults);
 	persistSettings();
 	applySettings();
+	notifySettingsChanged();
 }
 
 export async function resetStoredSettings() {

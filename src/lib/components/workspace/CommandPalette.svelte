@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Search, FileText, Folder, CornerDownLeft, ArrowUp, ArrowDown } from '@lucide/svelte';
+	import {
+		Search,
+		FileText,
+		Folder,
+		CornerDownLeft,
+		ArrowUp,
+		ArrowDown,
+		ListTodo,
+	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder as FolderType } from '$lib/stores/notes';
+	import { statusMeta, taskStatus, matchesTaskQuery, type Task } from '$lib/stores/tasks';
 
 	type Action = {
 		id: string;
@@ -15,24 +24,28 @@
 	let {
 		open = false,
 		notes,
+		tasks,
 		folders,
 		actions,
 		onselectnote,
+		onselecttask,
 		onselectfolder,
 		onclose,
 	}: {
 		open?: boolean;
 		notes: Note[];
+		tasks: Task[];
 		folders: FolderType[];
 		actions: Action[];
 		onselectnote: (id: string) => void;
+		onselecttask: (id: string) => void;
 		onselectfolder: (id: string) => void;
 		onclose: () => void;
 	} = $props();
 
 	type Item = {
 		id: string;
-		group: 'Notes' | 'Folders' | 'Actions';
+		group: 'Notes' | 'Tasks' | 'Folders' | 'Actions';
 		label: string;
 		hint?: string;
 		icon: typeof Search;
@@ -61,6 +74,21 @@
 				icon: FileText,
 				run: () => {
 					onselectnote(note.id);
+					onclose();
+				},
+			}));
+
+		const taskItems: Item[] = tasks
+			.filter((task) => matchesTaskQuery(task, q))
+			.slice(0, 5)
+			.map((task) => ({
+				id: `task:${task.id}`,
+				group: 'Tasks' as const,
+				label: task.title || 'Untitled task',
+				hint: statusMeta[taskStatus(task)].label,
+				icon: ListTodo,
+				run: () => {
+					onselecttask(task.id);
 					onclose();
 				},
 			}));
@@ -94,11 +122,11 @@
 				},
 			}));
 
-		return [...noteItems, ...folderItems, ...actionItems];
+		return [...noteItems, ...taskItems, ...folderItems, ...actionItems];
 	});
 
 	const grouped = $derived.by(() => {
-		const order: Item['group'][] = ['Notes', 'Folders', 'Actions'];
+		const order: Item['group'][] = ['Notes', 'Tasks', 'Folders', 'Actions'];
 		return order
 			.map((group) => ({ group, items: items.filter((item) => item.group === group) }))
 			.filter((section) => section.items.length > 0);
@@ -164,7 +192,7 @@
 		></button>
 
 		<div
-			class="glass-solid relative flex max-h-[62vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl"
+			class="glass-solid relative flex max-h-[62vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl max-sm:max-h-[80vh]"
 			role="dialog"
 			aria-modal="true"
 		>
@@ -175,7 +203,7 @@
 					bind:value={query}
 					onkeydown={onkeydown}
 					class="h-6 w-full bg-transparent text-body-lg font-body text-on-surface placeholder:text-outline focus:outline-none"
-					placeholder="Search notes, folders, and actions"
+					placeholder="Search notes, tasks, folders, and actions"
 					type="text"
 					spellcheck="false"
 				/>

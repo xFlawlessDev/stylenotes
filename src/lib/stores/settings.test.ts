@@ -17,6 +17,7 @@ import {
 	toggleMode,
 	resetSettings,
 	applySettings,
+	applySettingsSnapshot,
 	persistSettings,
 	resetStoredSettings,
 	accents,
@@ -41,6 +42,9 @@ describe('defaults', () => {
 			mode: 'dark',
 			accent: 'steel',
 			editorView: 'preview',
+			overlayStatus: 'all',
+			overlayPriority: 'all',
+			overlaySort: 'smart',
 		});
 		expect(accents.map((a) => a.id)).toContain('sage');
 	});
@@ -91,6 +95,38 @@ describe('updateSettings / toggleMode', () => {
 	});
 });
 
+describe('applySettingsSnapshot', () => {
+	it('applies an incoming snapshot without persisting it', () => {
+		applySettingsSnapshot({ mode: 'light', accent: 'rose' });
+		expect(settings.mode).toBe('light');
+		expect(settings.accent).toBe('rose');
+		expect(settings.overlayStatus).toBe('all');
+		expect(document.documentElement.classList.contains('light')).toBe(true);
+		expect(settingsRepo.save).not.toHaveBeenCalled();
+	});
+
+	it('ignores invalid payloads', () => {
+		applySettingsSnapshot(null);
+		applySettingsSnapshot(undefined);
+		expect(settings).toEqual(defaultSettings());
+	});
+
+	it('discards an in-flight database read that started before it', async () => {
+		vi.resetModules();
+		let resolveLoad!: (value: unknown) => void;
+		const pending = new Promise<unknown>((resolve) => (resolveLoad = resolve));
+		vi.mocked(settingsRepo.load).mockReturnValue(pending as never);
+		const mod = await import('$lib/stores/settings.svelte');
+
+		const read = mod.refreshSettings();
+		mod.applySettingsSnapshot({ mode: 'light' });
+		resolveLoad({ mode: 'dark' });
+		await read;
+
+		expect(mod.settings.mode).toBe('light');
+	});
+});
+
 describe('hydrateSettings', () => {
 	it('merges stored values over defaults', async () => {
 		vi.resetModules();
@@ -108,6 +144,16 @@ describe('hydrateSettings', () => {
 		const mod = await import('$lib/stores/settings.svelte');
 		await expect(mod.hydrateSettings()).resolves.toBeUndefined();
 		expect(mod.settings).toEqual(mod.defaultSettings());
+	});
+
+	it('re-reads stored settings on demand', async () => {
+		vi.resetModules();
+		vi.mocked(settingsRepo.load).mockResolvedValue({ overlayStatus: 'doing', overlayPriority: 'high' });
+		const mod = await import('$lib/stores/settings.svelte');
+		await mod.refreshSettings();
+		expect(mod.settings.overlayStatus).toBe('doing');
+		expect(mod.settings.overlayPriority).toBe('high');
+		expect(mod.settings.mode).toBe('dark');
 	});
 });
 

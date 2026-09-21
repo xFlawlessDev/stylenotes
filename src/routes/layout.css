@@ -403,8 +403,10 @@ html[data-motion='reduced'] *::after {
 
 	/* Material Design 3 semantic color utilities */
 	--color-primary-container: var(--color-primary-container);
+	--color-on-primary: var(--color-on-primary);
 	--color-on-primary-container: var(--color-on-primary-container);
 	--color-secondary-container: var(--color-secondary-container);
+	--color-on-secondary: var(--color-on-secondary);
 	--color-on-secondary-container: var(--color-on-secondary-container);
 	--color-tertiary: var(--color-tertiary);
 	--color-on-tertiary: var(--color-on-tertiary);
