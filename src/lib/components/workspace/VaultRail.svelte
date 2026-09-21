@@ -8,7 +8,6 @@
 		Code2,
 		User,
 		Archive,
-		Settings,
 	} from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -58,7 +57,7 @@
 	const chipTone = ['text-primary', 'text-secondary', 'text-tertiary'];
 </script>
 
-<aside class="glass-panel flex w-[248px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl p-2.5">
+<aside class="glass-panel flex w-[248px] shrink-0 flex-col overflow-hidden rounded-2xl p-2.5">
 	<div class="flex min-h-0 flex-col gap-3">
 		<div class="flex items-center gap-2.5 px-1 py-1">
 			<div
@@ -164,33 +163,5 @@
 				</div>
 			</div>
 		{/if}
-	</div>
-
-	<div class="flex items-center justify-between gap-2 border-t border-white/5 px-1 pt-3">
-		<div class="flex min-w-0 items-center gap-2.5">
-			<div
-				class="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-white/5"
-			>
-				AR
-			</div>
-			<div class="flex min-w-0 flex-col">
-				<span class="text-label-md font-label truncate text-on-surface">Alex Rivera</span>
-				<span class="text-label-sm font-label truncate text-outline">Personal vault</span>
-			</div>
-		</div>
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#snippet child({ props })}
-					<button
-						{...props}
-						class="flex size-7 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
-						aria-label="Settings"
-					>
-						<Settings size={16} />
-					</button>
-				{/snippet}
-			</Tooltip.Trigger>
-			<Tooltip.Content>Settings</Tooltip.Content>
-		</Tooltip.Root>
 	</div>
 </aside>
