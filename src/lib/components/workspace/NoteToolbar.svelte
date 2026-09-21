@@ -8,6 +8,7 @@
 		Eye,
 		Archive,
 		ArchiveRestore,
+		Maximize2,
 	} from '@lucide/svelte';
 	import type { EditorView } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -21,6 +22,7 @@
 		ontogglearchive,
 		onshare,
 		ondelete,
+		onfullpreview,
 	}: {
 		view: EditorView;
 		pinned: boolean;
@@ -30,6 +32,7 @@
 		ontogglearchive: () => void;
 		onshare: () => void;
 		ondelete: () => void;
+		onfullpreview: () => void;
 	} = $props();
 
 	const views: { id: EditorView; icon: typeof Eye; title: string }[] = [
@@ -63,6 +66,21 @@
 			</Tooltip.Root>
 		{/each}
 	</div>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				<button
+					{...props}
+					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+					aria-label="Full preview"
+					onclick={onfullpreview}
+				>
+					<Maximize2 size={16} />
+				</button>
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content>Full preview</Tooltip.Content>
+	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}

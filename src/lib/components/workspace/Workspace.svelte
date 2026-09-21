@@ -75,6 +75,11 @@
 	let notifications = $state<AppNotification[]>([]);
 	let toast = $state('');
 	let newNoteToken = $state(0);
+	let fullPreview = $state(false);
+
+	function toggleFullPreview() {
+		fullPreview = !fullPreview;
+	}
 
 	const folders = $derived(foldersFor(items, customFolders));
 	const folderLabelMap = $derived(
@@ -341,6 +346,11 @@
 	];
 
 	function onGlobalKeydown(event: KeyboardEvent) {
+		if (event.defaultPrevented) return;
+		if (event.key === 'Escape' && fullPreview) {
+			fullPreview = false;
+			return;
+		}
 		const mod = event.ctrlKey || event.metaKey;
 		if (!mod) return;
 		const key = event.key.toLowerCase();
@@ -403,41 +413,45 @@
 	/>
 
 	<div class="ws-grid relative flex min-h-0 flex-1">
-		<VaultRail
-			{folders}
-			{tags}
-			active={activeFolder}
-			{activeTag}
-			onselect={selectFolder}
-			oncreate={createNote}
-			onaddfolder={openAddFolder}
-			onrenamefolder={renameFolder}
-			onfoldericon={setFolderIcon}
-			ondeletedfolder={deleteFolder}
-			onreorder={reorderFolder}
-			onselecttag={selectTag}
-		/>
+		{#if !fullPreview}
+			<VaultRail
+				{folders}
+				{tags}
+				active={activeFolder}
+				{activeTag}
+				onselect={selectFolder}
+				oncreate={createNote}
+				onaddfolder={openAddFolder}
+				onrenamefolder={renameFolder}
+				onfoldericon={setFolderIcon}
+				ondeletedfolder={deleteFolder}
+				onreorder={reorderFolder}
+				onselecttag={selectTag}
+			/>
 
-		<NotesFeed
-			notes={visible}
-			{selectedId}
-			total={items.length}
-			folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
-			resetToken={newNoteToken}
-			showFolder={activeFolder === 'all'}
-			folderLabels={folderLabelMap}
-			{activeTag}
-			onselect={(id) => (selectedId = id)}
-			onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
-			onselecttag={selectTag}
-			oncleartag={() => selectTag(null)}
-			onselectfolder={selectFolder}
-		/>
+			<NotesFeed
+				notes={visible}
+				{selectedId}
+				total={items.length}
+				folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
+				resetToken={newNoteToken}
+				showFolder={activeFolder === 'all'}
+				folderLabels={folderLabelMap}
+				{activeTag}
+				onselect={(id) => (selectedId = id)}
+				onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
+				onselecttag={selectTag}
+				oncleartag={() => selectTag(null)}
+				onselectfolder={selectFolder}
+			/>
+		{/if}
 
 		<NoteEditor
 			note={selected}
 			{folders}
 			focusToken={newNoteToken}
+			{fullPreview}
+			ontogglefullpreview={toggleFullPreview}
 			onupdate={updateNote}
 			ondelete={deleteNote}
 			onshare={shareNote}

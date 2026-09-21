@@ -158,7 +158,7 @@
 {#if open}
 	<div class="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh]">
 		<button
-			class="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm"
+			class="absolute inset-0 cursor-default bg-scrim backdrop-blur-sm"
 			aria-label="Close command palette"
 			onclick={onclose}
 		></button>

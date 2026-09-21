@@ -18,11 +18,11 @@ export type Settings = {
 	confirmDelete: boolean;
 };
 
-export const accents: { id: Accent; label: string; swatch: string }[] = [
-	{ id: 'steel', label: 'Steel', swatch: '#a8c7e8' },
-	{ id: 'sage', label: 'Sage', swatch: '#a9cbb1' },
-	{ id: 'sand', label: 'Sand', swatch: '#ddc39a' },
-	{ id: 'rose', label: 'Rose', swatch: '#e3b6bd' },
+export const accents: { id: Accent; label: string; swatchClass: string }[] = [
+	{ id: 'steel', label: 'Steel', swatchClass: 'bg-accent-steel' },
+	{ id: 'sage', label: 'Sage', swatchClass: 'bg-accent-sage' },
+	{ id: 'sand', label: 'Sand', swatchClass: 'bg-accent-sand' },
+	{ id: 'rose', label: 'Rose', swatchClass: 'bg-accent-rose' },
 ];
 
 const defaults: Settings = {

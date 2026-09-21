@@ -74,7 +74,7 @@
 {#if open}
 	<div class="fixed inset-0 z-50 flex items-stretch justify-end">
 		<button
-			class="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm"
+			class="absolute inset-0 cursor-default bg-scrim backdrop-blur-sm"
 			aria-label="Close settings"
 			onclick={onclose}
 		></button>
@@ -159,11 +159,10 @@
 										onclick={() => updateSettings({ accent: accent.id })}
 									>
 										<span
-											class="flex size-6 items-center justify-center rounded-full ring-1 ring-inset ring-white/20"
-											style="background-color: {accent.swatch};"
+											class="{accent.swatchClass} flex size-6 items-center justify-center rounded-full ring-1 ring-inset ring-outline-variant"
 										>
 											{#if settings.accent === accent.id}
-												<Check size={13} class="text-black/70" />
+												<Check size={13} class="text-on-swatch" />
 											{/if}
 										</span>
 										<span class="text-label-sm font-label text-on-surface-variant">{accent.label}</span>
@@ -359,7 +358,7 @@
 					{#if section === 'about'}
 						<div class="flex flex-col items-center gap-3 py-6 text-center">
 							<div
-								class="flex size-14 items-center justify-center rounded-2xl bg-surface-container-high text-primary ring-1 ring-inset ring-white/5"
+								class="flex size-14 items-center justify-center rounded-2xl bg-surface-container-high text-primary ring-1 ring-inset ring-hairline"
 							>
 								<Sparkles size={24} />
 							</div>

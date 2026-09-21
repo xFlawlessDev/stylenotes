@@ -37,25 +37,25 @@
 	<div class="flex items-center gap-3">
 		<div class="flex items-center gap-2 pr-1">
 			<button
-				class="group flex size-3 items-center justify-center rounded-full bg-[#ff5f57] transition-transform hover:scale-110"
+				class="group flex size-3 items-center justify-center rounded-full bg-window-close transition-transform hover:scale-110"
 				aria-label="Close"
 				onclick={() => isTauri && win().close()}
 			>
-				<span class="size-1.5 rounded-full bg-black/50 opacity-0 group-hover:opacity-100"></span>
+				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>
 			<button
-				class="group flex size-3 items-center justify-center rounded-full bg-[#febc2e] transition-transform hover:scale-110"
+				class="group flex size-3 items-center justify-center rounded-full bg-window-minimize transition-transform hover:scale-110"
 				aria-label="Minimize"
 				onclick={() => isTauri && win().minimize()}
 			>
-				<span class="size-1.5 rounded-full bg-black/50 opacity-0 group-hover:opacity-100"></span>
+				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>
 			<button
-				class="group flex size-3 items-center justify-center rounded-full bg-[#28c840] transition-transform hover:scale-110"
+				class="group flex size-3 items-center justify-center rounded-full bg-window-maximize transition-transform hover:scale-110"
 				aria-label="Maximize"
 				onclick={() => isTauri && win().toggleMaximize()}
 			>
-				<span class="size-1.5 rounded-full bg-black/50 opacity-0 group-hover:opacity-100"></span>
+				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>
 		</div>
 
@@ -133,7 +133,7 @@
 				{#snippet child({ props })}
 					<button
 						{...props}
-						class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-white/5 transition-transform hover:scale-105"
+						class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-hairline transition-transform hover:scale-105"
 						aria-label="Open settings"
 						onclick={onsettings}
 					>

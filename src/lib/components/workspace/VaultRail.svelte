@@ -57,7 +57,7 @@
 	<div class="flex min-h-0 flex-col gap-3">
 		<div class="flex items-center gap-2.5 px-1 py-1">
 			<div
-				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-white/5"
+				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-hairline"
 			>
 				<img
 				src="/icon-128.png"
@@ -140,7 +140,7 @@
 		</div>
 
 		{#if tags.length}
-			<div class="flex flex-col gap-2 border-t border-white/5 px-1 pt-3">
+			<div class="flex flex-col gap-2 border-t border-hairline px-1 pt-3">
 				<div class="flex items-center justify-between">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase">Tags</span>
 					{#if activeTag}
