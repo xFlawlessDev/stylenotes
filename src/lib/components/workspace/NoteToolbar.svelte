@@ -9,9 +9,13 @@
 		Archive,
 		ArchiveRestore,
 		Maximize2,
+		Printer,
+		FileDown,
+		Copy,
 	} from '@lucide/svelte';
 	import type { EditorView } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 
 	let {
 		view,
@@ -20,7 +24,9 @@
 		onview,
 		ontogglepin,
 		ontogglearchive,
-		onshare,
+		onprint,
+		onexport,
+		oncopy,
 		ondelete,
 		onfullpreview,
 	}: {
@@ -30,7 +36,9 @@
 		onview: (view: EditorView) => void;
 		ontogglepin: () => void;
 		ontogglearchive: () => void;
-		onshare: () => void;
+		onprint: () => void;
+		onexport: () => void;
+		oncopy: () => void;
 		ondelete: () => void;
 		onfullpreview: () => void;
 	} = $props();
@@ -119,21 +127,33 @@
 		</Tooltip.Trigger>
 		<Tooltip.Content>{archived ? 'Unarchive note' : 'Archive note'}</Tooltip.Content>
 	</Tooltip.Root>
-	<Tooltip.Root>
-		<Tooltip.Trigger>
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
 				<button
 					{...props}
 					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
 					aria-label="Share note"
-					onclick={onshare}
 				>
 					<Share2 size={16} />
 				</button>
 			{/snippet}
-		</Tooltip.Trigger>
-		<Tooltip.Content>Share note</Tooltip.Content>
-	</Tooltip.Root>
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="end" class="min-w-40">
+			<DropdownMenu.Item onSelect={onprint}>
+				<Printer />
+				Print
+			</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={onexport}>
+				<FileDown />
+				Export .md
+			</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={oncopy}>
+				<Copy />
+				Copy all
+			</DropdownMenu.Item>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}

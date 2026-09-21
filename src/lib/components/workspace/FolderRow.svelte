@@ -12,14 +12,13 @@
 		toneClass,
 		draggable = false,
 		deletable = false,
+		dragging = false,
+		dropping = false,
 		onselect,
 		onedit,
 		onrename,
 		onicon,
 		ondelete,
-		ondragstart,
-		ondrop,
-		ondragend,
 	}: {
 		folder: Folder;
 		active: boolean;
@@ -28,19 +27,17 @@
 		toneClass?: string;
 		draggable?: boolean;
 		deletable?: boolean;
+		dragging?: boolean;
+		dropping?: boolean;
 		onselect: () => void;
 		onedit?: () => void;
 		onrename: (label: string) => void;
 		onicon: (icon: string) => void;
 		ondelete: () => void;
-		ondragstart?: (id: string) => void;
-		ondrop?: (id: string) => void;
-		ondragend?: () => void;
 	} = $props();
 
 	let editLabel = $state('');
 	let iconOpen = $state(false);
-	let over = $state(false);
 	let inputEl = $state<HTMLInputElement>();
 
 	$effect(() => {
@@ -57,41 +54,14 @@
 		if (label && label !== folder.label) onrename(label);
 		else onedit?.();
 	}
-
-	function handleDragStart(event: DragEvent) {
-		event.dataTransfer?.setData('text/plain', folder.id);
-		if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-		ondragstart?.(folder.id);
-	}
-
-	function handleDragOver(event: DragEvent) {
-		if (!draggable) return;
-		event.preventDefault();
-		if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-		over = true;
-	}
-
-	function handleDrop(event: DragEvent) {
-		event.preventDefault();
-		over = false;
-		ondrop?.(folder.id);
-	}
 </script>
 
 <div
-	class="group relative rounded-xl transition-all {over
+	class="group relative rounded-xl transition-all {dropping
 		? 'ring-1 ring-inset ring-primary/60'
-		: ''} {draggable ? 'cursor-grab active:cursor-grabbing' : ''}"
+		: ''} {dragging ? 'opacity-50' : ''}"
 	role="listitem"
-	draggable={draggable}
-	ondragstart={handleDragStart}
-	ondragover={handleDragOver}
-	ondragleave={() => (over = false)}
-	ondrop={handleDrop}
-	ondragend={() => {
-		over = false;
-		ondragend?.();
-	}}
+	data-folder-id={folder.id}
 >
 	{#if editing}
 		<div class="glass-chip flex flex-col gap-2 rounded-xl px-2 py-2">
@@ -233,7 +203,10 @@ class="flex size-7 items-center justify-center rounded-lg transition-colors {fol
 					</span>
 				{/if}
 				{#if draggable}
-					<span class="flex size-5 items-center justify-center text-outline/70">
+					<span
+						data-folder-handle
+						class="flex size-5 cursor-grab items-center justify-center text-outline/70 active:cursor-grabbing"
+					>
 						<GripVertical size={14} />
 					</span>
 				{/if}

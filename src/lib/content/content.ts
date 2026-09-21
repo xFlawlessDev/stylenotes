@@ -93,6 +93,20 @@ export function plainText(body: string): string {
   return stripMarkdown(body);
 }
 
+export function noteMarkdown(note: Note): string {
+  const meta = [
+    '---',
+    `title: ${note.title}`,
+    `folder: ${note.folder}`,
+    `tags: [${note.tags.join(', ')}]`,
+    `updated: ${note.updated}`,
+    `pinned: ${note.pinned}`,
+    '---',
+    '',
+  ].join('\n');
+  return `${meta}${note.body}\n`;
+}
+
 function buildNote(path: string, raw: string): Note {
   const { data, body } = parseFrontmatter(raw);
   const fileName = path.split('/').pop() ?? path;

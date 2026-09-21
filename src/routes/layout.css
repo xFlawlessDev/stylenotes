@@ -649,6 +649,8 @@ html[data-motion='reduced'] *::after {
 	color: var(--color-on-surface-variant);
 	font-size: 15px;
 	line-height: 1.75;
+	-webkit-user-select: text;
+	user-select: text;
 }
 
 .markdown-body > :first-child {
@@ -696,6 +698,16 @@ html[data-motion='reduced'] *::after {
 	text-decoration: underline;
 	text-decoration-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
 	text-underline-offset: 3px;
+}
+
+.markdown-body img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: 1rem 0;
+	border-radius: 0.75rem;
+	border: 1px solid var(--glass-stroke);
+	background-color: color-mix(in oklab, var(--color-surface-container) 40%, transparent);
 }
 
 .markdown-body ul,

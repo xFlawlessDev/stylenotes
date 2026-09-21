@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { PencilLine, FolderPlus, Boxes } from '@lucide/svelte';
+	import { PencilLine, FolderPlus, Boxes, X } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { defaultFolderIcons, resolveFolderIcon } from '$lib/content/folder-icons';
 	import { isCustomFolder } from '$lib/stores/notes';
+	import { pointerReorder } from '$lib/content/pointer-reorder';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import FolderRow from '$lib/components/workspace/FolderRow.svelte';
 
@@ -11,6 +12,8 @@
 		tags,
 		active,
 		activeTag,
+		open = false,
+		onclose,
 		onselect,
 		oncreate,
 		onaddfolder,
@@ -24,6 +27,8 @@
 		tags: string[];
 		active: string;
 		activeTag?: string | null;
+		open?: boolean;
+		onclose?: () => void;
 		onselect: (id: string) => void;
 		oncreate: () => void;
 		onaddfolder?: () => void;
@@ -36,6 +41,28 @@
 
 	let editingId = $state<string | null>(null);
 	let draggingId = $state<string | null>(null);
+	let overId = $state<string | null>(null);
+
+	function select(id: string) {
+		onselect(id);
+		onclose?.();
+	}
+
+	const reorder = (node: HTMLElement) =>
+		pointerReorder(node, {
+			handleSelector: '[data-folder-handle]',
+			idAttribute: 'data-folder-id',
+			onStart: (id) => {
+				if (id === 'all' || !onreorder) return;
+				draggingId = id;
+			},
+			onMove: (id) => (overId = id),
+			onEnd: () => {
+				if (draggingId && overId && draggingId !== overId) onreorder?.(draggingId, overId);
+				draggingId = null;
+				overId = null;
+			},
+		});
 
 	const tone: Record<string, string> = {
 		primary: 'text-primary',
@@ -105,7 +132,7 @@
 					</Tooltip.Root>
 				</div>
 			</div>
-			<nav class="flex flex-col gap-0.5" aria-label="Folders">
+			<nav class="flex flex-col gap-0.5" aria-label="Folders" use:reorder>
 				{#each folders as folder (folder.id)}
 					<FolderRow
 						{folder}
@@ -115,7 +142,9 @@
 						toneClass={tone[folder.tone]}
 						draggable={folder.id !== 'all' && !!onreorder}
 						deletable={isCustomFolder(folder.id)}
-						onselect={() => onselect(folder.id)}
+						dragging={draggingId === folder.id}
+						dropping={overId === folder.id}
+						onselect={() => select(folder.id)}
 						onedit={folder.id === 'all' ? undefined : () => {
 							editingId = editingId === folder.id ? null : folder.id;
 						}}
@@ -128,12 +157,6 @@
 							ondeletedfolder?.(folder.id);
 							editingId = null;
 						}}
-						ondragstart={(id) => (draggingId = id)}
-						ondrop={(id) => {
-							if (draggingId && draggingId !== id) onreorder?.(draggingId, id);
-							draggingId = null;
-						}}
-						ondragend={() => (draggingId = null)}
 					/>
 				{/each}
 			</nav>

@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { notes as seedNotes } from '$lib/content/content';
+import { noteMarkdown, notes as seedNotes } from '$lib/content/content';
 import type { Note } from '$lib/content/content';
 import { foldersRepo, metaRepo, notesRepo } from '$lib/db';
 
@@ -243,19 +243,5 @@ export function uniqueFolderId(label: string, existing: string[]): string {
 }
 
 export function exportNotes(notes: Note[]): string {
-	return notes
-		.map((note) => {
-			const meta = [
-				'---',
-				`title: ${note.title}`,
-				`folder: ${note.folder}`,
-				`tags: [${note.tags.join(', ')}]`,
-				`updated: ${note.updated}`,
-				`pinned: ${note.pinned}`,
-				'---',
-				'',
-			].join('\n');
-			return `${meta}${note.body}\n`;
-		})
-		.join('\n');
+	return notes.map((note) => noteMarkdown(note)).join('\n');
 }

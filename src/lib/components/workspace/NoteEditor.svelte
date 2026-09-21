@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { marked } from 'marked';
 	import { Check, Minimize2, PenLine, Tag, X } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { type EditState, type EditorCommand } from '$lib/content/markdown-editor';
@@ -10,15 +9,17 @@
 	import {
 		clickedCheckboxIndex,
 		enableTaskCheckboxes,
-		preserveBlankLines,
 	} from '$lib/content/markdown-preview';
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { toggleChecklistItem } from '$lib/stores/notes';
+	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
+	import { renderNoteHtml } from '$lib/content/note-actions';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
+	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>;
@@ -33,7 +34,9 @@
 		fullPreview = false,
 		onupdate,
 		ondelete,
-		onshare,
+		onprint,
+		onexport,
+		oncopy,
 		onselectfolder,
 		ontogglefullpreview,
 	}: {
@@ -43,7 +46,9 @@
 		fullPreview?: boolean;
 		onupdate: (id: string, patch: Patch) => void;
 		ondelete: (id: string) => void;
-		onshare?: (note: Note) => void;
+		onprint?: (note: Note) => void;
+		onexport?: (note: Note) => void;
+		oncopy?: (note: Note) => void;
 		onselectfolder?: (id: string) => void;
 		ontogglefullpreview?: () => void;
 	} = $props();
@@ -92,33 +97,17 @@
 
 	$effect(() => {
 		const source = note?.body ?? '';
-		let cancelled = false;
 
 		if (!source) {
 			html = '';
 			return;
 		}
 
-		const render = async () => {
-			try {
-				const rendered = await marked.parse(preserveBlankLines(source), { breaks: true });
-				let clean = rendered;
-				try {
-					const { default: DOMPurify } = await import('dompurify');
-					clean = DOMPurify.sanitize(rendered);
-				} catch {
-					clean = rendered;
-				}
-				if (!cancelled) html = enableTaskCheckboxes(clean);
-			} catch {
-				if (!cancelled) html = '';
-			}
-		};
-		void render();
-
-		return () => {
-			cancelled = true;
-		};
+		try {
+			html = enableTaskCheckboxes(renderNoteHtml(source));
+		} catch {
+			html = '';
+		}
 	});
 
 	function commitBody(value: string) {
@@ -213,11 +202,40 @@
 		event.preventDefault();
 		commitBody(toggleChecklistItem(draft, index));
 	}
+
+	function attachFiles(paths: string[]) {
+		if (!note || !paths.length) return;
+		const markdown = joinAttachmentMarkdown(paths);
+		const editing = view === 'write' || view === 'split';
+		const current =
+			editing && textareaEl
+				? { value: draft, start: textareaEl.selectionStart, end: textareaEl.selectionEnd }
+				: { value: draft, start: draft.length, end: draft.length };
+		const next = insertAttachment(current.value, current.start, current.end, markdown);
+		commitBody(next.value);
+		void tick().then(() => {
+			textareaEl?.focus();
+			textareaEl?.setSelectionRange(next.start, next.end);
+		});
+	}
 </script>
 
 <main class="glass-panel relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl">
-	<div class="relative z-10 flex min-h-0 flex-1 flex-col">
-		{#if note}
+	<FileDropZone class="relative z-10 flex min-h-0 flex-1 flex-col" onfiles={attachFiles}>
+		{#snippet children(droppable)}
+			{#if droppable && note}
+				<div
+					class="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-surface-container/40 backdrop-blur-[2px]"
+				>
+					<div
+						class="glass-solid rounded-full px-4 py-2 text-label-md font-label text-on-surface"
+					>
+						Drop files to attach
+					</div>
+				</div>
+			{/if}
+			<div class="relative flex min-h-0 flex-1 flex-col">
+				{#if note}
 			{#if fullPreview}
 				<div class="flex h-11 shrink-0 items-center justify-between px-4">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
@@ -273,7 +291,9 @@
 						onview={changeView}
 						ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
 						ontogglearchive={toggleArchive}
-						onshare={() => onshare?.(note)}
+						onprint={() => onprint?.(note)}
+						onexport={() => onexport?.(note)}
+						oncopy={() => oncopy?.(note)}
 						ondelete={() => ondelete(note.id)}
 						onfullpreview={() => ontogglefullpreview?.()}
 					/>
@@ -407,7 +427,9 @@
 				</div>
 			</div>
 		{/if}
-	</div>
+			</div>
+		{/snippet}
+	</FileDropZone>
 
 	<AddTagDialog bind:open={tagDialogOpen} existing={note?.tags ?? []} onsubmit={commitTag} />
 	<MarkdownGuideDialog bind:open={guideOpen} />
