@@ -65,7 +65,7 @@
 			<img
 				src="/icon-128.png"
 				alt="StyleNotes"
-				class="size-6 rounded-lg object-cover ring-1 ring-inset ring-white/5"
+				class="size-6 object-cover"
 			/>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
 		</div>

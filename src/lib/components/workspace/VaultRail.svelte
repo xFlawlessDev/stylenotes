@@ -59,7 +59,11 @@
 			<div
 				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-white/5"
 			>
-				<PencilLine size={18} />
+				<img
+				src="/icon-128.png"
+				alt="StyleNotes"
+				class="size-6 object-cover"
+				/>
 			</div>
 			<div class="flex min-w-0 flex-col">
 				<span class="text-headline-sm font-headline leading-tight text-on-surface">StyleNotes</span>
