@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "stylenotes",
+  "productName": "StyleNotes",
   "version": "0.1.0",
   "identifier": "com.arifpebryan.stylenotes",
   "build": {
@@ -12,9 +12,34 @@
   "app": {
     "windows": [
       {
-        "title": "stylenotes",
-        "width": 800,
-        "height": 600
+        "label": "workspace",
+        "title": "StyleNotes",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 600,
+        "decorations": false,
+        "resizable": true,
+        "center": true
+      },
+      {
+        "label": "overlay",
+        "title": "StyleNotes Dock",
+        "width": 360,
+        "height": 304,
+        "minWidth": 360,
+        "minHeight": 304,
+        "maxWidth": 360,
+        "maxHeight": 304,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false,
+        "focusable": false,
+        "visible": true
       }
     ],
     "security": {

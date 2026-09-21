@@ -8,6 +8,18 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                use tauri::Manager;
+                use tauri_plugin_positioner::{Position, WindowExt};
+                app.handle().plugin(tauri_plugin_positioner::init())?;
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let _ = overlay.as_ref().window().move_window(Position::TopRight);
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

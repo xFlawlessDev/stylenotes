@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "shadcn-svelte": {
+      "source": "vercel-labs/json-render",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn-svelte/SKILL.md",
+      "computedHash": "fcb9b65f29baf8a2e03960d37bceff6a71203aeb962105cf6f78c697c71efc3c"
+    },
+    "svelte": {
+      "source": "vercel-labs/json-render",
+      "sourceType": "github",
+      "skillPath": "skills/svelte/SKILL.md",
+      "computedHash": "425580721ac99b6388c04dbf00fdc2da7735dffe87a43d99acf9faa5b345edc5"
+    },
+    "tauri-v2": {
+      "source": "nodnarbnitram/claude-code-extensions",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/tauri-v2/SKILL.md",
+      "computedHash": "377c61c46cf48c35b942042bc8abb9a039049a47f37d7f12b4f491d012777490"
+    }
+  }
+}

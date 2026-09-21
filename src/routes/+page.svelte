@@ -1,31 +1,21 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import * as Card from "$lib/components/ui/card/index.js";
-  import { invoke } from "@tauri-apps/api/core";
+	import { onMount } from 'svelte';
+	import Workspace from '$lib/components/workspace/Workspace.svelte';
+	import DockRail from '$lib/components/overlay/DockRail.svelte';
+	import { currentWindowRole } from '$lib/windows';
 
-  let name = $state("");
-  let greetMsg = $state("");
+	let role = $state<'workspace' | 'overlay'>('workspace');
 
-  async function greet(event: Event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
-  }
+	onMount(() => {
+		role = currentWindowRole();
+		document.documentElement.dataset.window = role;
+	});
 </script>
 
-<main class="flex min-h-svh flex-col items-center justify-center gap-4 p-8">
-  <Card.Root class="w-full max-w-sm">
-    <Card.Header>
-      <Card.Title>Stylenotes</Card.Title>
-      <Card.Description>Tauri + SvelteKit + Tailwind 4 + shadcn-svelte</Card.Description>
-    </Card.Header>
-    <Card.Content>
-      <form class="flex flex-col gap-2" onsubmit={greet}>
-        <Input placeholder="Enter a name..." bind:value={name} />
-        <Button type="submit">Greet</Button>
-      </form>
-      {#if greetMsg}<p class="text-sm text-muted-foreground">{greetMsg}</p>{/if}
-    </Card.Content>
-  </Card.Root>
-</main>
+{#if role === 'overlay'}
+	<div class="h-screen w-screen bg-transparent">
+		<DockRail />
+	</div>
+{:else}
+	<Workspace />
+{/if}
