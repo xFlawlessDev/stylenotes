@@ -87,6 +87,21 @@
 	--aurora-2: rgba(143, 166, 189, 0.055);
 	--aurora-3: rgba(158, 201, 196, 0.04);
 
+	/* Emphasis gradients (Kumo-style): mix derived from the active accent.
+	   Base is darkened and the top stop is lit so text contrast rises, not falls. */
+	--emphasis-bg: color-mix(in oklab, var(--primary), black 6%);
+	--emphasis-ring: color-mix(in oklab, var(--primary), black 18%);
+	--emphasis-gradient-start: color-mix(in oklab, var(--primary), white 12%);
+	--emphasis-gradient-end: var(--primary);
+	--emphasis-container-bg: color-mix(in oklab, var(--color-primary-container), black 6%);
+	--emphasis-container-ring: color-mix(in oklab, var(--color-primary-container), black 18%);
+	--emphasis-container-gradient-start: color-mix(
+		in oklab,
+		var(--color-primary-container),
+		white 10%
+	);
+	--emphasis-container-gradient-end: var(--color-primary-container);
+
 	/* Scrims, hairlines, status, window chrome */
 	--glass-scrim: rgba(4, 7, 12, 0.55);
 	--glass-hairline: rgba(255, 255, 255, 0.06);
@@ -178,6 +193,19 @@ html.light {
 	--color-on-success: #ffffff;
 	--window-control-glyph: rgba(0, 0, 0, 0.45);
 	--on-swatch: #ffffff;
+}
+
+/* Light mode: containers are already pale, so keep the lit stop subtle and
+   darken slightly to hold contrast against on-*-container text */
+html.light {
+	--emphasis-bg: color-mix(in oklab, var(--primary), black 4%);
+	--emphasis-gradient-start: color-mix(in oklab, var(--primary), white 8%);
+	--emphasis-container-bg: color-mix(in oklab, var(--color-primary-container), black 3%);
+	--emphasis-container-gradient-start: color-mix(
+		in oklab,
+		var(--color-primary-container),
+		white 5%
+	);
 }
 
 /* ------------------------------------------------------------------ *
@@ -418,6 +446,8 @@ html[data-motion='reduced'] *::after {
 	--color-accent-sand: var(--accent-sand);
 	--color-accent-rose: var(--accent-rose);
 	--color-on-swatch: var(--on-swatch);
+	--color-emphasis-ring: var(--emphasis-ring);
+	--color-emphasis-container-ring: var(--emphasis-container-ring);
 
 	/* Typography scale */
 	--font-headline: 'Inter Variable', 'Inter', sans-serif;
@@ -542,6 +572,39 @@ html[data-motion='reduced'] *::after {
 			var(--glass-stroke) 18%,
 			var(--glass-stroke) 82%,
 			transparent
+		);
+	}
+
+	/* Kumo-style emphasis surfaces: accent-derived top-lit gradient */
+	.emphasis-primary {
+		background-color: var(--emphasis-bg);
+		background-image: linear-gradient(
+			to bottom,
+			var(--emphasis-gradient-start),
+			var(--emphasis-gradient-end)
+		);
+		box-shadow: inset 0 1px 0 0 var(--emphasis-bg);
+	}
+
+	.emphasis-primary:hover {
+		background-image: linear-gradient(to bottom, var(--emphasis-bg), var(--emphasis-gradient-end));
+	}
+
+	.emphasis-container {
+		background-color: var(--emphasis-container-bg);
+		background-image: linear-gradient(
+			to bottom,
+			var(--emphasis-container-gradient-start),
+			var(--emphasis-container-gradient-end)
+		);
+		box-shadow: inset 0 1px 0 0 var(--emphasis-container-bg);
+	}
+
+	.emphasis-container:hover {
+		background-image: linear-gradient(
+			to bottom,
+			var(--emphasis-container-bg),
+			var(--emphasis-container-gradient-end)
 		);
 	}
 

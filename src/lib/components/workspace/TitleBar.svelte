@@ -133,11 +133,11 @@
 				{#snippet child({ props })}
 					<button
 						{...props}
-						class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-hairline transition-transform hover:scale-105"
+						class="emphasis-container flex size-8 items-center justify-center rounded-full text-label-md font-label font-semibold text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all hover:scale-105"
 						aria-label="Open settings"
 						onclick={onsettings}
 					>
-						AR
+						<span class="relative">AR</span>
 					</button>
 				{/snippet}
 			</Tooltip.Trigger>

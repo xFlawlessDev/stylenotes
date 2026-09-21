@@ -403,10 +403,10 @@
 			</div>
 
 			<button
-				class="flex items-center justify-center gap-1.5 rounded-lg bg-primary-container px-3 py-1.5 text-headline-sm font-headline text-on-primary transition-all hover:bg-primary"
+				class="emphasis-primary flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-headline-sm font-headline text-on-primary ring-1 ring-inset ring-emphasis-ring transition-all"
 				onclick={openWorkspaceAndClose}
 			>
-				<span>Open in Workspace</span>
+				<span class="relative">Open in Workspace</span>
 				<ArrowUpRight size={14} />
 			</button>
 		</div>
@@ -478,11 +478,11 @@
 					{#snippet child({ props })}
 						<button
 							{...props}
-							class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
+							class="emphasis-primary flex size-9 items-center justify-center rounded-2xl text-on-primary shadow-md ring-1 ring-inset ring-emphasis-ring transition-all hover:scale-105"
 							aria-label="Add Sticky Note"
 							onclick={openWorkspaceAndClose}
 						>
-							<Plus size={19} />
+							<Plus size={19} class="relative" />
 						</button>
 					{/snippet}
 				</Tooltip.Trigger>

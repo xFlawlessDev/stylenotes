@@ -160,10 +160,10 @@
 						{@const Choice = entry.icon}
 						<button
 							type="button"
-							class="flex size-7 items-center justify-center rounded-md transition-colors {folder.icon ===
-							entry.id
-								? 'bg-primary-container text-on-primary-container'
-								: 'text-on-surface-variant hover:bg-surface-container-high/70 hover:text-on-surface'}"
+class="flex size-7 items-center justify-center rounded-lg transition-colors {folder.icon ===
+						entry.id
+							? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
+							: 'text-on-surface-variant hover:bg-surface-container-high/70 hover:text-on-surface'}"
 							aria-label={entry.id}
 							aria-pressed={folder.icon === entry.id}
 							onclick={() => {
@@ -179,7 +179,7 @@
 		</div>
 	{:else}
 		<div
-			class="relative flex items-center justify-between rounded-xl px-2 py-2 transition-all {active
+			class="relative flex items-center justify-between rounded-2xl px-2 py-2 transition-all {active
 				? 'glass-chip text-on-surface'
 				: 'text-on-surface-variant hover:bg-surface-container/50 hover:text-on-surface'}"
 			role="button"
@@ -193,7 +193,7 @@
 			}}
 		>
 			{#if active}
-				<span class="absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-primary"></span>
+				<span class="emphasis-primary absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full"></span>
 			{/if}
 			<span class="flex min-w-0 items-center gap-2">
 				<Icon size={17} class={active ? 'text-primary' : toneClass} />

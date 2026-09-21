@@ -104,14 +104,14 @@
 
 		{#if activeTag}
 			<div
-				class="flex items-center justify-between rounded-xl bg-primary-container/25 px-3 py-2"
+				class="emphasis-container flex items-center justify-between rounded-2xl px-3 py-2 ring-1 ring-inset ring-emphasis-container-ring"
 			>
-				<span class="flex items-center gap-1.5 text-code-sm font-code text-primary">
+				<span class="flex items-center gap-1.5 text-code-sm font-code text-on-primary-container">
 					<Tag size={12} />
 					Filtering by #{activeTag}
 				</span>
 				<button
-					class="flex size-5 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary-container/40"
+					class="flex size-5 items-center justify-center rounded-md text-on-primary-container transition-colors hover:bg-on-primary-container/15"
 					aria-label="Clear tag filter"
 					onclick={() => (oncleartag ? oncleartag() : onselecttag?.(activeTag))}
 				>
@@ -124,7 +124,7 @@
 	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
 		{#each filtered as note (note.id)}
 			<div
-				class="group relative w-full cursor-pointer rounded-xl p-3 text-left transition-all {selectedId === note.id
+				class="group relative w-full cursor-pointer rounded-2xl p-3 text-left transition-all {selectedId === note.id
 					? 'glass-chip'
 					: 'bg-surface-container-lowest/30 hover:bg-surface-container/50'}"
 				role="button"
@@ -139,7 +139,7 @@
 			>
 				{#if selectedId === note.id}
 					<span
-						class="absolute top-3 bottom-3 left-0 w-[3px] rounded-r-full bg-primary"
+						class="emphasis-primary absolute top-3 bottom-3 left-0 w-[3px] rounded-r-full"
 					></span>
 				{/if}
 				{#if showFolder}
@@ -197,7 +197,7 @@
 							<button
 								class="truncate rounded-md px-1.5 py-px text-code-sm font-code transition-colors {activeTag ===
 								tag
-									? 'bg-primary-container/40 text-primary'
+									? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 									: 'bg-surface-container-high/60 text-tertiary hover:text-on-surface'}"
 								onclick={(event) => {
 									event.stopPropagation();

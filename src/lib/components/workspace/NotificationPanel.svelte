@@ -131,7 +131,7 @@
 					onclick={() => onread(item.id)}
 				>
 					{#if !item.read}
-						<span class="absolute top-3.5 right-3 size-1.5 rounded-full bg-primary"></span>
+						<span class="emphasis-primary absolute top-3.5 right-3 size-1.5 rounded-full"></span>
 					{/if}
 					<span
 						class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl {item.read

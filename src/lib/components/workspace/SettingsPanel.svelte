@@ -125,18 +125,18 @@
 							>
 							<div class="grid grid-cols-2 gap-2">
 								<button
-									class="flex items-center justify-center gap-2 rounded-xl py-2.5 text-label-md font-label transition-all {settings.mode ===
+									class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.mode ===
 									'dark'
-										? 'glass-chip text-on-surface'
+										? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 										: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
 									onclick={() => updateSettings({ mode: 'dark' })}
 								>
 									<Moon size={15} /> Dark
 								</button>
 								<button
-									class="flex items-center justify-center gap-2 rounded-xl py-2.5 text-label-md font-label transition-all {settings.mode ===
+									class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.mode ===
 									'light'
-										? 'glass-chip text-on-surface'
+										? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 										: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
 									onclick={() => updateSettings({ mode: 'light' })}
 								>
@@ -152,9 +152,9 @@
 							<div class="grid grid-cols-4 gap-2">
 								{#each accents as accent (accent.id)}
 									<button
-										class="flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition-all {settings.accent ===
+										class="flex flex-col items-center gap-1.5 rounded-2xl py-2.5 transition-all {settings.accent ===
 										accent.id
-											? 'glass-chip'
+											? 'emphasis-container ring-1 ring-inset ring-emphasis-container-ring'
 											: 'bg-surface-container-lowest/30 hover:bg-surface-container/50'}"
 										onclick={() => updateSettings({ accent: accent.id })}
 									>
@@ -179,9 +179,9 @@
 								{#each densities as item (item.id)}
 									{@const Icon = item.icon}
 									<button
-										class="flex items-center justify-center gap-2 rounded-xl py-2.5 text-label-md font-label transition-all {settings.density ===
+										class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.density ===
 										item.id
-											? 'glass-chip text-on-surface'
+											? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 											: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
 										onclick={() => updateSettings({ density: item.id })}
 									>
@@ -192,7 +192,7 @@
 						</div>
 
 						<label
-							class="flex cursor-pointer items-center justify-between rounded-xl bg-surface-container-lowest/30 p-3"
+							class="flex cursor-pointer items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 						>
 							<span class="flex flex-col">
 								<span class="text-body-md font-body text-on-surface">Reduce motion</span>
@@ -202,7 +202,7 @@
 							</span>
 							<button
 								class="relative h-5 w-9 shrink-0 rounded-full transition-colors {settings.reduceMotion
-									? 'bg-primary'
+									? 'emphasis-primary'
 									: 'bg-surface-container-highest'}"
 								role="switch"
 								aria-checked={settings.reduceMotion}
@@ -227,9 +227,9 @@
 								{#each views as item (item.id)}
 									{@const Icon = item.icon}
 									<button
-										class="flex flex-col items-center gap-1.5 rounded-xl py-3 text-label-sm font-label transition-all {settings.editorView ===
+										class="flex flex-col items-center gap-1.5 rounded-2xl py-3 text-label-sm font-label transition-all {settings.editorView ===
 										item.id
-											? 'glass-chip text-on-surface'
+											? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
 											: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
 										onclick={() => updateSettings({ editorView: item.id })}
 									>
@@ -243,7 +243,7 @@
 						<div class="flex flex-col gap-2">
 							{#each [{ k: 'spellcheck' as const, t: 'Check spelling', d: 'Underline misspelled words while writing' }, { k: 'showWordCount' as const, t: 'Show word count', d: 'Display live counts in the editor footer' }, { k: 'confirmDelete' as const, t: 'Confirm before deleting', d: 'Ask before a note is permanently removed' }] as row (row.k)}
 								<label
-									class="flex cursor-pointer items-center justify-between rounded-xl bg-surface-container-lowest/30 p-3"
+									class="flex cursor-pointer items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 								>
 									<span class="flex flex-col">
 										<span class="text-body-md font-body text-on-surface">{row.t}</span>
@@ -253,7 +253,7 @@
 										class="relative h-5 w-9 shrink-0 rounded-full transition-colors {settings[
 											row.k
 										]
-											? 'bg-primary'
+											? 'emphasis-primary'
 											: 'bg-surface-container-highest'}"
 										role="switch"
 										aria-checked={settings[row.k]}
@@ -276,7 +276,7 @@
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 								>Shortcuts</span
 							>
-							<div class="flex flex-col gap-1 rounded-xl bg-surface-container-lowest/30 p-2">
+							<div class="flex flex-col gap-1 rounded-2xl bg-surface-container-lowest/30 p-2">
 								{#each shortcuts as item (item.keys)}
 									<div class="flex items-center justify-between px-1.5 py-1.5">
 										<span class="flex items-center gap-1.5 text-body-sm font-body text-on-surface-variant">
@@ -297,9 +297,9 @@
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 								>Local storage</span
 							>
-							<div class="glass-well flex items-center gap-3 rounded-xl p-3">
+							<div class="glass-well flex items-center gap-3 rounded-2xl p-3">
 								<div
-									class="flex size-9 items-center justify-center rounded-xl bg-tertiary-container text-on-tertiary-container"
+									class="flex size-9 items-center justify-center rounded-2xl bg-tertiary-container text-on-tertiary-container"
 								>
 									<HardDrive size={17} />
 								</div>
@@ -314,7 +314,7 @@
 							</div>
 							<div class="grid grid-cols-2 gap-2">
 								<button
-									class="glass-chip flex items-center justify-center gap-2 rounded-xl py-2.5 text-label-md font-label text-on-surface transition-colors hover:text-primary"
+									class="glass-chip flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label text-on-surface transition-colors hover:text-primary"
 									onclick={onexport}
 								>
 									<Download size={15} /> Export
@@ -328,7 +328,7 @@
 							>
 							<div class="flex flex-col gap-2">
 								<button
-									class="flex items-center justify-between rounded-xl bg-surface-container-lowest/30 p-3 text-left transition-colors hover:bg-surface-container/50"
+									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3 text-left transition-colors hover:bg-surface-container/50"
 									onclick={resetSettings}
 								>
 									<span class="flex flex-col">
@@ -340,7 +340,7 @@
 									<RotateCcw size={15} class="shrink-0 text-outline" />
 								</button>
 								<button
-									class="flex items-center justify-between rounded-xl bg-error-container/25 p-3 text-left transition-colors hover:bg-error-container/40"
+									class="flex items-center justify-between rounded-2xl bg-error-container/25 p-3 text-left transition-colors hover:bg-error-container/40"
 									onclick={onresetdata}
 								>
 									<span class="flex flex-col">
@@ -358,7 +358,7 @@
 					{#if section === 'about'}
 						<div class="flex flex-col items-center gap-3 py-6 text-center">
 							<div
-								class="flex size-14 items-center justify-center rounded-2xl bg-surface-container-high text-primary ring-1 ring-inset ring-hairline"
+								class="emphasis-container flex size-14 items-center justify-center rounded-2xl text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring"
 							>
 								<Sparkles size={24} />
 							</div>
