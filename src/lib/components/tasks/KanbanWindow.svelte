@@ -12,14 +12,20 @@
 		nextPosition,
 		taskStatus,
 		type Task,
+		type TaskFormData,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
-	import { KANBAN_SHORTCUT_LABEL, toggleKanbanLock } from '$lib/stores/kanban.svelte';
-	import { isTauri, openWorkspace } from '$lib/windows';
+	import {
+		KANBAN_SHORTCUT_LABEL,
+		listenKanbanLockChanged,
+		toggleKanbanLock
+	} from '$lib/stores/kanban.svelte';
+	import { isTauri, openTasksInWorkspace } from '$lib/windows';
 	import CompactKanban from '$lib/components/tasks/CompactKanban.svelte';
-	import TaskDialog, { type TaskFormData } from '$lib/components/tasks/TaskDialog.svelte';
+	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
+	import SelectField from '$lib/components/fields/SelectField.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let tasks = $state<Task[]>([]);
@@ -29,14 +35,24 @@
 	let dialogOpen = $state(false);
 	let editing = $state<Task | null>(null);
 	let defaultStatus = $state<TaskStatus>('todo');
+	let folderFilter = $state('all');
 	let notice = $state('');
 
 	const folders = $derived(foldersFor(notes, customFolders));
+	const folderOptions = $derived([
+		{ value: 'all', label: 'All folders' },
+		...folders
+			.filter((folder) => folder.id !== 'all')
+			.map((folder) => ({ value: folder.id, label: folder.label }))
+	]);
+	const visibleTasks = $derived(
+		folderFilter === 'all' ? tasks : tasks.filter((task) => task.folder === folderFilter)
+	);
 	const noteTitles = $derived(
 		Object.fromEntries(notes.map((note) => [note.id, note.title || 'Untitled note']))
 	);
 	const locked = $derived(settings.kanbanLocked);
-	const openCount = $derived(tasks.filter((task) => taskStatus(task) !== 'done').length);
+	const openCount = $derived(visibleTasks.filter((task) => taskStatus(task) !== 'done').length);
 
 	function notify(message: string) {
 		notice = message;
@@ -116,21 +132,27 @@
 		})();
 
 		let unlisten: (() => void) | undefined;
+		let unlistenLock: (() => void) | undefined;
 		let disposed = false;
 		if (isTauri) {
 			void listen(TASKS_CHANGED, () => void syncTasks()).then((fn) => {
 				if (disposed) fn();
 				else unlisten = fn;
 			});
+			void listenKanbanLockChanged().then((fn) => {
+				if (disposed) fn();
+				else unlistenLock = fn;
+			});
 		}
 		return () => {
 			disposed = true;
 			unlisten?.();
+			unlistenLock?.();
 		};
 	});
 </script>
 
-<div class="flex h-screen w-screen flex-col gap-1.5 overflow-hidden bg-surface p-1.5">
+<div class="@container flex h-screen w-screen flex-col gap-1.5 overflow-hidden bg-surface p-1.5">
 	<header
 		data-tauri-drag-region
 		class="flex h-9 shrink-0 items-center justify-between gap-2 rounded-xl border border-hairline/50 bg-surface-container-lowest/45 px-2.5"
@@ -139,8 +161,17 @@
 			<img src="/icon-128.png" alt="StyleNotes" class="size-4 shrink-0 object-cover" />
 			<span class="text-label-md font-label font-semibold tracking-tight text-on-surface">Kanban</span>
 			<span class="shrink-0 text-code-sm font-code text-outline">
-				{openCount} open · {tasks.length} total
+				{openCount} open · {visibleTasks.length} total
 			</span>
+			<div class="hidden shrink-0 @[560px]:block">
+				<SelectField
+					size="sm"
+					label="Filter tasks by folder"
+					class="h-7 w-[124px] px-2 text-code-sm font-code"
+					options={folderOptions}
+					bind:value={folderFilter}
+				/>
+			</div>
 		</div>
 
 		{#if locked}
@@ -177,14 +208,14 @@
 								{...props}
 								type="button"
 								class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container/70 hover:text-on-surface"
-								aria-label="Open StyleNotes"
-								onclick={() => void openWorkspace()}
+								aria-label="Open StyleNotes on the Kanban view"
+								onclick={() => void openTasksInWorkspace()}
 							>
 								<NotebookPen size={14} />
 							</button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Open StyleNotes</Tooltip.Content>
+					<Tooltip.Content>Open StyleNotes (Tasks · Kanban)</Tooltip.Content>
 				</Tooltip.Root>
 
 				<span class="mx-0.5 h-4 w-px bg-hairline/70"></span>
@@ -210,7 +241,7 @@
 	</header>
 
 	<CompactKanban
-		tasks={tasks}
+		tasks={visibleTasks}
 		{selectedId}
 		{noteTitles}
 		onselect={(id) => (selectedId = id)}
@@ -228,4 +259,13 @@
 	{/if}
 </div>
 
-<TaskDialog bind:open={dialogOpen} task={editing} {defaultStatus} {folders} {notes} onsubmit={commitForm} />
+<TaskDialog
+	bind:open={dialogOpen}
+	task={editing}
+	{defaultStatus}
+	defaultFolder={folderFilter === 'all' ? undefined : folderFilter}
+	compact
+	{folders}
+	{notes}
+	onsubmit={commitForm}
+/>

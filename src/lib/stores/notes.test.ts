@@ -40,6 +40,8 @@ import {
 	setFolderIconInList,
 	removeFolderFromList,
 	reassignNotesFolder,
+	dockedNotes,
+	applyNotePatch,
 	type CustomFolder,
 } from '$lib/stores/notes';
 import { notes as seedNotes, createNote } from '$lib/content/content';
@@ -301,6 +303,41 @@ describe('toggleChecklistItem', () => {
 		const body = '- [ ] only';
 		expect(toggleChecklistItem(body, 5)).toBe(body);
 		expect(toggleChecklistItem(body, -1)).toBe(body);
+	});
+});
+
+describe('applyNotePatch', () => {
+	it('keeps the derived preview fields in sync when the body changes', () => {
+		const before = note({ body: 'old' });
+		const after = applyNotePatch(before, { body: 'hello world' });
+
+		expect(after.words).toBe(2);
+		expect(after.chars).toBe(11);
+		expect(after.excerpt).toContain('hello world');
+		expect(after.updated).toBe('Just now');
+		expect(before.body).toBe('old');
+	});
+
+	it('toggles dock membership without touching the body fields', () => {
+		const before = note({ body: 'body', overlay: false });
+		const after = applyNotePatch(before, { overlay: true });
+
+		expect(after.overlay).toBe(true);
+		expect(after.words).toBe(before.words);
+		expect(after.excerpt).toBe(before.excerpt);
+	});
+});
+
+describe('dockedNotes', () => {
+	it('keeps docked notes only, pinned first then alphabetical', () => {
+		const result = dockedNotes([
+			note({ id: 'a', title: 'Zebra', overlay: true }),
+			note({ id: 'b', title: 'Beta', overlay: true, pinned: true }),
+			note({ id: 'c', title: 'Alpha', overlay: false }),
+			note({ id: 'd', title: 'Alpha', overlay: true }),
+		]);
+
+		expect(result.map((item) => item.id)).toEqual(['b', 'd', 'a']);
 	});
 });
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowUpRight, CalendarDays, Check, Play, RotateCcw, X } from '@lucide/svelte';
+	import { CalendarDays, Check, Play, RotateCcw, SquarePen, X } from '@lucide/svelte';
 	import {
 		formatTaskDate,
 		isTaskOverdue,
@@ -150,7 +150,7 @@
 		class="emphasis-container flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-headline-sm font-headline text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
 		onclick={onopen}
 	>
-		<span class="relative">Open in Workspace</span>
-		<ArrowUpRight size={14} />
+		<span class="relative">Edit task</span>
+		<SquarePen size={14} />
 	</button>
 </div>

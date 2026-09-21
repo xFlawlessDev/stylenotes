@@ -1,13 +1,17 @@
+import { listen } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import { setDesktopUnderlay } from 'tauri-plugin-desktop-underlay-api';
 import { settings, updateSettings } from '$lib/stores/settings.svelte';
 import { isTauri, KANBAN_LABEL } from '$lib/windows';
 
-/** Global shortcut that locks the Kanban window to the desktop or floats it. */
-export const KANBAN_SHORTCUT = 'CommandOrControl+Shift+K';
-/** Same shortcut, spelled for the UI. */
-export const KANBAN_SHORTCUT_LABEL = 'Ctrl+Shift+K';
+/**
+ * Global shortcut that locks the Kanban window to the desktop or floats it.
+ * Registered in Rust (`lib.rs`, `kanban_lock_shortcut`); keep this label in sync.
+ */
+export const KANBAN_SHORTCUT_LABEL = 'Ctrl+Shift+\\';
+
+/** Event emitted by the Rust shortcut handler with the new lock state. */
+export const KANBAN_LOCK_EVENT = 'kanban:lock-changed';
 
 async function kanbanWindow(): Promise<WebviewWindow | null> {
 	if (!isTauri) return null;
@@ -71,17 +75,15 @@ export async function restoreKanbanLock(): Promise<boolean> {
 }
 
 /**
- * Registers the global lock shortcut. Only the Kanban window calls this.
- * `unregisterAll` keeps dev reloads from failing with "already registered".
+ * Mirrors lock changes made through the global shortcut (handled in Rust) into
+ * the settings store. Returns an unlisten function.
  */
-export async function registerKanbanShortcut(): Promise<void> {
-	if (!isTauri) return;
-	try {
-		await unregisterAll();
-		await register(KANBAN_SHORTCUT, (event) => {
-			if (event.state === 'Pressed') void toggleKanbanLock();
-		});
-	} catch {
-		/* the shortcut is taken by another app, or permissions are missing */
-	}
+export async function listenKanbanLockChanged(): Promise<() => void> {
+	if (!isTauri) return () => {};
+	return listen<boolean>(KANBAN_LOCK_EVENT, (event) => {
+		if (typeof event.payload !== 'boolean') return;
+		if (settings.kanbanLocked !== event.payload) {
+			updateSettings({ kanbanLocked: event.payload });
+		}
+	});
 }

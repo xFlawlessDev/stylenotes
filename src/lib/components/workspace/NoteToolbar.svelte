@@ -9,6 +9,8 @@
 		Archive,
 		ArchiveRestore,
 		Maximize2,
+		AppWindow,
+		PictureInPicture2,
 		Printer,
 		FileDown,
 		Copy,
@@ -20,10 +22,13 @@
 	let {
 		view,
 		pinned,
+		docked,
 		archived,
 		onview,
 		ontogglepin,
+		ontoggledock,
 		ontogglearchive,
+		onopenwindow,
 		onprint,
 		onexport,
 		oncopy,
@@ -32,10 +37,13 @@
 	}: {
 		view: EditorView;
 		pinned: boolean;
+		docked: boolean;
 		archived: boolean;
 		onview: (view: EditorView) => void;
 		ontogglepin: () => void;
+		ontoggledock: () => void;
 		ontogglearchive: () => void;
+		onopenwindow: () => void;
 		onprint: () => void;
 		onexport: () => void;
 		oncopy: () => void;
@@ -105,6 +113,38 @@
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>{pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
+	</Tooltip.Root>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				<button
+					{...props}
+					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+					aria-label="Open in note window"
+					onclick={onopenwindow}
+				>
+					<AppWindow size={16} />
+				</button>
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content>Open in note window</Tooltip.Content>
+	</Tooltip.Root>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				<button
+					{...props}
+					class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {docked
+						? 'text-tertiary'
+						: 'text-on-surface-variant hover:text-on-surface'}"
+					aria-label={docked ? 'Remove from dock' : 'Add to dock'}
+					onclick={ontoggledock}
+				>
+					<PictureInPicture2 size={16} />
+				</button>
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content>{docked ? 'Remove from dock' : 'Add to dock'}</Tooltip.Content>
 	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>

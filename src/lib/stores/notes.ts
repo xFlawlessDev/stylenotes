@@ -1,7 +1,27 @@
 import { browser } from '$app/environment';
-import { noteMarkdown, notes as seedNotes } from '$lib/content/content';
-import type { Note } from '$lib/content/content';
+import { emit } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import {
+	buildExcerpt,
+	countWords,
+	noteMarkdown,
+	notes as seedNotes,
+	type Note
+} from '$lib/content/content';
 import { foldersRepo, metaRepo, notesRepo } from '$lib/db';
+import { isTauri } from '$lib/windows';
+
+export const NOTES_CHANGED = 'notes:changed';
+
+/** Identifies which window wrote, so listeners can ignore their own saves. */
+export type NotesChangedPayload = { source: string };
+
+/** Notifies other windows (dock, note windows, workspace) that notes changed. */
+function notifyNotesChanged() {
+	if (!browser || !isTauri) return;
+	const source = getCurrentWindow().label;
+	void emit(NOTES_CHANGED, { source } satisfies NotesChangedPayload).catch(() => undefined);
+}
 
 export const TONES = ['primary', 'secondary', 'tertiary', 'sky', 'violet', 'outline'] as const;
 
@@ -117,6 +137,16 @@ export function reassignNotesFolder(notes: Note[], id: string, to = 'personal'):
 
 const SEED_FLAG = 'notes_seeded_v1';
 
+/** Reads every note, falling back to the bundled samples outside Tauri. */
+export async function listNotes(): Promise<Note[]> {
+	if (!browser) return [...seedNotes];
+	try {
+		return await notesRepo.list();
+	} catch {
+		return [...seedNotes];
+	}
+}
+
 export async function hydrateNotes(): Promise<Note[]> {
 	if (!browser) return [...seedNotes];
 	try {
@@ -124,12 +154,11 @@ export async function hydrateNotes(): Promise<Note[]> {
 		if (!seeded) {
 			await notesRepo.replaceAll(seedNotes);
 			await metaRepo.set(SEED_FLAG, new Date().toISOString());
-			return await notesRepo.list();
 		}
-		return await notesRepo.list();
 	} catch {
 		return [...seedNotes];
 	}
+	return listNotes();
 }
 
 export async function loadFolders(): Promise<CustomFolder[]> {
@@ -154,6 +183,7 @@ export async function persistNote(note: Note): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await notesRepo.upsert(note);
+		notifyNotesChanged();
 		return true;
 	} catch {
 		return false;
@@ -164,6 +194,7 @@ export async function persistNotes(notes: Note[]): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await notesRepo.replaceAll(notes);
+		notifyNotesChanged();
 		return true;
 	} catch {
 		return false;
@@ -174,6 +205,7 @@ export async function removeNote(id: string): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await notesRepo.remove(id);
+		notifyNotesChanged();
 		return true;
 	} catch {
 		return false;
@@ -195,6 +227,28 @@ export async function resetNotesToSeed(): Promise<Note[]> {
 	await persistFolders([]);
 	await metaRepo.set(SEED_FLAG, new Date().toISOString()).catch(() => undefined);
 	return [...seedNotes];
+}
+
+export type NotePatch = Partial<
+	Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned' | 'overlay'>
+>;
+
+/** Applies a patch and keeps the derived preview fields in sync. */
+export function applyNotePatch(note: Note, patch: NotePatch): Note {
+	const next: Note = { ...note, ...patch, updated: 'Just now' };
+	if (patch.body !== undefined) {
+		next.words = countWords(patch.body);
+		next.chars = patch.body.length;
+		next.excerpt = buildExcerpt(patch.body);
+	}
+	return next;
+}
+
+/** Notes pinned to the overlay dock, pinned notes first. */
+export function dockedNotes(notes: Note[]): Note[] {
+	return notes
+		.filter((note) => note.overlay)
+		.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || a.title.localeCompare(b.title));
 }
 
 export function parseChecklist(body: string, limit = 3): { text: string; done: boolean }[] {

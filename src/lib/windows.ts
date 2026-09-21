@@ -1,17 +1,46 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 export const WORKSPACE_LABEL = "workspace";
 export const OVERLAY_LABEL = "overlay";
 export const KANBAN_LABEL = "kanban";
 
-export type WindowRole = "workspace" | "overlay" | "kanban";
+/** Event that asks the workspace window to switch section/view. */
+export const NAVIGATE_EVENT = "stylenotes:navigate";
+
+export type WorkspaceView = "list" | "kanban" | "gantt";
+
+export type WorkspaceNavigate = {
+  section: "notes" | "tasks";
+  view?: WorkspaceView;
+};
+export const NOTE_WINDOW_PREFIX = "note-";
+export const TASK_WINDOW_PREFIX = "task-";
+
+export type WindowRole = "workspace" | "overlay" | "kanban" | "note" | "task";
 
 export function currentWindowRole(): WindowRole {
   const label = getCurrentWindow().label;
   if (label === OVERLAY_LABEL) return "overlay";
   if (label === KANBAN_LABEL) return "kanban";
+  if (label.startsWith(NOTE_WINDOW_PREFIX)) return "note";
+  if (label.startsWith(TASK_WINDOW_PREFIX)) return "task";
   return "workspace";
+}
+
+/** Reads the record id encoded in a per-record window label. */
+export function currentRecordId(prefix: string): string | null {
+  const label = getCurrentWindow().label;
+  return label.startsWith(prefix) ? label.slice(prefix.length) : null;
+}
+
+export function currentNoteId(): string | null {
+  return currentRecordId(NOTE_WINDOW_PREFIX);
+}
+
+export function currentTaskId(): string | null {
+  return currentRecordId(TASK_WINDOW_PREFIX);
 }
 
 async function focusOrCreate(label: string, options: Record<string, unknown>) {
@@ -83,6 +112,53 @@ export async function openKanban() {
   });
 }
 
+/** Opens the workspace on the Kanban view of the tasks section. */
+export async function openTasksInWorkspace() {
+  if (isTauri) {
+    const payload: WorkspaceNavigate = { section: "tasks", view: "kanban" };
+    await emit(NAVIGATE_EVENT, payload).catch(() => undefined);
+  }
+  return openWorkspace();
+}
+
+/** One always-on-top editor window per note, label `note-<id>`. */
+export async function openNoteWindow(noteId: string) {
+  return focusOrCreate(`${NOTE_WINDOW_PREFIX}${noteId}`, {
+    url: "/",
+    title: "StyleNotes Note",
+    width: 440,
+    height: 540,
+    minWidth: 320,
+    minHeight: 240,
+    resizable: true,
+    decorations: false,
+    transparent: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    visible: false,
+  });
+}
+
+/** One always-on-top detail window per task, label `task-<id>`. */
+export async function openTaskWindow(taskId: string) {
+  return focusOrCreate(`${TASK_WINDOW_PREFIX}${taskId}`, {
+    url: "/",
+    title: "StyleNotes Task",
+    width: 420,
+    height: 520,
+    minWidth: 300,
+    minHeight: 260,
+    resizable: true,
+    decorations: false,
+    transparent: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    visible: false,
+  });
+}
+
 export async function toggleOverlay() {
   const overlay = await WebviewWindow.getByLabel(OVERLAY_LABEL);
   if (!overlay) {
@@ -107,6 +183,23 @@ export async function revealCurrentWindow() {
   const win = getCurrentWindow();
   if (!(await win.isVisible())) {
     await win.show();
+  }
+}
+
+/**
+ * Same as `revealCurrentWindow`, plus focus: detail windows opened from the
+ * dock or a global shortcut should be ready to type in.
+ */
+export async function revealAndFocusCurrentWindow() {
+  if (!isTauri) return;
+  const win = getCurrentWindow();
+  if (!(await win.isVisible())) {
+    await win.show();
+  }
+  try {
+    await win.setFocus();
+  } catch {
+    /* the window may not be focusable */
   }
 }
 

@@ -26,25 +26,25 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 ## Architecture
 
-- **Three Tauri windows share one route.** `workspace`, `overlay`, and `kanban` are declared in `tauri.conf.json`, all load `/`. `src/routes/+page.svelte` branches on `currentWindowRole()` from `src/lib/windows.ts`. Any window logic must handle all roles.
+- **Tauri windows share one route.** `workspace`, `overlay`, and `kanban` are declared in `tauri.conf.json`; `note-<id>` and `task-<id>` detail windows are created on demand by `openNoteWindow`/`openTaskWindow` (`src/lib/windows.ts`). All load `/` and `src/routes/+page.svelte` branches on `currentWindowRole()` from `src/lib/windows.ts`. Any window logic must handle all roles.
 - **SSR is off** (`+layout.ts` exports `ssr = false`); adapter-static with `index.html` fallback. Do not add server-only code/load functions.
 - **Fixed dev port 1420** with `strictPort`; Vite ignores `src-tauri/**`.
-- **Windows start invisible** (`visible: false`) and are revealed client-side by `revealCurrentWindow()`. Don't remove that.
+- **Windows start invisible** (`visible: false`) and are revealed client-side: `revealCurrentWindow()` for the declared windows, `revealAndFocusCurrentWindow()` for note/task windows (they reveal themselves once the record is loaded). Don't remove that.
 
 ## Database / migrations
 
 - SQLite via `tauri-plugin-sql`; URL `sqlite:stylenotes.db` is defined in **two places that must stay in sync**: `src-tauri/src/lib.rs` (`DB_URL`) and `tauri.conf.json` `plugins.sql.preload`.
 - Schema/migrations live **only** in `src-tauri/src/lib.rs`. Add a new `Migration` entry with an incremented `version`; never edit an applied migration.
-- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `metaRepo`). Stores in `src/lib/stores/` wrap these and call them.
+- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `tasksRepo`, `metaRepo`). Stores in `src/lib/stores/` wrap these and call them.
 - Outside Tauri, `getDb()` rejects and stores fall back to seed data (`src/lib/content/content.ts`, markdown in `src/lib/content/notes/`). Guard new DB work with `browser`/`isTauri` and swallow errors like existing stores do.
 
 ## Tauri / capabilities
 
-- New window or plugin APIs need matching permissions in `src-tauri/capabilities/default.json` (applies to all three windows). Missing permissions fail silently at runtime.
+- New window or plugin APIs need matching permissions in `src-tauri/capabilities/default.json` (window globs cover `note-*`/`task-*`). Missing permissions fail silently at runtime.
 - Rust crate lib name is `stylenotes_lib` (`src-tauri/Cargo.toml`).
 - `tauri-plugin-prevent-default` blocks browser shortcuts, but dev builds keep DevTools + Reload (`lib.rs`).
 - The `workspace`, `overlay`, and `kanban` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
-- The `kanban` window locks to the desktop via `tauri-plugin-desktop-underlay` (`src/lib/stores/kanban.svelte.ts`, `desktop-underlay:default` permission): locked = desktop underlay, unlocked = always on top. The `Ctrl+Shift+K` global shortcut (`tauri-plugin-global-shortcut`) is registered from the Kanban webview and the state lives in `settings.kanbanLocked`.
+- The `kanban` window locks to the desktop via `tauri-plugin-desktop-underlay` (`src/lib/stores/kanban.svelte.ts`, `desktop-underlay:default` permission): locked = desktop underlay, unlocked = always on top. Global shortcuts (`Ctrl+Shift+\` lock, `Ctrl+Shift+N`/`Ctrl+Shift+T` quick capture) are registered in Rust (`lib.rs`) and reported to the webviews through events; the lock state lives in `settings.kanbanLocked`.
 
 ## Frontend conventions
 
@@ -61,7 +61,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - Prefer callback props (`onupdate`, `onselect`) over event dispatchers; keep child components dumb and lift state to the parent (`Workspace.svelte`).
 - Bind component props with `$bindable()` and `bind:` only for two-way UI state (dialog `open`); pass data down and events up otherwise.
 - Never mutate props or objects you don't own; produce new arrays/objects (`items = items.map(...)`).
-- Always handle both `workspace` and `overlay` roles in shared components — never assume one window.
+- Always handle every window role (`workspace`, `overlay`, `kanban`, `note`, `task`) in shared components — never assume one window.
 - Type every `$props()` with an inline type; no `any`. Run `bun run check` before finishing.
 - Use `onMount` for browser-only setup; guard with `browser`/`isTauri` for Tauri/IPC and never touch `window`/`document` at module scope.
 - Async work in effects/onMount must be cancellable or guarded (`let cancelled = false`) to avoid setting state after unmount.

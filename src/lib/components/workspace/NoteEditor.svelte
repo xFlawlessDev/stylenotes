@@ -15,6 +15,7 @@
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { openNoteWindow } from '$lib/windows';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
@@ -23,7 +24,7 @@
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 
-	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>;
+	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned' | 'overlay'>>;
 
 	const ARCHIVE_FOLDER = 'archive';
 	const RESTORE_FOLDER = 'personal';
@@ -293,10 +294,13 @@
 						<NoteToolbar
 							{view}
 							pinned={note.pinned}
+							docked={note.overlay}
 							{archived}
 							onview={changeView}
 							ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
+							ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
 							ontogglearchive={toggleArchive}
+							onopenwindow={() => void openNoteWindow(note.id)}
 							onprint={() => onprint?.(note)}
 							onexport={() => onexport?.(note)}
 							oncopy={() => oncopy?.(note)}

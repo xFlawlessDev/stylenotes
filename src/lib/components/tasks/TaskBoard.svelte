@@ -14,9 +14,10 @@
 		taskStatus,
 		TASK_STATUSES,
 		type Task,
-		type TaskStatus,
 		type TaskDueFilter,
-		type TaskPriorityFilter
+		type TaskFormData,
+		type TaskPriorityFilter,
+		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, removeTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 	import { isTauri, openKanban } from '$lib/windows';
@@ -26,14 +27,15 @@
 	import TaskKanban from '$lib/components/tasks/TaskKanban.svelte';
 	import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
-	import TaskDialog, { type TaskFormData } from '$lib/components/tasks/TaskDialog.svelte';
+	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	type TaskView = 'list' | 'kanban' | 'gantt';
+	export type TaskView = 'list' | 'kanban' | 'gantt';
 
 	let {
 		tasks = $bindable(),
 		selectedId = $bindable(''),
+		view = $bindable<TaskView>('kanban'),
 		focusToken = 0,
 		folders,
 		notes,
@@ -41,13 +43,12 @@
 	}: {
 		tasks: Task[];
 		selectedId?: string;
+		view?: TaskView;
 		focusToken?: number;
 		folders: Folder[];
 		notes: Note[];
 		onnotify: (message: string) => void;
 	} = $props();
-
-	let view = $state<TaskView>('list');
 	let activeFolder = $state('all');
 	let activeStatus = $state<TaskStatus | 'all'>('all');
 	let priority = $state<TaskPriorityFilter>('all');

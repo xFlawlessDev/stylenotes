@@ -2,6 +2,7 @@
 	import { FilterX, PictureInPicture2 } from '@lucide/svelte';
 	import SelectField from '$lib/components/fields/SelectField.svelte';
 	import { DOCK_EDGES, dockEdgeLabels, type DockEdge } from '$lib/dock';
+	import { QUICK_NOTE_LABEL, QUICK_TASK_LABEL } from '$lib/stores/shortcuts';
 	import { settings, updateSettings } from '$lib/stores/settings.svelte';
 	import {
 		OVERLAY_SORTS,
@@ -108,6 +109,19 @@
 				value={settings.overlaySort}
 				onchange={(next) => updateSettings({ overlaySort: next as OverlaySort })}
 			/>
+		</div>
+
+		<div class="flex flex-col gap-1.5">
+			<span class="text-body-md font-body text-on-surface">Quick capture</span>
+			<p class="text-label-sm font-label leading-relaxed text-outline">
+				Press <kbd class="rounded bg-surface-container-highest px-1 py-px font-code text-code-sm text-on-surface"
+					>{QUICK_NOTE_LABEL}</kbd
+				>
+				for a docked note or <kbd
+					class="rounded bg-surface-container-highest px-1 py-px font-code text-code-sm text-on-surface"
+					>{QUICK_TASK_LABEL}</kbd
+				> for a docked task.
+			</p>
 		</div>
 
 		{#if customized}

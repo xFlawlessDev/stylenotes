@@ -5,6 +5,7 @@ import {
 	dockAxis,
 	dockCardOffset,
 	dockEdgeLabels,
+	dockItemBar,
 	dockTooltipSide,
 	dockWindowSize,
 	snapToDockEdge
@@ -122,5 +123,25 @@ describe('dockCardOffset', () => {
 		expect(
 			dockCardOffset({ edge: 'top', pointer: { x: 9999, y: 30 }, window, card }).x
 		).toBe(window.width - card.width - 8);
+	});
+});
+
+describe('dockItemBar', () => {
+	it('runs along the window interior edge for side rails', () => {
+		expect(dockItemBar('left', false)).toContain('left-0');
+		expect(dockItemBar('right', false)).toContain('right-0');
+		expect(dockItemBar('left', false)).toContain('h-7');
+	});
+
+	it('grows toward the interior when the item is active', () => {
+		expect(dockItemBar('left', true)).toContain('h-8');
+		expect(dockItemBar('left', true)).toContain('top-0.5');
+		expect(dockItemBar('left', false)).toContain('top-1');
+	});
+
+	it('rotates the bar for a top-edge rail', () => {
+		expect(dockItemBar('top', true)).toContain('bottom-0');
+		expect(dockItemBar('top', true)).toContain('w-8');
+		expect(dockItemBar('top', false)).toContain('left-1');
 	});
 });

@@ -49,6 +49,7 @@ describe('notesRepo.list', () => {
 				words: 1,
 				chars: 4,
 				pinned: true,
+				overlay: false,
 				updated: 'Just now',
 				tags: ['a', 'b'],
 			},
@@ -67,13 +68,14 @@ describe('notesRepo.upsert', () => {
 			words: 1,
 			chars: 4,
 			pinned: true,
+			overlay: true,
 			updated: 'Just now',
 			tags: ['a', 'b'],
 		});
 
 		const insert = execute.mock.calls.find(([sql]) => sql.includes('INSERT INTO notes'));
 		expect(insert).toBeDefined();
-		expect(insert![1]).toEqual(['n1', 'Alpha', 'work', 'body', 'body', 1, 4, 1, 'Just now']);
+		expect(insert![1]).toEqual(['n1', 'Alpha', 'work', 'body', 'body', 1, 4, 1, 1, 'Just now']);
 
 		expect(execute).toHaveBeenCalledWith('DELETE FROM tags WHERE note_id = $1', ['n1']);
 		expect(execute).toHaveBeenCalledWith('INSERT OR IGNORE INTO tags (note_id, tag) VALUES ($1, $2)', [
@@ -176,6 +178,7 @@ describe('settingsRepo', () => {
 			overlaySort: 'smart',
 			overlayPosition: 'right',
 			kanbanLocked: false,
+			detailAlwaysOnTop: true,
 		});
 		expect(execute.mock.calls[0][0]).toContain('ON CONFLICT(id) DO UPDATE');
 		expect(JSON.parse(execute.mock.calls[0][1][0])).toMatchObject({ mode: 'dark' });

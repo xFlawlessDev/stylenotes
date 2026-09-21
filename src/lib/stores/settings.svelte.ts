@@ -25,6 +25,7 @@ export type Settings = {
 	overlaySort: OverlaySort;
 	overlayPosition: DockEdge;
 	kanbanLocked: boolean;
+	detailAlwaysOnTop: boolean;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -49,6 +50,7 @@ const defaults: Settings = {
 	overlaySort: 'smart',
 	overlayPosition: 'right',
 	kanbanLocked: false,
+	detailAlwaysOnTop: true,
 };
 
 export function defaultSettings(): Settings {

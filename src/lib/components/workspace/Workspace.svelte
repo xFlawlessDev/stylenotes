@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { buildExcerpt, countWords, createNote as makeNote } from '$lib/content/content';
+	import { listen } from '@tauri-apps/api/event';
+	import { getCurrentWindow } from '@tauri-apps/api/window';
+	import { createNote as makeNote } from '$lib/content/content';
 	import { createNoteActions } from '$lib/content/note-actions';
 	import type { Note } from '$lib/content/content';
 	import {
@@ -13,6 +15,9 @@
 		clearNotes,
 		resetNotesToSeed,
 		loadFolders,
+		listNotes,
+		NOTES_CHANGED,
+		applyNotePatch,
 		uniqueFolderId,
 		reorderFolders,
 		renameFolderInList,
@@ -22,6 +27,8 @@
 		isCustomFolder,
 		type CustomFolder,
 		type Folder,
+		type NotePatch,
+		type NotesChangedPayload,
 	} from '$lib/stores/notes';
 	import {
 		settings,
@@ -41,13 +48,13 @@
 	import NoteEditor from '$lib/components/workspace/NoteEditor.svelte';
 	import NotificationPanel from '$lib/components/workspace/NotificationPanel.svelte';
 	import WorkspaceOverlays from '$lib/components/workspace/WorkspaceOverlays.svelte';
-	import TaskBoard from '$lib/components/tasks/TaskBoard.svelte';
+	import TaskBoard, { type TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 	import {
 		hydrateTasks,
 		clearTasks,
 	} from '$lib/stores/tasks.svelte';
 	import type { Task } from '$lib/stores/tasks';
-	import { toggleOverlay } from '$lib/windows';
+	import { isTauri, NAVIGATE_EVENT, toggleOverlay, type WorkspaceNavigate } from '$lib/windows';
 
 	let items = $state<Note[]>([]);
 	let customFolders = $state<CustomFolder[]>([]);
@@ -71,6 +78,7 @@
 	let section = $state<'notes' | 'tasks'>('notes');
 	let tasks = $state<Task[]>([]);
 	let selectedTaskId = $state('');
+	let taskView = $state<TaskView>('kanban');
 	let taskFocusToken = $state(0);
 	let railOpen = $state(false);
 	let feedOpen = $state(false);
@@ -108,6 +116,44 @@
 			tasks = storedTasks;
 			if (!selectedId && items.length) selectedId = items[0].id;
 		})();
+
+		let unlisten: (() => void) | undefined;
+		let unlistenNotes: (() => void) | undefined;
+		let disposed = false;
+		if (isTauri) {
+			void listen<WorkspaceNavigate>(NAVIGATE_EVENT, (event) => {
+				const payload = event.payload;
+				if (!payload) return;
+				section = payload.section;
+				if (payload.view) taskView = payload.view;
+				if (payload.section === 'tasks') taskFocusToken += 1;
+			}).then((fn) => {
+				if (disposed) fn();
+				else unlisten = fn;
+			});
+
+			// Quick-captured notes arrive from the dock or a note window; mirror
+			// them here unless a local save is still in flight.
+			void listen<NotesChangedPayload>(NOTES_CHANGED, (event) => {
+				if (event.payload?.source === getCurrentWindow().label) return;
+				if (persistTimer) return;
+				void listNotes().then((next) => {
+					if (persistTimer) return;
+					items = next;
+					if (!next.some((note) => note.id === selectedId)) {
+						selectedId = next[0]?.id ?? '';
+					}
+				});
+			}).then((fn) => {
+				if (disposed) fn();
+				else unlistenNotes = fn;
+			});
+		}
+		return () => {
+			disposed = true;
+			unlisten?.();
+			unlistenNotes?.();
+		};
 	});
 
 	function showToast(message: string) {
@@ -191,18 +237,12 @@
 
 	let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
-	function updateNote(id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>) {
+	function updateNote(id: string, patch: NotePatch) {
 		let updated: Note | undefined;
 		items = items.map((note) => {
 			if (note.id !== id) return note;
-			const next: Note = { ...note, ...patch, updated: 'Just now' };
-			if (patch.body !== undefined) {
-				next.words = countWords(patch.body);
-				next.chars = patch.body.length;
-				next.excerpt = buildExcerpt(patch.body);
-			}
-			updated = next;
-			return next;
+			updated = applyNotePatch(note, patch);
+			return updated;
 		});
 
 		if (!updated) return;
@@ -286,6 +326,9 @@
 		}
 		const mod = event.ctrlKey || event.metaKey;
 		if (!mod) return;
+		// Only the bare Ctrl/Cmd combos below belong to the app; Ctrl+Shift+… is
+		// reserved for system/global shortcuts.
+		if (event.shiftKey || event.altKey) return;
 		const key = event.key.toLowerCase();
 		if (key === 'k') {
 			event.preventDefault();
@@ -364,6 +407,7 @@
 			<TaskBoard
 				bind:tasks
 				bind:selectedId={selectedTaskId}
+				bind:view={taskView}
 				focusToken={taskFocusToken}
 				{folders}
 				notes={items}

@@ -4,10 +4,12 @@ A desktop markdown note-taking app built with Tauri v2, SvelteKit (Svelte 5), an
 
 ## Features
 
-- Three windows driven by one route:
+- Windows driven by one route:
   - **workspace** — full note editor with feed, vault rail, command palette, settings, and notifications.
-  - **overlay** — always-on-top dock rail for quick access.
-  - **kanban** — task board that can lock itself to the desktop as an underlay (`Ctrl+Shift+K` toggles lock / always-on-top).
+  - **overlay** — always-on-top dock rail for quick access. Hover the rail items for a preview, double-click a note or task to open its detail window, and hover the **+** button to quick-capture a note or task.
+  - **kanban** — task board that can lock itself to the desktop as an underlay (`Ctrl+Shift+\` toggles lock / always-on-top).
+  - **note-&lt;id&gt;** / **task-&lt;id&gt;** — always-on-top detail windows created on demand. Each note window is a small sticky-note editor with live save and write/split/preview views.
+- Quick capture from anywhere: `Ctrl+Shift+N` opens a new docked note, `Ctrl+Shift+T` a new docked task.
 - Markdown editing with live preview (rendered via `marked` + `dompurify`).
 - Folders, tags, pinning, search, and a command palette.
 - Customizable theme: light/dark, accent, density, reduced motion, editor view, focus mode.

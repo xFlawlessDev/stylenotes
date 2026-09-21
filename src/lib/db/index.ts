@@ -29,6 +29,7 @@ type NoteRow = {
 	words: number;
 	chars: number;
 	pinned: number;
+	overlay: number;
 	updated: string;
 };
 
@@ -42,6 +43,7 @@ function toNote(row: NoteRow, tags: string[]): Note {
 		tags,
 		updated: row.updated,
 		pinned: Boolean(row.pinned),
+		overlay: Boolean(row.overlay),
 		excerpt: row.excerpt,
 		body: row.body,
 		words: Number(row.words) || 0,
@@ -88,8 +90,8 @@ export const notesRepo = {
 	async upsert(note: Note): Promise<void> {
 		const db = await getDb();
 		await db.execute(
-			`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, updated)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			 ON CONFLICT(id) DO UPDATE SET
 				title = excluded.title,
 				folder = excluded.folder,
@@ -98,6 +100,7 @@ export const notesRepo = {
 				words = excluded.words,
 				chars = excluded.chars,
 				pinned = excluded.pinned,
+				overlay = excluded.overlay,
 				updated = excluded.updated`,
 			[
 				note.id,
@@ -108,6 +111,7 @@ export const notesRepo = {
 				note.words,
 				note.chars,
 				note.pinned ? 1 : 0,
+				note.overlay ? 1 : 0,
 				note.updated,
 			]
 		);
@@ -126,8 +130,8 @@ export const notesRepo = {
 		await db.execute('DELETE FROM notes');
 		for (const note of notes) {
 			await db.execute(
-				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, updated)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 				[
 					note.id,
 					note.title,
@@ -137,6 +141,7 @@ export const notesRepo = {
 					note.words,
 					note.chars,
 					note.pinned ? 1 : 0,
+					note.overlay ? 1 : 0,
 					note.updated,
 				]
 			);

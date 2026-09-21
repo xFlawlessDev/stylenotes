@@ -23,6 +23,17 @@ export type Task = {
 	overlay: boolean;
 };
 
+export type TaskFormData = {
+	title: string;
+	notes: string;
+	status: TaskStatus;
+	priority: TaskPriority;
+	folder: string;
+	noteId: string | null;
+	startAt: string | null;
+	dueAt: string | null;
+};
+
 export const statusMeta: Record<TaskStatus, { label: string; tone: string; dot: string }> = {
 	todo: { label: 'To do', tone: 'text-on-surface-variant', dot: 'bg-outline/70' },
 	doing: { label: 'In progress', tone: 'text-secondary', dot: 'bg-secondary' },

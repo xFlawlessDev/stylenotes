@@ -1,42 +1,27 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
 	import { ListTodo } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder } from '$lib/stores/notes';
 	import {
-		TASK_STATUSES,
-		TASK_PRIORITIES,
-		statusMeta,
-		priorityMeta,
-		taskStatus,
-		taskPriority,
-		toDateInput,
 		fromDateInput,
+		taskPriority,
+		taskStatus,
+		toDateInput,
 		type Task,
-		type TaskStatus,
-		type TaskPriority
+		type TaskFormData,
+		type TaskPriority,
+		type TaskStatus
 	} from '$lib/stores/tasks';
-
-	export type TaskFormData = {
-		title: string;
-		notes: string;
-		status: TaskStatus;
-		priority: TaskPriority;
-		folder: string;
-		noteId: string | null;
-		startAt: string | null;
-		dueAt: string | null;
-	};
+	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
 
 	let {
 		open = $bindable(false),
 		task = null,
 		defaultStatus = 'todo',
+		defaultFolder,
+		compact = false,
 		folders,
 		notes,
 		onsubmit
@@ -44,6 +29,10 @@
 		open?: boolean;
 		task?: Task | null;
 		defaultStatus?: TaskStatus;
+		/** Pre-selected folder for new tasks, e.g. the board's active folder filter. */
+		defaultFolder?: string;
+		/** Denser layout plus a scrollable max height for dialogs in small windows. */
+		compact?: boolean;
 		folders: Folder[];
 		notes: Note[];
 		onsubmit: (data: TaskFormData) => void;
@@ -57,7 +46,6 @@
 	let noteId = $state('');
 	let startDate = $state('');
 	let dueDate = $state('');
-	let titleEl = $state<HTMLInputElement | null>(null);
 
 	const folderOptions = $derived(folders.filter((item) => item.id !== 'all'));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
@@ -68,11 +56,10 @@
 			detail = task?.notes ?? '';
 			status = task ? taskStatus(task) : defaultStatus;
 			priority = task ? taskPriority(task) : 'medium';
-			folder = task?.folder ?? folderOptions[0]?.id ?? 'personal';
+			folder = task?.folder ?? defaultFolder ?? folderOptions[0]?.id ?? 'personal';
 			noteId = task?.noteId ?? '';
 			startDate = toDateInput(task?.startAt ?? null);
 			dueDate = toDateInput(task?.dueAt ?? null);
-			void tick().then(() => titleEl?.focus());
 		}
 	});
 
@@ -94,7 +81,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		class="glass-dialog"
+		class="glass-dialog {compact ? 'max-h-[calc(100vh-1.5rem)] overflow-y-auto p-3' : ''}"
 		onkeydown={(event) => {
 			if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 				event.preventDefault();
@@ -102,128 +89,61 @@
 			}
 		}}
 	>
-		<Dialog.Header>
-			<div
-				class="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-container text-primary"
+		<Dialog.Header class={compact ? 'gap-1' : ''}>
+			{#if !compact}
+				<div
+					class="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-container text-primary"
+				>
+					<ListTodo size={18} />
+				</div>
+			{/if}
+			<Dialog.Title
+				class={compact
+					? 'pr-7 text-headline-sm font-headline text-on-surface'
+					: 'text-headline-md font-headline text-on-surface'}
 			>
-				<ListTodo size={18} />
-			</div>
-			<Dialog.Title class="text-headline-md font-headline text-on-surface">
 				{task ? 'Edit task' : 'New task'}
 			</Dialog.Title>
-			<Dialog.Description>
-				Give the task a home, a status, and a date range for the calendar view.
-			</Dialog.Description>
+			{#if !compact}
+				<Dialog.Description>
+					Give the task a home, a status, and a date range for the calendar view.
+				</Dialog.Description>
+			{/if}
 		</Dialog.Header>
 
 		<form
-			class="flex flex-col gap-4"
+			class="flex flex-col {compact ? 'gap-3' : 'gap-4'}"
 			onsubmit={(event) => {
 				event.preventDefault();
 				submit();
 			}}
 		>
-			<div class="flex flex-col gap-2">
-				<Label for="task-title" class="text-label-md font-label text-on-surface-variant">Title</Label>
-				<Input
-					id="task-title"
-					bind:ref={titleEl}
-					bind:value={title}
-					placeholder="What needs doing?"
-					class="glass-well h-9 border-0 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50"
-				/>
-			</div>
-
-			<div class="flex flex-col gap-2">
-				<Label for="task-notes" class="text-label-md font-label text-on-surface-variant"
-					>Details <span class="text-outline">(optional)</span></Label
-				>
-				<textarea
-					id="task-notes"
-					bind:value={detail}
-					rows="2"
-					placeholder="Context, links, next steps."
-					class="glass-well w-full resize-none rounded-lg px-3 py-2 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none"
-				></textarea>
-			</div>
-
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				<div class="flex flex-col gap-2">
-					<Label class="text-label-md font-label text-on-surface-variant">Status</Label>
-					<SelectField
-						label="Status"
-						options={TASK_STATUSES.map((value) => ({ value, label: statusMeta[value].label }))}
-						bind:value={status}
-					/>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<Label class="text-label-md font-label text-on-surface-variant"
-						>Priority</Label
-					>
-					<SelectField
-						label="Priority"
-						options={TASK_PRIORITIES.map((value) => ({ value, label: priorityMeta[value].label }))}
-						bind:value={priority}
-					/>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<Label for="task-start" class="text-label-md font-label text-on-surface-variant">Start</Label>
-					<Input
-						id="task-start"
-						type="date"
-						bind:value={startDate}
-						class="glass-well h-9 border-0 text-body-md font-body text-on-surface focus-visible:ring-1 focus-visible:ring-primary/50"
-					/>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<Label for="task-due" class="text-label-md font-label text-on-surface-variant">Due</Label>
-					<Input
-						id="task-due"
-						type="date"
-						bind:value={dueDate}
-						class="glass-well h-9 border-0 text-body-md font-body text-on-surface focus-visible:ring-1 focus-visible:ring-primary/50"
-					/>
-				</div>
-			</div>
-
-			{#if dateError}
-				<p class="text-label-sm font-label text-error">The due date cannot precede the start date.</p>
-			{/if}
-
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				<div class="flex flex-col gap-2">
-					<Label class="text-label-md font-label text-on-surface-variant">Folder</Label>
-					<SelectField
-						label="Folder"
-						options={folderOptions.map((option) => ({ value: option.id, label: option.label }))}
-						bind:value={folder}
-					/>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<Label class="text-label-md font-label text-on-surface-variant"
-						>Linked note <span class="text-outline">(optional)</span></Label
-					>
-					<SelectField
-						label="Linked note"
-						placeholder="None"
-						options={[
-							{ value: '', label: 'None' },
-							...notes.map((note) => ({ value: note.id, label: note.title || 'Untitled note' }))
-						]}
-						bind:value={noteId}
-					/>
-				</div>
-			</div>
+			<TaskFormFields
+				bind:title
+				bind:detail
+				bind:status
+				bind:priority
+				bind:folder
+				bind:noteId
+				bind:startDate
+				bind:dueDate
+				{folders}
+				{notes}
+				{compact}
+				idPrefix="task-dialog"
+				autofocus
+			/>
 
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit" disabled={!title.trim() || dateError}>
+				<Button
+					type="button"
+					variant="outline"
+					size={compact ? 'sm' : 'default'}
+					onclick={() => (open = false)}>Cancel</Button
+				>
+				<Button type="submit" size={compact ? 'sm' : 'default'} disabled={!title.trim() || dateError}>
 					{task ? 'Save task' : 'Create task'}
 				</Button>
 			</Dialog.Footer>

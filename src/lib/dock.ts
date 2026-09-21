@@ -1,4 +1,10 @@
+import type { Note } from '$lib/content/content';
+import type { Task } from '$lib/stores/tasks';
+
 export type DockEdge = 'left' | 'right' | 'top';
+
+/** A dock rail item under the pointer: a docked note or task. */
+export type DockHover = { kind: 'task'; task: Task } | { kind: 'note'; note: Note };
 
 export type DockPoint = { x: number; y: number };
 export type DockSize = { width: number; height: number };
@@ -101,4 +107,16 @@ export function dockCardOffset({
 		x: edge === 'right' ? window.width - gap - card.width : gap,
 		y: clamp(pointer.y - card.height / 2, margin, window.height - card.height - margin)
 	};
+}
+
+/**
+ * Edge-facing indicator bar for a dock item button (task priority or note
+ * pin); `active` grows the bar toward the window interior.
+ */
+export function dockItemBar(edge: DockEdge, active: boolean): string {
+	if (edge === 'top') {
+		return `absolute bottom-0 rounded-t ${active ? 'left-0.5 h-1.5 w-8' : 'left-1 h-1 w-7'}`;
+	}
+	const side = edge === 'right' ? 'right-0 rounded-l' : 'left-0 rounded-r';
+	return `absolute ${side} ${active ? 'top-0.5 h-8 w-1.5' : 'top-1 h-7 w-1'}`;
 }

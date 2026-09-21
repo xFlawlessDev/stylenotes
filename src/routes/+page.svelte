@@ -3,26 +3,36 @@
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import DockRail from '$lib/components/overlay/DockRail.svelte';
 	import KanbanWindow from '$lib/components/tasks/KanbanWindow.svelte';
+	import NoteWindow from '$lib/components/note/NoteWindow.svelte';
+	import TaskWindow from '$lib/components/tasks/TaskWindow.svelte';
 	import { refreshSettings, settings } from '$lib/stores/settings.svelte';
-	import { registerKanbanShortcut, restoreKanbanLock } from '$lib/stores/kanban.svelte';
-	import { currentWindowRole, revealCurrentWindow, type WindowRole } from '$lib/windows';
+	import { restoreKanbanLock } from '$lib/stores/kanban.svelte';
+	import { currentWindowRole, isTauri, revealCurrentWindow, type WindowRole } from '$lib/windows';
 
-	let role = $state<WindowRole>('workspace');
+	/** Resolved before the first render so no window ever paints another role. */
+	function detectRole(): WindowRole {
+		if (!isTauri) return 'workspace';
+		try {
+			return currentWindowRole();
+		} catch {
+			return 'workspace';
+		}
+	}
+
+	let role = $state<WindowRole>(detectRole());
 
 	onMount(async () => {
-		role = currentWindowRole();
 		document.documentElement.dataset.window = role;
 		await tick();
 		if (role === 'kanban') {
-			// The Kanban webview is alive from launch (hidden), so registering the
-			// global shortcut here makes it available app-wide.
-			void registerKanbanShortcut();
 			await refreshSettings();
 			await restoreKanbanLock();
 			// A locked board is a desktop widget: bring it back on launch.
 			if (settings.kanbanLocked) requestAnimationFrame(() => revealCurrentWindow());
 			return;
 		}
+		// Note and task windows reveal themselves once their record is loaded.
+		if (role === 'note' || role === 'task') return;
 		requestAnimationFrame(() => revealCurrentWindow());
 	});
 </script>
@@ -33,6 +43,10 @@
 	</div>
 {:else if role === 'kanban'}
 	<KanbanWindow />
+{:else if role === 'note'}
+	<NoteWindow />
+{:else if role === 'task'}
+	<TaskWindow />
 {:else}
 	<Workspace />
 {/if}

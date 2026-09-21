@@ -8,8 +8,8 @@
 		PhysicalPosition
 	} from '@tauri-apps/api/window';
 	import { listen } from '@tauri-apps/api/event';
-	import { ListTodo, Plus } from '@lucide/svelte';
-	import { isTauri, openWorkspace } from '$lib/windows';
+	import type { Note } from '$lib/content/content';
+	import { isTauri, openNoteWindow, openTaskWindow } from '$lib/windows';
 	import {
 		DOCK_RAIL,
 		dockCardOffset,
@@ -17,6 +17,7 @@
 		dockWindowSize,
 		snapToDockEdge,
 		type DockEdge,
+		type DockHover,
 		type DockPoint,
 		type DockSize
 	} from '$lib/dock';
@@ -29,20 +30,30 @@
 	import {
 		applyDockFilters,
 		dockStore,
-		loadDockTasks,
+		loadDockItems,
+		removeDockNote,
 		removeDockTask,
 		toggleDockComplete,
 		toggleDockProgress
 	} from '$lib/stores/dock.svelte';
+	import { NOTES_CHANGED } from '$lib/stores/notes';
 	import { TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import {
+		createQuickNote,
+		createQuickTask,
+		listenQuickCapture,
+		type QuickCaptureKind
+	} from '$lib/stores/shortcuts';
 	import type { Task } from '$lib/stores/tasks';
 	import DockHandle from '$lib/components/overlay/DockHandle.svelte';
-	import DockTaskButton from '$lib/components/overlay/DockTaskButton.svelte';
-	import TaskDockCard from '$lib/components/overlay/TaskDockCard.svelte';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import DockRailItems from '$lib/components/overlay/DockRailItems.svelte';
+	import DockRailLayers from '$lib/components/overlay/DockRailLayers.svelte';
 
 	const CARD: DockSize = { width: 288, height: 280 };
+	const CAPTURE_CARD: DockSize = { width: 208, height: 104 };
 	const POLL_MS = 40;
+	/** Grace period so the pointer can travel from the + button to the menu. */
+	const CAPTURE_LINGER_MS = 250;
 
 	const railClasses: Record<DockEdge, string> = {
 		left: 'top-3 left-0 flex-col rounded-r-2xl py-3',
@@ -53,34 +64,70 @@
 	const edge = $derived(settings.overlayPosition);
 	const railSide = $derived(railClasses[edge]);
 	const tooltipSide = $derived(dockTooltipSide(edge));
+
 	let collapsed = $state(false);
-	let hovered = $state<Task | null>(null);
+	let hovered = $state<DockHover | null>(null);
 	let cardOffset = $state<DockPoint>({ x: 0, y: 0 });
+	let captureOpen = $state(false);
+	let captureOffset = $state<DockPoint>({ x: 0, y: 0 });
 	let railEl: HTMLElement | undefined = $state();
 	let cardEl: HTMLElement | undefined = $state();
+	let captureEl: HTMLElement | undefined = $state();
+	let plusEl: HTMLElement | undefined = $state();
 	let ignoring = false;
 	let dragging = false;
+	let captureCloseTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function syncHovered() {
-		if (hovered && !dockStore.tasks.some((item) => item.id === hovered?.id)) hovered = null;
+		const current = hovered;
+		if (!current) return;
+		if (current.kind === 'task' && !dockStore.tasks.some((item) => item.id === current.task.id)) {
+			hovered = null;
+		}
+		if (current.kind === 'note' && !dockStore.notes.some((item) => item.id === current.note.id)) {
+			hovered = null;
+		}
 	}
 
 	async function reload() {
-		await loadDockTasks();
+		await loadDockItems();
 		syncHovered();
 	}
 
 	async function toggleProgress(task: Task) {
-		hovered = await toggleDockProgress(task);
+		hovered = { kind: 'task', task: await toggleDockProgress(task) };
 	}
 
 	async function toggleComplete(task: Task) {
-		hovered = await toggleDockComplete(task);
+		hovered = { kind: 'task', task: await toggleDockComplete(task) };
 	}
 
 	async function removeFromDock(task: Task) {
 		hovered = null;
 		await removeDockTask(task);
+	}
+
+	async function removeNoteFromDock(note: Note) {
+		hovered = null;
+		await removeDockNote(note);
+	}
+
+	function openNote(note: Note) {
+		closeCaptureMenu();
+		hovered = null;
+		void openNoteWindow(note.id);
+	}
+
+	function openTask(task: Task) {
+		closeCaptureMenu();
+		hovered = null;
+		void openTaskWindow(task.id);
+	}
+
+	async function createDockItem(kind: QuickCaptureKind) {
+		closeCaptureMenu();
+		if (kind === 'note') await createQuickNote();
+		else await createQuickTask();
 	}
 
 	/** Sizes the window for the current edge and pins it against that edge. */
@@ -109,7 +156,10 @@
 
 	async function toggleCollapsed() {
 		collapsed = !collapsed;
-		if (collapsed) hovered = null;
+		if (collapsed) {
+			hovered = null;
+			closeCaptureMenu();
+		}
 		await applyDockGeometry();
 	}
 
@@ -119,29 +169,66 @@
 		return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 	}
 
+	function rectCenter(r: DOMRect): DockPoint {
+		return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+	}
+
 	async function setIgnore(value: boolean) {
 		if (!isTauri || ignoring === value) return;
 		ignoring = value;
 		await getCurrentWindow().setIgnoreCursorEvents(value);
 	}
 
-	function taskAtPoint(x: number, y: number): { task: Task; anchor: DockPoint } | null {
+	function itemAtPoint(x: number, y: number): { hover: DockHover; anchor: DockPoint } | null {
 		if (!railEl) return null;
-		const buttons = railEl.querySelectorAll<HTMLElement>('[data-task-id]');
+		const buttons = railEl.querySelectorAll<HTMLElement>('[data-dock-id]');
 		for (const btn of buttons) {
 			const r = btn.getBoundingClientRect();
-			if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-				const task = dockStore.tasks.find((item) => item.id === btn.dataset.taskId);
-				if (task) {
-					return { task, anchor: { x: r.left + r.width / 2, y: r.top + r.height / 2 } };
-				}
+			if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+			const id = btn.dataset.dockId;
+			if (btn.dataset.dockKind === 'note') {
+				const note = dockStore.notes.find((item) => item.id === id);
+				if (note) return { hover: { kind: 'note', note }, anchor: rectCenter(r) };
+			} else if (btn.dataset.dockKind === 'task') {
+				const task = dockStore.tasks.find((item) => item.id === id);
+				if (task) return { hover: { kind: 'task', task }, anchor: rectCenter(r) };
 			}
 		}
 		return null;
 	}
 
-	async function openWorkspaceWindow() {
-		await openWorkspace();
+	function openCaptureMenu() {
+		if (captureOpen || !plusEl) return;
+		cancelCaptureClose();
+		captureOpen = true;
+		hovered = null;
+		captureOffset = dockCardOffset({
+			edge: settings.overlayPosition,
+			pointer: rectCenter(plusEl.getBoundingClientRect()),
+			window: dockWindowSize(settings.overlayPosition, false),
+			card: CAPTURE_CARD
+		});
+	}
+
+	function cancelCaptureClose() {
+		if (captureCloseTimer) {
+			clearTimeout(captureCloseTimer);
+			captureCloseTimer = undefined;
+		}
+	}
+
+	/** Closes after a short linger so the pointer can cross the gap to the menu. */
+	function scheduleCaptureClose() {
+		if (!captureOpen || captureCloseTimer) return;
+		captureCloseTimer = setTimeout(() => {
+			captureCloseTimer = undefined;
+			captureOpen = false;
+		}, CAPTURE_LINGER_MS);
+	}
+
+	function closeCaptureMenu() {
+		cancelCaptureClose();
+		captureOpen = false;
 	}
 
 	onMount(() => {
@@ -149,7 +236,9 @@
 
 		let unlistenFocus: (() => void) | undefined;
 		let unlistenTasks: (() => void) | undefined;
+		let unlistenNotes: (() => void) | undefined;
 		let unlistenSettings: (() => void) | undefined;
+		let unlistenCapture: (() => void) | undefined;
 		let unlistenBrowser: (() => void) | undefined;
 
 		if (isTauri) {
@@ -159,6 +248,10 @@
 				})
 				.then((fn) => (unlistenFocus = fn));
 			void listen(TASKS_CHANGED, () => void reload()).then((fn) => (unlistenTasks = fn));
+			void listen(NOTES_CHANGED, () => void reload()).then((fn) => (unlistenNotes = fn));
+			void listenQuickCapture((kind) => void createDockItem(kind)).then(
+				(fn) => (unlistenCapture = fn)
+			);
 			void listen<Settings>(SETTINGS_CHANGED, (event) => {
 				const edgeChanged = event.payload?.overlayPosition !== settings.overlayPosition;
 				applySettingsSnapshot(event.payload);
@@ -166,6 +259,7 @@
 				syncHovered();
 				if (edgeChanged) {
 					hovered = null;
+					closeCaptureMenu();
 					void applyDockGeometry();
 				}
 			}).then((fn) => (unlistenSettings = fn));
@@ -178,7 +272,9 @@
 		const cleanupListeners = () => {
 			unlistenFocus?.();
 			unlistenTasks?.();
+			unlistenNotes?.();
 			unlistenSettings?.();
+			unlistenCapture?.();
 			unlistenBrowser?.();
 		};
 
@@ -206,30 +302,40 @@
 				const y = (cursor.y - pos.y) / scale;
 
 				const overRail = inRect(railEl, x, y);
+				const overPlus = inRect(plusEl, x, y);
+				const overCard = inRect(cardEl, x, y);
+				const overCapture = captureOpen && inRect(captureEl, x, y);
 
 				if (collapsed) {
-					if (overRail) await setIgnore(false);
-					else await setIgnore(true);
-				} else {
-					const hit = taskAtPoint(x, y);
-					const overCard = inRect(cardEl, x, y);
-					if (overRail) {
-						await setIgnore(false);
-						if (hit) {
-							hovered = hit.task;
-							cardOffset = dockCardOffset({
-								edge: settings.overlayPosition,
-								pointer: hit.anchor,
-								window: dockWindowSize(settings.overlayPosition, false),
-								card: CARD
-							});
-						}
-					} else if (overCard) {
-						await setIgnore(false);
+					await setIgnore(!overRail);
+				} else if (overPlus) {
+					await setIgnore(false);
+					openCaptureMenu();
+				} else if (overCapture) {
+					await setIgnore(false);
+					cancelCaptureClose();
+				} else if (overRail) {
+					await setIgnore(false);
+					const hit = itemAtPoint(x, y);
+					if (hit) {
+						closeCaptureMenu();
+						hovered = hit.hover;
+						cardOffset = dockCardOffset({
+							edge: settings.overlayPosition,
+							pointer: hit.anchor,
+							window: dockWindowSize(settings.overlayPosition, false),
+							card: CARD
+						});
 					} else {
-						hovered = null;
-						await setIgnore(true);
+						scheduleCaptureClose();
 					}
+				} else if (overCard) {
+					await setIgnore(false);
+					scheduleCaptureClose();
+				} else {
+					hovered = null;
+					scheduleCaptureClose();
+					await setIgnore(true);
 				}
 			} catch {
 				/* ignore */
@@ -240,29 +346,28 @@
 
 		return () => {
 			clearTimeout(timer);
+			cancelCaptureClose();
 			cleanupListeners();
 		};
 	});
 </script>
 
 <div class="relative h-screen w-screen overflow-hidden" role="presentation">
-	<!-- Task preview card -->
-	{#if hovered}
-		<div
-			bind:this={cardEl}
-			class="absolute w-72"
-			style="left: {cardOffset.x}px; top: {cardOffset.y}px;"
-		>
-			<TaskDockCard
-				task={hovered}
-				onopen={openWorkspaceWindow}
-				onprogress={toggleProgress}
-				oncomplete={toggleComplete}
-				onremove={removeFromDock}
-				onclose={() => (hovered = null)}
-			/>
-		</div>
-	{/if}
+	<DockRailLayers
+		bind:hovered
+		{cardOffset}
+		{captureOpen}
+		{captureOffset}
+		bind:cardEl
+		bind:captureEl
+		onopennote={openNote}
+		onopentask={openTask}
+		onprogress={toggleProgress}
+		oncomplete={toggleComplete}
+		onremovetask={removeFromDock}
+		onremovenote={removeNoteFromDock}
+		oncreate={createDockItem}
+	/>
 
 	{#if !collapsed}
 		<!-- Rail (full) -->
@@ -277,60 +382,19 @@
 				ontoggle={toggleCollapsed}
 				ondraggingchange={(value) => (dragging = value)}
 			/>
-
-			<div
-				class="scrollbar-none flex items-center gap-2.5 {edge === 'top'
-					? 'max-w-[168px] flex-row overflow-x-auto'
-					: 'max-h-[168px] w-full flex-col overflow-y-auto'}"
-			>
-				{#each dockStore.tasks as task (task.id)}
-					<DockTaskButton {task} {edge} active={hovered?.id === task.id} />
-				{/each}
-
-				{#if dockStore.tasks.length === 0}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<button
-									{...props}
-									class="glass-chip flex size-9 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-all hover:text-on-surface"
-									aria-label={dockStore.docked > 0
-										? 'No tasks match the dock filters'
-										: 'No tasks in the dock'}
-									onclick={openWorkspaceWindow}
-								>
-									<ListTodo size={18} />
-								</button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content side={tooltipSide}>
-							{dockStore.docked > 0 ? 'No tasks match the dock filters' : 'No tasks in the dock'}
-						</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
-			</div>
-
-			<div
-				class={edge === 'top'
-					? 'mx-0.5 h-6 w-px bg-surface-container'
-					: 'my-0.5 h-px w-6 bg-surface-container'}
-			></div>
-
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<button
-							{...props}
-							class="emphasis-container flex size-9 shrink-0 items-center justify-center rounded-2xl text-on-primary-container shadow-md ring-1 ring-inset ring-emphasis-container-ring transition-all hover:scale-105"
-							aria-label="Open Tasks"
-							onclick={openWorkspaceWindow}
-						>
-							<Plus size={19} class="relative" />
-						</button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content side={tooltipSide}>Open Tasks</Tooltip.Content>
-			</Tooltip.Root>
+			<DockRailItems
+				notes={dockStore.notes}
+				tasks={dockStore.tasks}
+				docked={dockStore.docked}
+				{edge}
+				{hovered}
+				{tooltipSide}
+				bind:plusEl
+				onopennote={openNote}
+				onopentask={openTask}
+				onplus={() => (captureOpen ? closeCaptureMenu() : openCaptureMenu())}
+				onplusenter={openCaptureMenu}
+			/>
 		</div>
 	{:else}
 		<!-- Collapsed minimal tab -->

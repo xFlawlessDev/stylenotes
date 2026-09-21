@@ -7,6 +7,7 @@ export type Note = {
   tags: string[];
   updated: string;
   pinned: boolean;
+  overlay: boolean;
   excerpt: string;
   body: string;
   words: number;
@@ -32,6 +33,7 @@ export function createNote(seed: Partial<Note> = {}): Note {
     tags: seed.tags ?? [],
     updated: seed.updated ?? 'Just now',
     pinned: seed.pinned ?? false,
+    overlay: seed.overlay ?? false,
     excerpt: seed.excerpt ?? buildExcerpt(body),
     body,
     words: seed.words ?? countWords(body),
@@ -119,6 +121,7 @@ function buildNote(path: string, raw: string): Note {
     tags: asList(data.tags),
     updated: asString(data.updated, 'Recently'),
     pinned: asString(data.pinned).toLowerCase() === 'true',
+    overlay: false,
     excerpt: asString(data.excerpt) || buildExcerpt(body),
     body,
     words: countWords(body),
