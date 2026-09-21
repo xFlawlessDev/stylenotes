@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { FilterX, PictureInPicture2 } from '@lucide/svelte';
 	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { DOCK_EDGES, dockEdgeLabels, type DockEdge } from '$lib/dock';
 	import { settings, updateSettings } from '$lib/stores/settings.svelte';
 	import {
 		OVERLAY_SORTS,
@@ -29,14 +30,25 @@
 
 	const sortOptions = OVERLAY_SORTS.map((sort) => ({ value: sort, label: overlaySortLabels[sort] }));
 
+	const positionOptions = DOCK_EDGES.map((position) => ({
+		value: position,
+		label: dockEdgeLabels[position]
+	}));
+
 	const customized = $derived(
 		settings.overlayStatus !== 'all' ||
 			settings.overlayPriority !== 'all' ||
-			settings.overlaySort !== 'smart'
+			settings.overlaySort !== 'smart' ||
+			settings.overlayPosition !== 'right'
 	);
 
 	function resetFilters() {
-		updateSettings({ overlayStatus: 'all', overlayPriority: 'all', overlaySort: 'smart' });
+		updateSettings({
+			overlayStatus: 'all',
+			overlayPriority: 'all',
+			overlaySort: 'smart',
+			overlayPosition: 'right'
+		});
 	}
 </script>
 
@@ -52,12 +64,22 @@
 		<div class="flex flex-col">
 			<span class="text-headline-sm font-headline text-on-surface">Docked tasks</span>
 			<span class="text-label-sm font-label text-outline"
-				>Choose which tasks the overlay shows and how they are ordered</span
+				>Choose where the dock sits and which tasks it shows</span
 			>
 		</div>
 	</div>
 
 	<div class="flex flex-col gap-3 rounded-2xl bg-surface-container-lowest/30 p-3">
+		<div class="flex flex-col gap-1.5">
+			<span class="text-body-md font-body text-on-surface">Position</span>
+			<SelectField
+				label="Dock position"
+				options={positionOptions}
+				value={settings.overlayPosition}
+				onchange={(next) => updateSettings({ overlayPosition: next as DockEdge })}
+			/>
+		</div>
+
 		<div class="flex flex-col gap-1.5">
 			<span class="text-body-md font-body text-on-surface">Status</span>
 			<SelectField
@@ -100,7 +122,7 @@
 	</div>
 
 	<p class="text-label-sm font-label leading-relaxed text-outline">
-		Filters and sorting apply to the overlay dock only. Tasks still stay in your task list either
-		way.
+		Position pins the overlay dock to a screen edge. Filters and sorting apply to the dock only;
+		tasks still stay in your task list either way.
 	</p>
 </div>

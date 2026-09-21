@@ -5,7 +5,11 @@ import {
 } from "@tauri-apps/api/window";
 import { isTauri } from "./windows";
 
-export type VerticalDragOptions = {
+export type DragAxis = "x" | "y";
+
+export type EdgeDragOptions = {
+  /** Screen axis the window travels along. Defaults to "y". */
+  axis?: DragAxis;
   /** Fired when a press ends without travelling past `threshold` pixels. */
   onClick?: () => void;
   /** Fired when a press becomes a drag and again when the drag ends. */
@@ -15,27 +19,33 @@ export type VerticalDragOptions = {
 };
 
 /**
- * Svelte action: drag a window vertically only.
+ * Svelte action: drag a window along one screen axis.
  *
- * A press that never travels past `threshold` pixels is reported as a click, so
- * one control can toggle on click and reposition on drag. The horizontal
- * position is frozen at drag start, and vertical movement is clamped so the
- * window always stays within the current monitor.
+ * The dock is pinned to a screen edge, so only the free axis moves; the other
+ * position is frozen at drag start and movement is clamped to the current
+ * monitor. A press that never travels past `threshold` pixels is reported as a
+ * click, so one control can toggle on click and reposition on drag.
  */
-export function verticalDrag(node: HTMLElement, options: VerticalDragOptions) {
+export function edgeDrag(node: HTMLElement, options: EdgeDragOptions = {}) {
   let opts = options;
   let pressed = false;
   let ready = false;
   let dragging = false;
   let pressToken = 0;
-  let startPointerY = 0;
+  let axis: DragAxis = "y";
+  let startPointer = 0;
   let startWinX = 0;
   let startWinY = 0;
+  let startPos = 0;
   let scale = 1;
-  let minY = 0;
-  let maxY = Number.POSITIVE_INFINITY;
+  let minPos = 0;
+  let maxPos = Number.POSITIVE_INFINITY;
   let raf = 0;
-  let pendingY = 0;
+  let pending = 0;
+
+  function pointerPos(event: PointerEvent) {
+    return axis === "x" ? event.screenX : event.screenY;
+  }
 
   async function prepare(token: number) {
     const win = getCurrentWindow();
@@ -50,9 +60,16 @@ export function verticalDrag(node: HTMLElement, options: VerticalDragOptions) {
     scale = factor;
     startWinX = pos.x;
     startWinY = pos.y;
+    startPos = axis === "x" ? pos.x : pos.y;
     if (monitor) {
-      minY = monitor.position.y;
-      maxY = monitor.position.y + monitor.size.height - size.height;
+      minPos = axis === "x" ? monitor.position.x : monitor.position.y;
+      maxPos =
+        axis === "x"
+          ? monitor.position.x + monitor.size.width - size.width
+          : monitor.position.y + monitor.size.height - size.height;
+    } else {
+      minPos = 0;
+      maxPos = Number.POSITIVE_INFINITY;
     }
     ready = true;
   }
@@ -62,7 +79,8 @@ export function verticalDrag(node: HTMLElement, options: VerticalDragOptions) {
     pressed = true;
     ready = false;
     dragging = false;
-    startPointerY = event.screenY;
+    axis = opts.axis ?? "y";
+    startPointer = pointerPos(event);
     node.setPointerCapture(event.pointerId);
     event.preventDefault();
     if (isTauri) void prepare(++pressToken);
@@ -71,18 +89,22 @@ export function verticalDrag(node: HTMLElement, options: VerticalDragOptions) {
   function move(event: PointerEvent) {
     if (!pressed || !ready) return;
     if (!dragging) {
-      if (Math.abs(event.screenY - startPointerY) < (opts.threshold ?? 4)) return;
+      if (Math.abs(pointerPos(event) - startPointer) < (opts.threshold ?? 4)) return;
       dragging = true;
       opts.onStateChange?.(true);
     }
 
-    const delta = Math.round((event.screenY - startPointerY) * scale);
-    pendingY = Math.min(maxY, Math.max(minY, startWinY + delta));
+    const delta = Math.round((pointerPos(event) - startPointer) * scale);
+    pending = Math.min(maxPos, Math.max(minPos, startPos + delta));
 
     if (!raf) {
       raf = requestAnimationFrame(() => {
         raf = 0;
-        getCurrentWindow().setPosition(new PhysicalPosition(startWinX, pendingY));
+        getCurrentWindow().setPosition(
+          axis === "x"
+            ? new PhysicalPosition(pending, startWinY)
+            : new PhysicalPosition(startWinX, pending),
+        );
       });
     }
   }
@@ -115,7 +137,7 @@ export function verticalDrag(node: HTMLElement, options: VerticalDragOptions) {
   node.addEventListener("pointercancel", onCancel);
 
   return {
-    update(next: VerticalDragOptions) {
+    update(next: EdgeDragOptions) {
       opts = next;
     },
     destroy() {

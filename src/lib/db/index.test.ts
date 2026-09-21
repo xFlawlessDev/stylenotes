@@ -174,6 +174,7 @@ describe('settingsRepo', () => {
 			overlayStatus: 'all',
 			overlayPriority: 'all',
 			overlaySort: 'smart',
+			overlayPosition: 'right',
 		});
 		expect(execute.mock.calls[0][0]).toContain('ON CONFLICT(id) DO UPDATE');
 		expect(JSON.parse(execute.mock.calls[0][1][0])).toMatchObject({ mode: 'dark' });

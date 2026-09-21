@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { Check, Minimize2, PenLine, Tag, X } from '@lucide/svelte';
+	import { Minimize2, PenLine, Tag, X } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { type EditState, type EditorCommand } from '$lib/content/markdown-editor';
 	import { continueList, indentLines } from '$lib/content/markdown-lines';
@@ -18,6 +18,7 @@
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
+	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
@@ -249,19 +250,22 @@
 					</button>
 				</div>
 			{:else if settings.focusMode}
-				<div class="flex h-11 shrink-0 items-center justify-between px-4">
+				<div class="flex h-11 shrink-0 items-center justify-between gap-3 px-4 @container">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 						>Focus mode</span
 					>
-					<button
-						class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
-						onclick={() => updateSettings({ focusMode: false })}
-					>
-						<X size={13} /> Exit
-					</button>
+					<div class="flex items-center gap-3">
+						<EditorStatus {note} />
+						<button
+							class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
+							onclick={() => updateSettings({ focusMode: false })}
+						>
+							<X size={13} /> Exit
+						</button>
+					</div>
 				</div>
 			{:else}
-				<div class="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
+				<div class="flex h-12 shrink-0 items-center justify-between gap-3 px-4 @container">
 					<Breadcrumb.Root class="min-w-0">
 						<Breadcrumb.List
 							class="gap-1.5 text-label-md font-label text-on-surface-variant sm:gap-1.5"
@@ -284,19 +288,22 @@
 						</Breadcrumb.List>
 					</Breadcrumb.Root>
 
-					<NoteToolbar
-						{view}
-						pinned={note.pinned}
-						{archived}
-						onview={changeView}
-						ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
-						ontogglearchive={toggleArchive}
-						onprint={() => onprint?.(note)}
-						onexport={() => onexport?.(note)}
-						oncopy={() => oncopy?.(note)}
-						ondelete={() => ondelete(note.id)}
-						onfullpreview={() => ontogglefullpreview?.()}
-					/>
+					<div class="flex shrink-0 items-center gap-3">
+						<EditorStatus {note} />
+						<NoteToolbar
+							{view}
+							pinned={note.pinned}
+							{archived}
+							onview={changeView}
+							ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
+							ontogglearchive={toggleArchive}
+							onprint={() => onprint?.(note)}
+							onexport={() => onexport?.(note)}
+							oncopy={() => oncopy?.(note)}
+							ondelete={() => ondelete(note.id)}
+							onfullpreview={() => ontogglefullpreview?.()}
+						/>
+					</div>
 				</div>
 			{/if}
 
@@ -392,28 +399,6 @@
 					</div>
 				{/if}
 			</div>
-
-			{#if !fullPreview}
-				<footer
-					class="glass-well m-2.5 mt-0 flex h-8 shrink-0 items-center justify-between rounded-xl px-4 text-code-sm font-code text-outline"
-				>
-					<div class="flex items-center gap-3">
-						{#if settings.showWordCount}
-							<span>Words <strong class="font-normal text-on-surface">{note.words}</strong></span>
-							<span>Chars <strong class="font-normal text-on-surface">{note.chars}</strong></span>
-						{:else}
-							<span class="capitalize">{view} mode</span>
-						{/if}
-					</div>
-					<div class="flex items-center gap-3">
-						<span class="flex items-center gap-1.5">
-							<Check size={12} class="text-success" />
-							Saved locally
-						</span>
-						<span>{note.updated}</span>
-					</div>
-				</footer>
-			{/if}
 		{:else}
 			<div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
 				<div class="glass-well flex size-14 items-center justify-center rounded-2xl text-outline">

@@ -43,6 +43,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - New window or plugin APIs need matching permissions in `src-tauri/capabilities/default.json` (applies to both `workspace` and `overlay`). Missing permissions fail silently at runtime.
 - Rust crate lib name is `stylenotes_lib` (`src-tauri/Cargo.toml`).
 - `tauri-plugin-prevent-default` blocks browser shortcuts, but dev builds keep DevTools + Reload (`lib.rs`).
+- The `workspace` and `overlay` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
 
 ## Frontend conventions
 

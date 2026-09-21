@@ -1,6 +1,22 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+#[cfg(desktop)]
+mod tray;
+
 const DB_URL: &str = "sqlite:stylenotes.db";
+const WORKSPACE_LABEL: &str = "workspace";
+const OVERLAY_LABEL: &str = "overlay";
+
+/// Both windows are hidden instead of closed so the app keeps running in the
+/// system tray; "Quit StyleNotes" in the tray menu is the way out.
+fn hide_on_close(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        if window.label() == WORKSPACE_LABEL || window.label() == OVERLAY_LABEL {
+            api.prevent_close();
+            let _ = window.hide();
+        }
+    }
+}
 
 fn migrations() -> Vec<Migration> {
     vec![
@@ -114,15 +130,17 @@ pub fn run() {
                 .build(),
         )
         .plugin(prevent_default())
+        .on_window_event(hide_on_close)
         .setup(|app| {
             #[cfg(desktop)]
             {
                 use tauri::Manager;
                 use tauri_plugin_positioner::{Position, WindowExt};
                 app.handle().plugin(tauri_plugin_positioner::init())?;
-                if let Some(overlay) = app.get_webview_window("overlay") {
+                if let Some(overlay) = app.get_webview_window(OVERLAY_LABEL) {
                     let _ = overlay.as_ref().window().move_window(Position::TopRight);
                 }
+                tray::init(app.handle())?;
             }
             Ok(())
         })

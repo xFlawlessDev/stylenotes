@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { emit } from '@tauri-apps/api/event';
 import { settingsRepo } from '$lib/db';
+import type { DockEdge } from '$lib/dock';
 import type { OverlaySort, TaskPriorityFilter, TaskStatus } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 
@@ -22,6 +23,7 @@ export type Settings = {
 	overlayStatus: TaskStatus | 'all';
 	overlayPriority: TaskPriorityFilter;
 	overlaySort: OverlaySort;
+	overlayPosition: DockEdge;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -44,6 +46,7 @@ const defaults: Settings = {
 	overlayStatus: 'all',
 	overlayPriority: 'all',
 	overlaySort: 'smart',
+	overlayPosition: 'right',
 };
 
 export function defaultSettings(): Settings {

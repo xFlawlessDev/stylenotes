@@ -51,6 +51,16 @@
 	function win() {
 		return getCurrentWindow();
 	}
+
+	/** Hides the window instead of closing it: the app keeps running in the tray. */
+	async function hideWindow() {
+		if (!isTauri) return;
+		try {
+			await win().hide();
+		} catch {
+			/* window is already hidden */
+		}
+	}
 </script>
 
 <header
@@ -62,8 +72,8 @@
 		<div class="flex items-center gap-2 pr-1">
 			<button
 				class="group flex size-3 items-center justify-center rounded-full bg-window-close transition-transform hover:scale-110"
-				aria-label="Close"
-				onclick={() => isTauri && win().close()}
+				aria-label="Hide to tray"
+				onclick={hideWindow}
 			>
 				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>

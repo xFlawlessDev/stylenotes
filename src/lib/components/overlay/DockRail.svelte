@@ -5,155 +5,112 @@
 		cursorPosition,
 		currentMonitor,
 		LogicalSize,
-		PhysicalPosition,
+		PhysicalPosition
 	} from '@tauri-apps/api/window';
 	import { listen } from '@tauri-apps/api/event';
-	import {
-		Circle,
-		CircleCheck,
-		CircleDashed,
-		Eye,
-		ListTodo,
-		PanelRightClose,
-		PanelRightOpen,
-		Plus,
-	} from '@lucide/svelte';
+	import { ListTodo, Plus } from '@lucide/svelte';
 	import { isTauri, openWorkspace } from '$lib/windows';
-	import { verticalDrag } from '$lib/drag';
-	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 	import {
-		settings,
-		refreshSettings,
+		DOCK_RAIL,
+		dockCardOffset,
+		dockTooltipSide,
+		dockWindowSize,
+		snapToDockEdge,
+		type DockEdge,
+		type DockPoint,
+		type DockSize
+	} from '$lib/dock';
+	import {
 		applySettingsSnapshot,
+		settings,
 		SETTINGS_CHANGED,
-		type Settings,
+		type Settings
 	} from '$lib/stores/settings.svelte';
 	import {
-		applyTaskPatch,
-		matchesOverlayFilter,
-		overlayTasks,
-		sortOverlayTasks,
-		taskPriority,
-		taskStatus,
-		type Task,
-		type TaskPriority,
-		type TaskStatus,
-	} from '$lib/stores/tasks';
+		applyDockFilters,
+		dockStore,
+		loadDockTasks,
+		removeDockTask,
+		toggleDockComplete,
+		toggleDockProgress
+	} from '$lib/stores/dock.svelte';
+	import { TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import type { Task } from '$lib/stores/tasks';
+	import DockHandle from '$lib/components/overlay/DockHandle.svelte';
+	import DockTaskButton from '$lib/components/overlay/DockTaskButton.svelte';
 	import TaskDockCard from '$lib/components/overlay/TaskDockCard.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	const statusIcons: Record<TaskStatus, typeof Circle> = {
-		todo: Circle,
-		doing: CircleDashed,
-		review: Eye,
-		done: CircleCheck,
-	};
-
-	const priorityBar: Record<TaskPriority, string> = {
-		low: 'bg-outline',
-		medium: 'bg-secondary',
-		high: 'bg-error',
-	};
-
-	const priorityText: Record<TaskPriority, string> = {
-		low: 'text-on-surface-variant',
-		medium: 'text-secondary',
-		high: 'text-error',
-	};
-
-	const RAIL_W = 60;
-	const WINDOW_W = 360;
-	const WINDOW_H = 304;
-	const CARD_H = 280;
-	const MIN_W = 28;
-	const MIN_H = 96;
+	const CARD: DockSize = { width: 288, height: 280 };
 	const POLL_MS = 40;
 
-	let dockTasks = $state<Task[]>([]);
-	let dockedCount = $state(0);
+	const railClasses: Record<DockEdge, string> = {
+		left: 'top-3 left-0 flex-col rounded-r-2xl py-3',
+		right: 'top-3 right-0 flex-col rounded-l-2xl py-3',
+		top: 'top-0 left-0 w-full flex-row rounded-b-2xl px-3'
+	};
+
+	const edge = $derived(settings.overlayPosition);
+	const railSide = $derived(railClasses[edge]);
+	const tooltipSide = $derived(dockTooltipSide(edge));
+	let collapsed = $state(false);
 	let hovered = $state<Task | null>(null);
-	let cardTop = $state(8);
+	let cardOffset = $state<DockPoint>({ x: 0, y: 0 });
 	let railEl: HTMLElement | undefined = $state();
 	let cardEl: HTMLElement | undefined = $state();
 	let ignoring = false;
 	let dragging = false;
-	let collapsed = $state(false);
-	let loadToken = 0;
-	let loadedTasks: Task[] = [];
 
-	function applyDockFilters() {
-		const docked = overlayTasks(loadedTasks);
-		dockedCount = docked.length;
-		dockTasks = sortOverlayTasks(
-			docked.filter((task) =>
-				matchesOverlayFilter(task, {
-					status: settings.overlayStatus,
-					priority: settings.overlayPriority,
-				})
-			),
-			settings.overlaySort
-		);
-		if (hovered && !dockTasks.some((item) => item.id === hovered?.id)) hovered = null;
+	function syncHovered() {
+		if (hovered && !dockStore.tasks.some((item) => item.id === hovered?.id)) hovered = null;
 	}
 
-	async function loadTasks() {
-		const token = ++loadToken;
-		await refreshSettings();
-		const tasks = await refreshTasks();
-		if (token !== loadToken) return;
-		loadedTasks = tasks;
-		applyDockFilters();
+	async function reload() {
+		await loadDockTasks();
+		syncHovered();
 	}
 
 	async function toggleProgress(task: Task) {
-		const next = applyTaskPatch(task, {
-			status: taskStatus(task) === 'doing' ? 'todo' : 'doing',
-		});
-		dockTasks = dockTasks.map((item) => (item.id === task.id ? next : item));
-		hovered = next;
-		if (!(await persistTask(next))) await loadTasks();
+		hovered = await toggleDockProgress(task);
 	}
 
 	async function toggleComplete(task: Task) {
-		const next = applyTaskPatch(task, {
-			status: taskStatus(task) === 'done' ? 'todo' : 'done',
-		});
-		dockTasks = dockTasks.map((item) => (item.id === task.id ? next : item));
-		hovered = next;
-		if (!(await persistTask(next))) await loadTasks();
+		hovered = await toggleDockComplete(task);
 	}
 
 	async function removeFromDock(task: Task) {
-		const next = applyTaskPatch(task, { overlay: false });
-		dockTasks = dockTasks.filter((item) => item.id !== task.id);
 		hovered = null;
-		if (!(await persistTask(next))) await loadTasks();
+		await removeDockTask(task);
 	}
 
-	async function resizeWindow(w: number, h: number) {
+	/** Sizes the window for the current edge and pins it against that edge. */
+	async function applyDockGeometry() {
 		if (!isTauri) return;
 		const win = getCurrentWindow();
 		const [pos, factor, monitor] = await Promise.all([
 			win.outerPosition(),
 			win.scaleFactor(),
-			currentMonitor(),
+			currentMonitor()
 		]);
-		await win.setSize(new LogicalSize(w, h));
+		const size = dockWindowSize(settings.overlayPosition, collapsed);
+		await win.setSize(new LogicalSize(size.width, size.height));
 		if (!monitor) return;
-		const physW = Math.round(w * factor);
-		const physH = Math.round(h * factor);
-		const maxY = monitor.position.y + monitor.size.height - physH;
-		const y = Math.min(maxY, Math.max(monitor.position.y, pos.y));
-		await win.setPosition(
-			new PhysicalPosition(monitor.position.x + monitor.size.width - physW, y)
-		);
+		const next = snapToDockEdge({
+			edge: settings.overlayPosition,
+			monitor,
+			size: {
+				width: Math.round(size.width * factor),
+				height: Math.round(size.height * factor)
+			},
+			current: pos
+		});
+		await win.setPosition(new PhysicalPosition(next.x, next.y));
 	}
 
 	async function toggleCollapsed() {
-		const next = !collapsed;
-		collapsed = next;
-		if (next) hovered = null;
-		await resizeWindow(next ? MIN_W : WINDOW_W, next ? MIN_H : WINDOW_H);
+		collapsed = !collapsed;
+		if (collapsed) hovered = null;
+		await applyDockGeometry();
 	}
 
 	function inRect(el: HTMLElement | undefined, x: number, y: number) {
@@ -168,29 +125,27 @@
 		await getCurrentWindow().setIgnoreCursorEvents(value);
 	}
 
-	function taskAtPoint(x: number, y: number): { task: Task; top: number } | null {
+	function taskAtPoint(x: number, y: number): { task: Task; anchor: DockPoint } | null {
 		if (!railEl) return null;
 		const buttons = railEl.querySelectorAll<HTMLElement>('[data-task-id]');
 		for (const btn of buttons) {
 			const r = btn.getBoundingClientRect();
 			if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-				const task = dockTasks.find((item) => item.id === btn.dataset.taskId);
+				const task = dockStore.tasks.find((item) => item.id === btn.dataset.taskId);
 				if (task) {
-					const top = Math.min(WINDOW_H - CARD_H - 8, Math.max(8, r.top + r.height / 2 - CARD_H / 2));
-					return { task, top };
+					return { task, anchor: { x: r.left + r.width / 2, y: r.top + r.height / 2 } };
 				}
 			}
 		}
 		return null;
 	}
 
-	async function openWorkspaceAndClose() {
+	async function openWorkspaceWindow() {
 		await openWorkspace();
-		if (isTauri) await getCurrentWindow().hide();
 	}
 
 	onMount(() => {
-		void loadTasks();
+		void reload();
 
 		let unlistenFocus: (() => void) | undefined;
 		let unlistenTasks: (() => void) | undefined;
@@ -200,16 +155,22 @@
 		if (isTauri) {
 			void getCurrentWindow()
 				.onFocusChanged(({ payload: focused }) => {
-					if (focused) void loadTasks();
+					if (focused) void reload();
 				})
 				.then((fn) => (unlistenFocus = fn));
-			void listen(TASKS_CHANGED, () => void loadTasks()).then((fn) => (unlistenTasks = fn));
+			void listen(TASKS_CHANGED, () => void reload()).then((fn) => (unlistenTasks = fn));
 			void listen<Settings>(SETTINGS_CHANGED, (event) => {
+				const edgeChanged = event.payload?.overlayPosition !== settings.overlayPosition;
 				applySettingsSnapshot(event.payload);
 				applyDockFilters();
+				syncHovered();
+				if (edgeChanged) {
+					hovered = null;
+					void applyDockGeometry();
+				}
 			}).then((fn) => (unlistenSettings = fn));
 		} else {
-			const onFocus = () => void loadTasks();
+			const onFocus = () => void reload();
 			window.addEventListener('focus', onFocus);
 			unlistenBrowser = () => window.removeEventListener('focus', onFocus);
 		}
@@ -225,6 +186,7 @@
 			return cleanupListeners;
 		}
 
+		void applyDockGeometry();
 		void setIgnore(true);
 
 		let timer: ReturnType<typeof setTimeout> | undefined;
@@ -238,7 +200,7 @@
 				const [cursor, pos, scale] = await Promise.all([
 					cursorPosition(),
 					getCurrentWindow().outerPosition(),
-					getCurrentWindow().scaleFactor(),
+					getCurrentWindow().scaleFactor()
 				]);
 				const x = (cursor.x - pos.x) / scale;
 				const y = (cursor.y - pos.y) / scale;
@@ -255,7 +217,12 @@
 						await setIgnore(false);
 						if (hit) {
 							hovered = hit.task;
-							cardTop = hit.top;
+							cardOffset = dockCardOffset({
+								edge: settings.overlayPosition,
+								pointer: hit.anchor,
+								window: dockWindowSize(settings.overlayPosition, false),
+								card: CARD
+							});
 						}
 					} else if (overCard) {
 						await setIgnore(false);
@@ -284,11 +251,11 @@
 		<div
 			bind:this={cardEl}
 			class="absolute w-72"
-			style="right: 52px; top: {cardTop}px;"
+			style="left: {cardOffset.x}px; top: {cardOffset.y}px;"
 		>
 			<TaskDockCard
 				task={hovered}
-				onopen={openWorkspaceAndClose}
+				onopen={openWorkspaceWindow}
 				onprogress={toggleProgress}
 				oncomplete={toggleComplete}
 				onremove={removeFromDock}
@@ -297,100 +264,57 @@
 		</div>
 	{/if}
 
-	<!-- Rail (full) -->
 	{#if !collapsed}
+		<!-- Rail (full) -->
 		<div
 			bind:this={railEl}
-			class="absolute top-3 right-0 flex flex-col items-center gap-2.5 rounded-l-2xl bg-surface-container-lowest/90 py-3 shadow-2xl backdrop-blur-2xl"
-			style="width: {RAIL_W}px;"
+			class="absolute flex items-center gap-2.5 bg-surface-container-lowest/90 shadow-2xl backdrop-blur-2xl {railSide}"
+			style={edge === 'top' ? `height: ${DOCK_RAIL}px;` : `width: ${DOCK_RAIL}px;`}
 		>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<button
-							{...props}
-							use:verticalDrag={{
-								onClick: toggleCollapsed,
-								onStateChange: (value) => (dragging = value),
-							}}
-							class="glass-chip flex size-6 cursor-grab touch-none items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface active:cursor-grabbing"
-							aria-label="Minimize to edge"
-							onclick={(event) => {
-								// Pointer presses are resolved by the drag action (click vs
-								// drag); keyboard and assistive tech report detail 0.
-								if (event.detail === 0) void toggleCollapsed();
-							}}
-						>
-							<PanelRightClose size={14} />
-						</button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>Click to minimize · drag to move</Tooltip.Content>
-			</Tooltip.Root>
+			<DockHandle
+				{edge}
+				{collapsed}
+				ontoggle={toggleCollapsed}
+				ondraggingchange={(value) => (dragging = value)}
+			/>
 
 			<div
-				class="flex max-h-[168px] w-full flex-col items-center gap-2.5 overflow-y-auto scrollbar-none"
+				class="scrollbar-none flex items-center gap-2.5 {edge === 'top'
+					? 'max-w-[168px] flex-row overflow-x-auto'
+					: 'max-h-[168px] w-full flex-col overflow-y-auto'}"
 			>
-				{#each dockTasks as task (task.id)}
-					{@const Icon = statusIcons[taskStatus(task)]}
-					{@const priority = taskPriority(task)}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<button
-									{...props}
-									data-task-id={task.id}
-									class="glass-chip group relative flex size-9 shrink-0 items-center justify-center rounded-xl transition-all {hovered?.id ===
-									task.id
-										? 'scale-105 ring-1 ring-inset ring-primary/60'
-										: 'hover:scale-105 hover:text-on-surface'}"
-									aria-label={task.title}
-								>
-									<Icon size={19} class={priorityText[priority]} />
-									{#if hovered?.id === task.id}
-										<span
-											class="absolute top-0.5 right-0 h-8 w-1.5 rounded-l {priorityBar[
-												priority
-											]}"
-										></span>
-									{:else}
-										<span
-											class="absolute top-1 right-0 h-7 w-1 rounded-l {priorityBar[
-												priority
-											]}"
-										></span>
-									{/if}
-								</button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content side="left">{task.title}</Tooltip.Content>
-					</Tooltip.Root>
+				{#each dockStore.tasks as task (task.id)}
+					<DockTaskButton {task} {edge} active={hovered?.id === task.id} />
 				{/each}
 
-				{#if dockTasks.length === 0}
+				{#if dockStore.tasks.length === 0}
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
 								<button
 									{...props}
 									class="glass-chip flex size-9 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-all hover:text-on-surface"
-									aria-label={dockedCount > 0
+									aria-label={dockStore.docked > 0
 										? 'No tasks match the dock filters'
 										: 'No tasks in the dock'}
-									onclick={openWorkspaceAndClose}
+									onclick={openWorkspaceWindow}
 								>
 									<ListTodo size={18} />
 								</button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content side="left">
-							{dockedCount > 0 ? 'No tasks match the dock filters' : 'No tasks in the dock'}
+						<Tooltip.Content side={tooltipSide}>
+							{dockStore.docked > 0 ? 'No tasks match the dock filters' : 'No tasks in the dock'}
 						</Tooltip.Content>
 					</Tooltip.Root>
 				{/if}
 			</div>
 
-			<div class="my-0.5 h-px w-6 bg-surface-container"></div>
+			<div
+				class={edge === 'top'
+					? 'mx-0.5 h-6 w-px bg-surface-container'
+					: 'my-0.5 h-px w-6 bg-surface-container'}
+			></div>
 
 			<Tooltip.Root>
 				<Tooltip.Trigger>
@@ -399,40 +323,24 @@
 							{...props}
 							class="emphasis-container flex size-9 shrink-0 items-center justify-center rounded-2xl text-on-primary-container shadow-md ring-1 ring-inset ring-emphasis-container-ring transition-all hover:scale-105"
 							aria-label="Open Tasks"
-							onclick={openWorkspaceAndClose}
+							onclick={openWorkspaceWindow}
 						>
 							<Plus size={19} class="relative" />
 						</button>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content side="left">Open Tasks</Tooltip.Content>
+				<Tooltip.Content side={tooltipSide}>Open Tasks</Tooltip.Content>
 			</Tooltip.Root>
 		</div>
 	{:else}
 		<!-- Collapsed minimal tab -->
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#snippet child({ props })}
-					<button
-						{...props}
-						bind:this={railEl}
-						use:verticalDrag={{
-							onClick: toggleCollapsed,
-							onStateChange: (value) => (dragging = value),
-						}}
-						class="absolute top-0 right-0 flex h-full w-full cursor-grab touch-none items-center justify-center rounded-l-xl bg-surface-container-lowest/90 text-on-surface-variant shadow-2xl backdrop-blur-2xl transition-colors hover:text-primary active:cursor-grabbing"
-						aria-label="Expand dock"
-						onclick={(event) => {
-							// Pointer presses are resolved by the drag action (click vs drag);
-							// keyboard and assistive tech report detail 0.
-							if (event.detail === 0) void toggleCollapsed();
-						}}
-					>
-						<PanelRightOpen size={15} />
-					</button>
-				{/snippet}
-			</Tooltip.Trigger>
-			<Tooltip.Content side="left">Expand dock</Tooltip.Content>
-		</Tooltip.Root>
+		<div bind:this={railEl} class="absolute inset-0">
+			<DockHandle
+				{edge}
+				{collapsed}
+				ontoggle={toggleCollapsed}
+				ondraggingchange={(value) => (dragging = value)}
+			/>
+		</div>
 	{/if}
 </div>
