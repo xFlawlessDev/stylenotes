@@ -4,6 +4,7 @@
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		title = 'StyleNotes',
@@ -97,28 +98,42 @@
 			<span class="hidden lg:inline">New note</span>
 		</button>
 
-		<button
-			class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
-			aria-label="Toggle theme"
-			title="Toggle light and dark"
-			onclick={ontogglemode}
-		>
-			{#if mode === 'dark'}
-				<Sun size={16} />
-			{:else}
-				<Moon size={16} />
-			{/if}
-		</button>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<button
+						{...props}
+						class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+						aria-label="Toggle theme"
+						onclick={ontogglemode}
+					>
+						{#if mode === 'dark'}
+							<Sun size={16} />
+						{:else}
+							<Moon size={16} />
+						{/if}
+					</button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Toggle light and dark</Tooltip.Content>
+		</Tooltip.Root>
 
 		{@render notifications?.()}
 
-		<button
-			class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-white/5 transition-transform hover:scale-105"
-			aria-label="Open settings"
-			title="Settings"
-			onclick={onsettings}
-		>
-			AR
-		</button>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<button
+						{...props}
+						class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-white/5 transition-transform hover:scale-105"
+						aria-label="Open settings"
+						onclick={onsettings}
+					>
+						AR
+					</button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Settings</Tooltip.Content>
+		</Tooltip.Root>
 	</div>
 </header>

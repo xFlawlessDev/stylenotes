@@ -10,6 +10,7 @@
 		Trash2,
 	} from '@lucide/svelte';
 	import type { NotificationKind } from '$lib/stores/notifications';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	export type Notification = {
 		id: string;
@@ -56,20 +57,28 @@
 </script>
 
 <div class="relative">
-	<button
-		class="glass-chip relative flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
-		aria-label="Notifications"
-		onclick={ontoggle}
-	>
-		<Bell size={16} />
-		{#if unreadCount > 0}
-			<span
-				class="absolute -top-0.5 -right-0.5 flex min-w-[15px] items-center justify-center rounded-full bg-secondary px-1 text-[9px] font-semibold text-on-secondary"
-			>
-				{unreadCount}
-			</span>
-		{/if}
-	</button>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				<button
+					{...props}
+					class="glass-chip relative flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+					aria-label="Notifications"
+					onclick={ontoggle}
+				>
+					<Bell size={16} />
+					{#if unreadCount > 0}
+						<span
+							class="absolute -top-0.5 -right-0.5 flex min-w-[15px] items-center justify-center rounded-full bg-secondary px-1 text-[9px] font-semibold text-on-secondary"
+						>
+							{unreadCount}
+						</span>
+					{/if}
+				</button>
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content>Notifications</Tooltip.Content>
+	</Tooltip.Root>
 </div>
 
 {#if open}

@@ -26,6 +26,7 @@
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>;
 
@@ -237,41 +238,73 @@
 						<div class="glass-well mr-1 hidden items-center rounded-lg p-0.5 sm:flex">
 							{#each views as item (item.id)}
 								{@const Icon = item.icon}
-								<button
-									class="flex size-7 items-center justify-center rounded-md transition-colors {view ===
-									item.id
-										? 'bg-surface-container-high/80 text-primary'
-										: 'text-outline hover:text-on-surface'}"
-									title={item.title}
-									onclick={() => updateSettings({ editorView: item.id })}
-								>
-									<Icon size={15} />
-								</button>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<button
+												{...props}
+												class="flex size-7 items-center justify-center rounded-md transition-colors {view ===
+												item.id
+													? 'bg-surface-container-high/80 text-primary'
+													: 'text-outline hover:text-on-surface'}"
+												aria-label={item.title}
+												onclick={() => updateSettings({ editorView: item.id })}
+											>
+												<Icon size={15} />
+											</button>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content>{item.title}</Tooltip.Content>
+								</Tooltip.Root>
 							{/each}
 						</div>
-						<button
-							class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {note.pinned
-								? 'text-primary'
-								: 'text-on-surface-variant hover:text-on-surface'}"
-							title="Pin note"
-							onclick={() => onupdate(note.id, { pinned: !note.pinned })}
-						>
-							<Pin size={16} />
-						</button>
-						<button
-							class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
-							title="Share"
-							onclick={() => onshare?.(note)}
-						>
-							<Share2 size={16} />
-						</button>
-						<button
-							class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
-							title="Delete note"
-							onclick={() => ondelete(note.id)}
-						>
-							<Trash2 size={16} />
-						</button>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {note.pinned
+											? 'text-primary'
+											: 'text-on-surface-variant hover:text-on-surface'}"
+										aria-label="Pin note"
+										onclick={() => onupdate(note.id, { pinned: !note.pinned })}
+									>
+										<Pin size={16} />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>{note.pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
+						</Tooltip.Root>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+										aria-label="Share note"
+										onclick={() => onshare?.(note)}
+									>
+										<Share2 size={16} />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>Share note</Tooltip.Content>
+						</Tooltip.Root>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
+										aria-label="Delete note"
+										onclick={() => ondelete(note.id)}
+									>
+										<Trash2 size={16} />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>Delete note</Tooltip.Content>
+						</Tooltip.Root>
 					</div>
 				</div>
 			{/if}

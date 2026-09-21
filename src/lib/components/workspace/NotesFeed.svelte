@@ -1,21 +1,26 @@
 <script lang="ts">
-	import { Search, Pin, FileText, Plus } from '@lucide/svelte';
+	import { Search, Pin, FileText, Plus, X, Tag } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		notes,
 		selectedId,
 		total,
+		activeTag = null,
 		onselect,
 		onpin,
 		oncreate,
+		onselecttag,
 	}: {
 		notes: Note[];
 		selectedId: string;
 		total: number;
+		activeTag?: string | null;
 		onselect: (id: string) => void;
 		onpin: (id: string) => void;
 		oncreate: () => void;
+		onselecttag?: (tag: string) => void;
 	} = $props();
 
 	let query = $state('');
@@ -56,6 +61,24 @@
 				</button>
 			{/each}
 		</div>
+
+		{#if activeTag}
+			<div
+				class="flex items-center justify-between rounded-xl bg-primary-container/25 px-3 py-2"
+			>
+				<span class="flex items-center gap-1.5 text-code-sm font-code text-primary">
+					<Tag size={12} />
+					Filtering by #{activeTag}
+				</span>
+				<button
+					class="flex size-5 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary-container/40"
+					aria-label="Clear tag filter"
+					onclick={() => onselecttag?.(activeTag)}
+				>
+					<X size={13} />
+				</button>
+			</div>
+		{/if}
 	</div>
 
 	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
@@ -85,18 +108,26 @@
 					>
 						{note.title || 'Untitled note'}
 					</h2>
-					<button
-						class="shrink-0 rounded-md p-0.5 transition-all {note.pinned
-							? 'text-primary'
-							: 'text-outline opacity-0 group-hover:opacity-100'}"
-						aria-label="Toggle pin"
-						onclick={(event) => {
-							event.stopPropagation();
-							onpin(note.id);
-						}}
-					>
-						<Pin size={15} />
-					</button>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="shrink-0 rounded-md p-0.5 transition-all {note.pinned
+										? 'text-primary'
+										: 'text-outline opacity-0 group-hover:opacity-100'}"
+									aria-label="Toggle pin"
+									onclick={(event) => {
+										event.stopPropagation();
+										onpin(note.id);
+									}}
+								>
+									<Pin size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{note.pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
+					</Tooltip.Root>
 				</div>
 				<p class="mb-2.5 line-clamp-2 text-body-sm font-body leading-relaxed text-outline">
 					{note.excerpt}
@@ -104,12 +135,19 @@
 				<div class="flex items-center justify-between gap-2">
 					<span class="text-code-sm font-code text-outline">{note.updated}</span>
 					<div class="flex min-w-0 gap-1">
-						{#each note.tags.slice(0, 2) as tag}
-							<span
-								class="truncate rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code text-tertiary"
+						{#each note.tags.slice(0, 2) as tag (tag)}
+							<button
+								class="truncate rounded-md px-1.5 py-px text-code-sm font-code transition-colors {activeTag ===
+								tag
+									? 'bg-primary-container/40 text-primary'
+									: 'bg-surface-container-high/60 text-tertiary hover:text-on-surface'}"
+								onclick={(event) => {
+									event.stopPropagation();
+									onselecttag?.(tag);
+								}}
 							>
 								#{tag}
-							</span>
+							</button>
 						{/each}
 					</div>
 				</div>

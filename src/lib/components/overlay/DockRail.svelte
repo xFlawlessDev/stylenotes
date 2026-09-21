@@ -26,6 +26,7 @@
 	} from '@lucide/svelte';
 	import { isTauri, openWorkspace } from '$lib/windows';
 	import { verticalDrag } from '$lib/drag';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	type Tone = 'secondary' | 'tertiary' | 'error' | 'primary';
 
@@ -310,30 +311,62 @@
 					{/each}
 				</div>
 				<div class="flex items-center gap-0.5">
-					<button
-						class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
-						title="Edit"
-					>
-						<NotebookPen size={15} />
-					</button>
-					<button
-						class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-secondary"
-						title="Copy"
-					>
-						<Copy size={15} />
-					</button>
-					<button
-						class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-						title="Rename"
-					>
-						<Pencil size={15} />
-					</button>
-					<button
-						class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error-container/40 hover:text-error"
-						title="Delete"
-					>
-						<Trash2 size={15} />
-					</button>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
+									aria-label="Edit"
+								>
+									<NotebookPen size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Edit</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-secondary"
+									aria-label="Copy"
+								>
+									<Copy size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Copy</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+									aria-label="Rename"
+								>
+									<Pencil size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Rename</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error-container/40 hover:text-error"
+									aria-label="Delete"
+								>
+									<Trash2 size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Delete</Tooltip.Content>
+					</Tooltip.Root>
 				</div>
 			</div>
 
@@ -355,13 +388,21 @@
 			style="width: {RAIL_W}px;"
 		>
 			<div class="flex items-center gap-1">
-				<button
-					class="flex size-6 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container hover:text-on-surface"
-					title="Minimize to edge"
-					onclick={collapse}
-				>
-					<PanelRightClose size={14} />
-				</button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								class="flex size-6 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container hover:text-on-surface"
+								aria-label="Minimize to edge"
+								onclick={collapse}
+							>
+								<PanelRightClose size={14} />
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>Minimize to edge</Tooltip.Content>
+				</Tooltip.Root>
 				<button
 					use:verticalDrag={(d) => (dragging = d)}
 					class="h-3 w-5 cursor-grab touch-none active:cursor-grabbing"
@@ -373,41 +414,65 @@
 
 			{#each notes as note (note.id)}
 				{@const Icon = note.icon}
-				<button
-					data-note-id={note.id}
-					class="group relative flex size-9 items-center justify-center rounded-xl transition-all {hovered?.id ===
-					note.id
-						? 'scale-105 bg-primary-container/20'
-						: 'bg-surface-container hover:scale-105 hover:bg-surface-container-high'}"
-					title={note.title}
-				>
-					<Icon size={19} class={textClass[note.tone]} />
-					{#if hovered?.id === note.id}
-						<span class="absolute top-0.5 right-0 h-8 w-1.5 rounded-l {barClass[note.tone]}"></span>
-					{:else}
-						<span class="absolute top-1 right-0 h-7 w-1 rounded-l {barClass[note.tone]}"></span>
-					{/if}
-				</button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								data-note-id={note.id}
+								class="group relative flex size-9 items-center justify-center rounded-xl transition-all {hovered?.id ===
+								note.id
+									? 'scale-105 bg-primary-container/20'
+									: 'bg-surface-container hover:scale-105 hover:bg-surface-container-high'}"
+								aria-label={note.title}
+							>
+								<Icon size={19} class={textClass[note.tone]} />
+								{#if hovered?.id === note.id}
+									<span class="absolute top-0.5 right-0 h-8 w-1.5 rounded-l {barClass[note.tone]}"></span>
+								{:else}
+									<span class="absolute top-1 right-0 h-7 w-1 rounded-l {barClass[note.tone]}"></span>
+								{/if}
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content side="left">{note.title}</Tooltip.Content>
+				</Tooltip.Root>
 			{/each}
 
 			<div class="my-0.5 h-px w-6 bg-surface-container"></div>
 
-			<button
-				class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
-				title="Add Sticky Note"
-			>
-				<Plus size={19} />
-			</button>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
+							aria-label="Add Sticky Note"
+						>
+							<Plus size={19} />
+						</button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content side="left">Add Sticky Note</Tooltip.Content>
+			</Tooltip.Root>
 		</div>
 	{:else}
 		<!-- Collapsed minimal tab -->
-		<button
-			bind:this={railEl}
-			class="absolute top-0 right-0 flex h-full w-full items-center justify-center rounded-l-xl bg-surface-container-lowest/90 text-outline shadow-2xl backdrop-blur-2xl transition-colors hover:text-primary"
-			title="Expand dock"
-			onclick={expandRail}
-		>
-			<PanelRightOpen size={15} />
-		</button>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<button
+						{...props}
+						bind:this={railEl}
+						class="absolute top-0 right-0 flex h-full w-full items-center justify-center rounded-l-xl bg-surface-container-lowest/90 text-outline shadow-2xl backdrop-blur-2xl transition-colors hover:text-primary"
+						aria-label="Expand dock"
+						onclick={expandRail}
+					>
+						<PanelRightOpen size={15} />
+					</button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content side="left">Expand dock</Tooltip.Content>
+		</Tooltip.Root>
 	{/if}
 </div>

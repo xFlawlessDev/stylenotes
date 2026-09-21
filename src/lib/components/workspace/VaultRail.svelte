@@ -11,21 +11,26 @@
 		Settings,
 	} from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		folders,
 		tags,
 		active,
+		activeTag,
 		onselect,
 		oncreate,
 		onaddfolder,
+		onselecttag,
 	}: {
 		folders: Folder[];
 		tags: string[];
 		active: string;
+		activeTag?: string | null;
 		onselect: (id: string) => void;
 		oncreate: () => void;
 		onaddfolder?: () => void;
+		onselecttag?: (tag: string | null) => void;
 	} = $props();
 
 	const tone: Record<string, string> = {
@@ -83,14 +88,21 @@
 		<div class="flex min-h-0 flex-col gap-1 overflow-y-auto scrollbar-none">
 			<div class="mb-1 flex items-center justify-between px-1">
 				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</span>
-				<button
-					class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
-					aria-label="New folder"
-					title="New folder"
-					onclick={onaddfolder}
-				>
-					<FolderPlus size={15} />
-				</button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+								aria-label="New folder"
+								onclick={onaddfolder}
+							>
+								<FolderPlus size={15} />
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>New folder</Tooltip.Content>
+				</Tooltip.Root>
 			</div>
 			<nav class="flex flex-col gap-0.5">
 				{#each folders as folder (folder.id)}
@@ -125,16 +137,29 @@
 
 		{#if tags.length}
 			<div class="flex flex-col gap-2 border-t border-white/5 px-1 pt-3">
-				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Tags</span>
+				<div class="flex items-center justify-between">
+					<span class="text-label-sm font-label tracking-wider text-outline uppercase">Tags</span>
+					{#if activeTag}
+						<button
+							class="text-label-sm font-label text-primary transition-colors hover:brightness-110"
+							onclick={() => onselecttag?.(null)}
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
 				<div class="flex flex-wrap gap-1.5">
 					{#each tags as tag, i}
-						<span
-							class="glass-chip cursor-pointer rounded-full px-2.5 py-1 text-code-sm font-code transition-transform hover:scale-105 {chipTone[
-								i % chipTone.length
-							]}"
+						<button
+							class="glass-chip rounded-full px-2.5 py-1 text-code-sm font-code transition-all hover:scale-105 {activeTag ===
+							tag
+								? 'text-on-surface ring-1 ring-inset ring-primary/60'
+								: chipTone[i % chipTone.length]}"
+							aria-pressed={activeTag === tag}
+							onclick={() => onselecttag?.(activeTag === tag ? null : tag)}
 						>
 							#{tag}
-						</span>
+						</button>
 					{/each}
 				</div>
 			</div>
@@ -153,11 +178,19 @@
 				<span class="text-label-sm font-label truncate text-outline">Personal vault</span>
 			</div>
 		</div>
-		<button
-			class="flex size-7 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
-			aria-label="Settings"
-		>
-			<Settings size={16} />
-		</button>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<button
+						{...props}
+						class="flex size-7 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+						aria-label="Settings"
+					>
+						<Settings size={16} />
+					</button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Settings</Tooltip.Content>
+		</Tooltip.Root>
 	</div>
 </aside>

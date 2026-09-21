@@ -49,6 +49,7 @@
 	let customFolders = $state<CustomFolder[]>(loadFolders());
 	let selectedId = $state('');
 	let activeFolder = $state('all');
+	let activeTag = $state<string | null>(null);
 	let paletteOpen = $state(false);
 	let settingsOpen = $state(false);
 	let notificationsOpen = $state(false);
@@ -62,9 +63,11 @@
 
 	const folders = $derived(foldersFor(items, customFolders));
 	const tags = $derived([...new Set(items.flatMap((note) => note.tags))]);
-	const visible = $derived(
-		activeFolder === 'all' ? items : items.filter((note) => note.folder === activeFolder)
-	);
+	const visible = $derived.by(() => {
+		let list = activeFolder === 'all' ? items : items.filter((note) => note.folder === activeFolder);
+		if (activeTag) list = list.filter((note) => note.tags.includes(activeTag!));
+		return list;
+	});
 	const selected = $derived(
 		items.find((note) => note.id === selectedId) ?? visible[0] ?? items[0]
 	);
@@ -79,6 +82,10 @@
 
 	$effect(() => {
 		saveNotifications(notifications);
+	});
+
+	$effect(() => {
+		if (activeTag && !tags.includes(activeTag)) activeTag = null;
 	});
 
 	onMount(() => {
@@ -146,8 +153,20 @@
 
 	function selectFolder(id: string) {
 		activeFolder = id;
+		activeTag = null;
 		const pool = id === 'all' ? items : items.filter((note) => note.folder === id);
 		if (!pool.some((note) => note.id === selectedId)) selectedId = pool[0]?.id ?? '';
+	}
+
+	function selectTag(tag: string | null) {
+		const next = !tag || tag === activeTag ? null : tag;
+		activeTag = next;
+		const pool = next
+			? items.filter(
+					(note) => (activeFolder === 'all' || note.folder === activeFolder) && note.tags.includes(next)
+				)
+			: [];
+		if (next && !pool.some((note) => note.id === selectedId)) selectedId = pool[0]?.id ?? '';
 	}
 
 	async function shareNote(note: Note) {
@@ -302,18 +321,22 @@
 			{folders}
 			{tags}
 			active={activeFolder}
+			{activeTag}
 			onselect={selectFolder}
 			oncreate={createNote}
 			onaddfolder={openAddFolder}
+			onselecttag={selectTag}
 		/>
 
 		<NotesFeed
 			notes={visible}
 			{selectedId}
 			total={items.length}
+			{activeTag}
 			onselect={(id) => (selectedId = id)}
 			onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
 			oncreate={createNote}
+			onselecttag={selectTag}
 		/>
 
 		<NoteEditor
