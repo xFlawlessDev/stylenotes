@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
-	import { LayoutList, Kanban, GanttChart, SlidersHorizontal, Trash2 } from '@lucide/svelte';
+	import { LayoutList, Kanban, GanttChart, SlidersHorizontal, Trash2, PictureInPicture2 } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder } from '$lib/stores/notes';
 	import {
 		applyTaskPatch,
 		createTask,
 		filterTasks,
+		moveTaskInList,
 		nextPosition,
 		statusMeta,
 		taskStatus,
@@ -18,7 +19,7 @@
 		type TaskPriorityFilter
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, removeTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
-	import { isTauri } from '$lib/windows';
+	import { isTauri, openKanban } from '$lib/windows';
 	import SelectField from '$lib/components/fields/SelectField.svelte';
 	import TaskRail from '$lib/components/tasks/TaskRail.svelte';
 	import TaskList from '$lib/components/tasks/TaskList.svelte';
@@ -26,6 +27,7 @@
 	import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
 	import TaskDialog, { type TaskFormData } from '$lib/components/tasks/TaskDialog.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	type TaskView = 'list' | 'kanban' | 'gantt';
 
@@ -146,23 +148,9 @@
 	}
 
 	function moveTask(id: string, status: TaskStatus, beforeId: string | null) {
-		const task = tasks.find((item) => item.id === id);
-		if (!task) return;
-		const column = tasks
-			.filter((item) => item.status === status && item.id !== id)
-			.sort((a, b) => a.position - b.position);
-		const index = beforeId ? column.findIndex((item) => item.id === beforeId) : -1;
-		const target = index >= 0 ? index : column.length;
-		const ordered = [...column.slice(0, target), { ...task, status }, ...column.slice(target)];
-		const positions = new Map(ordered.map((item, order) => [item.id, order]));
-		tasks = tasks.map((item) =>
-			item.id === id
-				? { ...applyTaskPatch(item, { status }), position: positions.get(id) ?? 0 }
-				: positions.has(item.id)
-					? { ...item, position: positions.get(item.id)! }
-					: item
-		);
-		const moved = tasks.find((item) => item.id === id);
+		const next = moveTaskInList(tasks, id, status, beforeId);
+		tasks = next;
+		const moved = next.find((item) => item.id === id);
 		if (moved) void persistOrToast(moved);
 	}
 
@@ -259,6 +247,23 @@
 				</div>
 
 				<div class="ml-auto flex shrink-0 items-center gap-2">
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="glass-chip flex size-7 items-center justify-center rounded-full text-outline transition-colors hover:text-on-surface"
+									aria-label="Open Kanban window"
+									onclick={() => void openKanban()}
+								>
+									<PictureInPicture2 size={14} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Open Kanban window</Tooltip.Content>
+					</Tooltip.Root>
+
 					<span class="hidden text-label-sm font-label text-outline sm:inline">
 						{filtered.length} {filtered.length === 1 ? 'task' : 'tasks'}
 					</span>

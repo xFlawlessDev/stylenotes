@@ -4,10 +4,11 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 
-use crate::WORKSPACE_LABEL;
+use crate::{KANBAN_LABEL, WORKSPACE_LABEL};
 
 const TRAY_ID: &str = "stylenotes-tray";
 const MENU_SHOW: &str = "tray-show";
+const MENU_KANBAN: &str = "tray-kanban";
 const MENU_HIDE: &str = "tray-hide";
 const MENU_QUIT: &str = "tray-quit";
 
@@ -17,10 +18,11 @@ const MENU_QUIT: &str = "tray-quit";
 /// reachable while it runs in the background and lets the user quit.
 pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, MENU_SHOW, "Show StyleNotes", true, None::<&str>)?;
+    let kanban = MenuItem::with_id(app, MENU_KANBAN, "Show Kanban board", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, MENU_HIDE, "Hide window", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit StyleNotes", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &hide, &separator, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &kanban, &hide, &separator, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("StyleNotes")
@@ -28,6 +30,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             MENU_SHOW => show_workspace(app),
+            MENU_KANBAN => show_kanban(app),
             MENU_HIDE => hide_workspace(app),
             MENU_QUIT => app.exit(0),
             _ => {}
@@ -54,6 +57,14 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
 fn show_workspace<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window(WORKSPACE_LABEL) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn show_kanban<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(window) = app.get_webview_window(KANBAN_LABEL) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();

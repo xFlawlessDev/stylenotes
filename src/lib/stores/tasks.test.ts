@@ -17,6 +17,7 @@ import {
 	filterTasks,
 	matchesTaskQuery,
 	isTaskOverdue,
+	moveTaskInList,
 	nextPosition,
 	overlayTasks,
 	matchesDueFilter,
@@ -307,6 +308,39 @@ describe('nextPosition / reorderWithinColumn', () => {
 		const next = reorderWithinColumn(items, 'todo', 'c', 'a');
 		expect(next.find((t) => t.id === 'c')?.position).toBe(0);
 		expect(next.find((t) => t.id === 'a')?.position).toBe(1);
+	});
+});
+
+describe('moveTaskInList', () => {
+	it('appends a task to the end of the target column', () => {
+		const items = [
+			task({ id: 'a', status: 'todo', position: 0 }),
+			task({ id: 'b', status: 'doing', position: 0 }),
+		];
+		const next = moveTaskInList(items, 'a', 'doing', null);
+		expect(next.find((t) => t.id === 'a')).toMatchObject({ status: 'doing', position: 1 });
+		expect(next.find((t) => t.id === 'b')?.position).toBe(0);
+	});
+
+	it('inserts before the drop target and renumbers the column', () => {
+		const items = [
+			task({ id: 'a', status: 'doing', position: 0 }),
+			task({ id: 'b', status: 'doing', position: 1 }),
+			task({ id: 'c', status: 'todo', position: 0 }),
+		];
+		const next = moveTaskInList(items, 'c', 'doing', 'a');
+		expect(next.map((t) => `${t.id}:${t.position}`)).toEqual(['a:1', 'b:2', 'c:0']);
+	});
+
+	it('completes a task dropped in the done column', () => {
+		const items = [task({ id: 'a', status: 'todo', position: 0 })];
+		const next = moveTaskInList(items, 'a', 'done', null);
+		expect(next[0]).toMatchObject({ status: 'done', completed: true });
+	});
+
+	it('keeps the list when the task is missing', () => {
+		const items = [task({ id: 'a' })];
+		expect(moveTaskInList(items, 'nope', 'doing', null)).toBe(items);
 	});
 });
 

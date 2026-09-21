@@ -3,12 +3,14 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 export const WORKSPACE_LABEL = "workspace";
 export const OVERLAY_LABEL = "overlay";
+export const KANBAN_LABEL = "kanban";
 
-export type WindowRole = "workspace" | "overlay";
+export type WindowRole = "workspace" | "overlay" | "kanban";
 
 export function currentWindowRole(): WindowRole {
   const label = getCurrentWindow().label;
   if (label === OVERLAY_LABEL) return "overlay";
+  if (label === KANBAN_LABEL) return "kanban";
   return "workspace";
 }
 
@@ -17,7 +19,11 @@ async function focusOrCreate(label: string, options: Record<string, unknown>) {
   if (existing) {
     await existing.show();
     await existing.unminimize();
-    await existing.setFocus();
+    try {
+      await existing.setFocus();
+    } catch {
+      /* not every window is focusable (e.g. the dock overlay) */
+    }
     return existing;
   }
   return new WebviewWindow(label, options);
@@ -56,6 +62,24 @@ export async function openOverlay() {
     shadow: false,
     focus: false,
     focusable: false,
+  });
+}
+
+/** Options must stay in sync with the kanban window in `tauri.conf.json`. */
+export async function openKanban() {
+  return focusOrCreate(KANBAN_LABEL, {
+    url: "/",
+    title: "StyleNotes Kanban",
+    width: 720,
+    height: 440,
+    minWidth: 380,
+    minHeight: 280,
+    resizable: true,
+    decorations: false,
+    transparent: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
   });
 }
 

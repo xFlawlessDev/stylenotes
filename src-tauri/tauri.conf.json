@@ -42,6 +42,20 @@
         "focus": false,
         "focusable": false,
         "visible": false
+      },
+      {
+        "label": "kanban",
+        "title": "StyleNotes Kanban",
+        "width": 720,
+        "height": 440,
+        "minWidth": 380,
+        "minHeight": 280,
+        "decorations": false,
+        "resizable": true,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

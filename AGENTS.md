@@ -26,7 +26,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 ## Architecture
 
-- **Two Tauri windows share one route.** `workspace` and `overlay` are declared in `tauri.conf.json`, both load `/`. `src/routes/+page.svelte` branches on `currentWindowRole()` from `src/lib/windows.ts`. Any window logic must handle both roles.
+- **Three Tauri windows share one route.** `workspace`, `overlay`, and `kanban` are declared in `tauri.conf.json`, all load `/`. `src/routes/+page.svelte` branches on `currentWindowRole()` from `src/lib/windows.ts`. Any window logic must handle all roles.
 - **SSR is off** (`+layout.ts` exports `ssr = false`); adapter-static with `index.html` fallback. Do not add server-only code/load functions.
 - **Fixed dev port 1420** with `strictPort`; Vite ignores `src-tauri/**`.
 - **Windows start invisible** (`visible: false`) and are revealed client-side by `revealCurrentWindow()`. Don't remove that.
@@ -40,10 +40,11 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 ## Tauri / capabilities
 
-- New window or plugin APIs need matching permissions in `src-tauri/capabilities/default.json` (applies to both `workspace` and `overlay`). Missing permissions fail silently at runtime.
+- New window or plugin APIs need matching permissions in `src-tauri/capabilities/default.json` (applies to all three windows). Missing permissions fail silently at runtime.
 - Rust crate lib name is `stylenotes_lib` (`src-tauri/Cargo.toml`).
 - `tauri-plugin-prevent-default` blocks browser shortcuts, but dev builds keep DevTools + Reload (`lib.rs`).
-- The `workspace` and `overlay` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
+- The `workspace`, `overlay`, and `kanban` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
+- The `kanban` window locks to the desktop via `tauri-plugin-desktop-underlay` (`src/lib/stores/kanban.svelte.ts`, `desktop-underlay:default` permission): locked = desktop underlay, unlocked = always on top. The `Ctrl+Shift+K` global shortcut (`tauri-plugin-global-shortcut`) is registered from the Kanban webview and the state lives in `settings.kanbanLocked`.
 
 ## Frontend conventions
 

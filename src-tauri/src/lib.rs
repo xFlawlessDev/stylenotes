@@ -6,14 +6,18 @@ mod tray;
 const DB_URL: &str = "sqlite:stylenotes.db";
 const WORKSPACE_LABEL: &str = "workspace";
 const OVERLAY_LABEL: &str = "overlay";
+const KANBAN_LABEL: &str = "kanban";
 
-/// Both windows are hidden instead of closed so the app keeps running in the
+/// Every window is hidden instead of closed so the app keeps running in the
 /// system tray; "Quit StyleNotes" in the tray menu is the way out.
 fn hide_on_close(window: &tauri::Window, event: &tauri::WindowEvent) {
     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-        if window.label() == WORKSPACE_LABEL || window.label() == OVERLAY_LABEL {
-            api.prevent_close();
-            let _ = window.hide();
+        match window.label() {
+            WORKSPACE_LABEL | OVERLAY_LABEL | KANBAN_LABEL => {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+            _ => {}
         }
     }
 }
@@ -120,10 +124,11 @@ fn migrations() -> Vec<Migration> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations(DB_URL, migrations())
@@ -143,7 +148,13 @@ pub fn run() {
                 tray::init(app.handle())?;
             }
             Ok(())
-        })
+        });
+
+    // The desktop underlay APIs only exist on desktop platforms.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_desktop_underlay::init());
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
-	import { pointerReorder } from '$lib/content/pointer-reorder';
+	import { kanbanDrag } from '$lib/content/kanban-drag';
 	import {
 		statusMeta,
 		tasksByStatus,
@@ -34,36 +34,20 @@
 	let draggingId = $state<string | null>(null);
 	let overColumn = $state<TaskStatus | null>(null);
 
-	function statusAt(x: number, y: number): TaskStatus | null {
-		const el = document.elementFromPoint(x, y);
-		return (el?.closest<HTMLElement>('[data-task-status]')?.dataset.taskStatus ??
-			null) as TaskStatus | null;
-	}
-
-	function taskAt(x: number, y: number): string | null {
-		const el = document.elementFromPoint(x, y);
-		return el?.closest<HTMLElement>('[data-task-id]')?.dataset.taskId ?? null;
-	}
-
-	function endTaskDrag(x: number, y: number) {
-		const status = statusAt(x, y);
-		const beforeId = taskAt(x, y);
-		const id = draggingId;
+	function endTaskDrag(id: string, status: TaskStatus | null, beforeId: string | null) {
 		draggingId = null;
 		overColumn = null;
-		if (!id || !status) return;
+		if (!status) return;
 		const task = tasks.find((item) => item.id === id);
 		if (task && taskStatus(task) === status && (!beforeId || beforeId === id)) return;
 		onmove(id, status, beforeId === id ? null : beforeId);
 	}
 
 	const kanban = (node: HTMLElement) =>
-		pointerReorder(node, {
-			handleSelector: '[data-task-handle]',
-			idAttribute: 'data-task-id',
+		kanbanDrag(node, {
 			onStart: (id) => (draggingId = id),
-			onMove: (_id, event) => (overColumn = statusAt(event.clientX, event.clientY)),
-			onEnd: (_id, event) => endTaskDrag(event.clientX, event.clientY),
+			onOver: (status) => (overColumn = status),
+			onDrop: endTaskDrag
 		});
 </script>
 

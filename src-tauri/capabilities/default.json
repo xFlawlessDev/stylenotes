@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the workspace and overlay windows",
-  "windows": ["workspace", "overlay"],
+  "description": "Capability for the workspace, overlay, and kanban windows",
+  "windows": ["workspace", "overlay", "kanban"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -29,6 +29,11 @@
     "core:window:allow-scale-factor",
     "core:webview:allow-create-webview-window",
     "positioner:default",
+    "desktop-underlay:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "global-shortcut:allow-is-registered",
     "opener:default",
     "dialog:default",
     "fs:allow-write-text-file",

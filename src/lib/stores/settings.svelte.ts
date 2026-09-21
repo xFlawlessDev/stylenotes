@@ -24,6 +24,7 @@ export type Settings = {
 	overlayPriority: TaskPriorityFilter;
 	overlaySort: OverlaySort;
 	overlayPosition: DockEdge;
+	kanbanLocked: boolean;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -47,6 +48,7 @@ const defaults: Settings = {
 	overlayPriority: 'all',
 	overlaySort: 'smart',
 	overlayPosition: 'right',
+	kanbanLocked: false,
 };
 
 export function defaultSettings(): Settings {

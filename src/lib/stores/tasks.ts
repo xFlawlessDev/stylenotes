@@ -23,17 +23,20 @@ export type Task = {
 	overlay: boolean;
 };
 
-export const statusMeta: Record<TaskStatus, { label: string; tone: string }> = {
-	todo: { label: 'To do', tone: 'text-on-surface-variant' },
-	doing: { label: 'In progress', tone: 'text-secondary' },
-	review: { label: 'In review', tone: 'text-tertiary' },
-	done: { label: 'Done', tone: 'text-primary' },
+export const statusMeta: Record<TaskStatus, { label: string; tone: string; dot: string }> = {
+	todo: { label: 'To do', tone: 'text-on-surface-variant', dot: 'bg-outline/70' },
+	doing: { label: 'In progress', tone: 'text-secondary', dot: 'bg-secondary' },
+	review: { label: 'In review', tone: 'text-tertiary', dot: 'bg-tertiary' },
+	done: { label: 'Done', tone: 'text-primary', dot: 'bg-primary' },
 };
 
-export const priorityMeta: Record<TaskPriority, { label: string; tone: string; rank: number }> = {
-	low: { label: 'Low', tone: 'text-on-surface-variant', rank: 0 },
-	medium: { label: 'Medium', tone: 'text-secondary', rank: 1 },
-	high: { label: 'High', tone: 'text-error', rank: 2 },
+export const priorityMeta: Record<
+	TaskPriority,
+	{ label: string; tone: string; dot: string; rank: number }
+> = {
+	low: { label: 'Low', tone: 'text-on-surface-variant', dot: 'bg-outline/60', rank: 0 },
+	medium: { label: 'Medium', tone: 'text-secondary', dot: 'bg-secondary', rank: 1 },
+	high: { label: 'High', tone: 'text-error', dot: 'bg-error', rank: 2 },
 };
 
 export function isTaskStatus(value: string): value is TaskStatus {
@@ -358,6 +361,34 @@ export function resolveNoteTitle(noteId: string | null, notes: Note[]): string |
 export function nextPosition(tasks: Task[], status: TaskStatus): number {
 	const column = tasks.filter((task) => taskStatus(task) === status);
 	return column.reduce((max, task) => Math.max(max, task.position), -1) + 1;
+}
+
+/**
+ * Moves a task into `status`, right before `beforeId` (or at the end of the
+ * column), renumbering the target column so positions stay dense.
+ */
+export function moveTaskInList(
+	tasks: Task[],
+	id: string,
+	status: TaskStatus,
+	beforeId: string | null
+): Task[] {
+	const task = tasks.find((item) => item.id === id);
+	if (!task) return tasks;
+	const column = tasks
+		.filter((item) => taskStatus(item) === status && item.id !== id)
+		.sort((a, b) => a.position - b.position);
+	const index = beforeId ? column.findIndex((item) => item.id === beforeId) : -1;
+	const target = index >= 0 ? index : column.length;
+	const ordered = [...column.slice(0, target), { ...task, status }, ...column.slice(target)];
+	const positions = new Map(ordered.map((item, order) => [item.id, order]));
+	return tasks.map((item) =>
+		item.id === id
+			? { ...applyTaskPatch(item, { status }), position: positions.get(id) ?? 0 }
+			: positions.has(item.id)
+				? { ...item, position: positions.get(item.id)! }
+				: item
+	);
 }
 
 export function reorderWithinColumn(

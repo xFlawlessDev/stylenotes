@@ -12,7 +12,8 @@
 		timelineRange,
 		statusMeta,
 		taskStatus,
-		type Task
+		type Task,
+		type TaskStatus
 	} from '$lib/stores/tasks';
 
 	let {
@@ -28,6 +29,20 @@
 	} = $props();
 
 	const DAY_WIDTH = 30;
+
+	const BAR_BASE =
+		'group absolute top-1/2 flex -translate-y-1/2 cursor-pointer items-center px-2 text-code-sm font-code transition-all hover:scale-[1.02]';
+
+	// Each status gets its own colour + silhouette so the timeline is scannable at a glance:
+	// hollow dashed = planned, solid pill = active, tinted outline = under review, muted short bar = done.
+	const BAR_STYLES: Record<TaskStatus, string> = {
+		todo: 'h-5 rounded-lg border border-dashed border-outline/60 bg-surface-container/25 text-on-surface-variant hover:bg-surface-container/60',
+		doing: 'h-6 rounded-full bg-secondary/80 text-on-secondary shadow-sm hover:bg-secondary',
+		review: 'h-6 rounded-lg border border-tertiary/60 bg-tertiary/25 text-tertiary hover:bg-tertiary/35',
+		done: 'h-5 rounded-lg bg-primary/60 text-on-primary hover:bg-primary/75'
+	};
+
+	const OVERDUE_BAR = 'ring-2 ring-error/70';
 
 	const range = $derived(timelineRange(tasks, { padding: 2, minDays: 21 }));
 	const days = $derived(
@@ -89,6 +104,8 @@
 					<!-- Rows -->
 					{#each rows as task (task.id)}
 						{@const bar = taskBar(task, range)}
+						{@const status = taskStatus(task)}
+						{@const overdue = isTaskOverdue(task)}
 						<div class="flex border-b border-hairline/60 last:border-b-0">
 							<button
 								type="button"
@@ -100,8 +117,8 @@
 								ondblclick={() => onedit(task)}
 							>
 								<span class="block truncate text-body-sm font-body text-on-surface">{task.title}</span>
-								<span class="block truncate text-code-sm font-code {statusMeta[taskStatus(task)].tone}">
-									{statusMeta[taskStatus(task)].label}
+								<span class="block truncate text-code-sm font-code {statusMeta[status].tone}">
+									{statusMeta[status].label}{#if overdue}<span class="text-error"> · Overdue</span>{/if}
 								</span>
 							</button>
 
@@ -129,19 +146,17 @@
 								{#if bar}
 									<button
 										type="button"
-										class="group absolute top-1/2 flex h-6 -translate-y-1/2 cursor-pointer items-center rounded-full px-2 text-code-sm font-code transition-transform hover:scale-[1.02] {taskStatus(
-											task
-										) === 'done'
-											? 'bg-primary/70 text-on-primary'
-											: isTaskOverdue(task)
-												? 'bg-error/70 text-on-error'
-												: 'bg-secondary/70 text-on-secondary'}"
+										class="{BAR_BASE} {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
 										style="left: {bar.offset * DAY_WIDTH + 1}px; width: {bar.span * DAY_WIDTH - 2}px"
-										title="{task.title} · {priorityMeta[taskPriority(task)].label} (double-click to open)"
+										title="{task.title} · {statusMeta[status].label} · {priorityMeta[taskPriority(task)]
+											.label}{overdue ? ' · Overdue' : ''} (double-click to open)"
+										aria-label="{task.title}, {statusMeta[status].label}{overdue
+											? ', overdue'
+											: ''}"
 										onclick={() => onselect(task.id)}
 										ondblclick={() => onedit(task)}
 									>
-										<span class="truncate">{task.title}</span>
+										<span class="truncate {status === 'done' ? 'line-through' : ''}">{task.title}</span>
 									</button>
 								{/if}
 							</div>
