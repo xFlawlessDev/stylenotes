@@ -30,6 +30,8 @@
     "core:webview:allow-create-webview-window",
     "positioner:default",
     "opener:default",
+    "dialog:default",
+    "fs:allow-write-text-file",
     "sql:default",
     "sql:allow-execute"
   ]

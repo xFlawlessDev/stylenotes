@@ -21,7 +21,7 @@
         "decorations": false,
         "resizable": true,
         "center": true,
-        "dragDropEnabled": false,
+        "dragDropEnabled": true,
         "visible": false
       },
       {
@@ -45,7 +45,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "plugins": {
