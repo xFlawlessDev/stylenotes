@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getCurrentWindow, cursorPosition } from '@tauri-apps/api/window';
+	import {
+		getCurrentWindow,
+		cursorPosition,
+		currentMonitor,
+		LogicalSize,
+		PhysicalPosition,
+	} from '@tauri-apps/api/window';
 	import {
 		Rocket,
 		ShoppingBasket,
@@ -15,6 +21,8 @@
 		Pencil,
 		CheckSquare,
 		Square,
+		PanelRightClose,
+		PanelRightOpen,
 	} from '@lucide/svelte';
 	import { isTauri, openWorkspace } from '$lib/windows';
 	import { verticalDrag } from '$lib/drag';
@@ -117,6 +125,8 @@
 	const RAIL_W = 60;
 	const WINDOW_H = 304;
 	const CARD_H = 280;
+	const MIN_W = 28;
+	const MIN_H = 96;
 	const POLL_MS = 40;
 
 	let hovered = $state<RailNote | null>(null);
@@ -125,6 +135,37 @@
 	let cardEl: HTMLElement | undefined = $state();
 	let ignoring = false;
 	let dragging = false;
+	let collapsed = $state(false);
+
+	async function resizeWindow(w: number, h: number) {
+		if (!isTauri) return;
+		const win = getCurrentWindow();
+		const [pos, factor, monitor] = await Promise.all([
+			win.outerPosition(),
+			win.scaleFactor(),
+			currentMonitor(),
+		]);
+		await win.setSize(new LogicalSize(w, h));
+		if (!monitor) return;
+		const physW = Math.round(w * factor);
+		const physH = Math.round(h * factor);
+		const maxY = monitor.position.y + monitor.size.height - physH;
+		const y = Math.min(maxY, Math.max(monitor.position.y, pos.y));
+		await win.setPosition(
+			new PhysicalPosition(monitor.position.x + monitor.size.width - physW, y)
+		);
+	}
+
+	async function collapse() {
+		hovered = null;
+		collapsed = true;
+		await resizeWindow(MIN_W, MIN_H);
+	}
+
+	async function expandRail() {
+		collapsed = false;
+		await resizeWindow(RAIL_W, WINDOW_H);
+	}
 
 	function inRect(el: HTMLElement | undefined, x: number, y: number) {
 		if (!el) return false;
@@ -180,21 +221,26 @@
 				const x = (cursor.x - pos.x) / scale;
 				const y = (cursor.y - pos.y) / scale;
 
-				const hit = noteAtPoint(x, y);
 				const overRail = inRect(railEl, x, y);
-				const overCard = inRect(cardEl, x, y);
 
-				if (overRail) {
-					await setIgnore(false);
-					if (hit) {
-						hovered = hit.note;
-						cardTop = hit.top;
-					}
-				} else if (overCard) {
-					await setIgnore(false);
+				if (collapsed) {
+					if (overRail) await setIgnore(false);
+					else await setIgnore(true);
 				} else {
-					hovered = null;
-					await setIgnore(true);
+					const hit = noteAtPoint(x, y);
+					const overCard = inRect(cardEl, x, y);
+					if (overRail) {
+						await setIgnore(false);
+						if (hit) {
+							hovered = hit.note;
+							cardTop = hit.top;
+						}
+					} else if (overCard) {
+						await setIgnore(false);
+					} else {
+						hovered = null;
+						await setIgnore(true);
+					}
 				}
 			} catch {
 				/* ignore */
@@ -301,46 +347,67 @@
 		</div>
 	{/if}
 
-	<!-- Rail -->
-	<div
-		bind:this={railEl}
-		class="absolute top-3 right-0 flex flex-col items-center gap-2.5 rounded-l-2xl bg-surface-container-lowest/90 py-3 shadow-2xl backdrop-blur-2xl"
-		style="width: {RAIL_W}px;"
-	>
-		<button
-			use:verticalDrag={(d) => (dragging = d)}
-			class="mb-0.5 h-3 w-7 cursor-grab touch-none active:cursor-grabbing"
-			aria-label="Drag vertically to reposition"
+	<!-- Rail (full) -->
+	{#if !collapsed}
+		<div
+			bind:this={railEl}
+			class="absolute top-3 right-0 flex flex-col items-center gap-2.5 rounded-l-2xl bg-surface-container-lowest/90 py-3 shadow-2xl backdrop-blur-2xl"
+			style="width: {RAIL_W}px;"
 		>
-			<span class="mx-auto block h-1 w-4 rounded-full bg-outline-variant/60"></span>
-		</button>
+			<div class="flex items-center gap-1">
+				<button
+					class="flex size-6 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container hover:text-on-surface"
+					title="Minimize to edge"
+					onclick={collapse}
+				>
+					<PanelRightClose size={14} />
+				</button>
+				<button
+					use:verticalDrag={(d) => (dragging = d)}
+					class="h-3 w-5 cursor-grab touch-none active:cursor-grabbing"
+					aria-label="Drag vertically to reposition"
+				>
+					<span class="mx-auto block h-1 w-4 rounded-full bg-outline-variant/60"></span>
+				</button>
+			</div>
 
-		{#each notes as note (note.id)}
-			{@const Icon = note.icon}
+			{#each notes as note (note.id)}
+				{@const Icon = note.icon}
+				<button
+					data-note-id={note.id}
+					class="group relative flex size-9 items-center justify-center rounded-xl transition-all {hovered?.id ===
+					note.id
+						? 'scale-105 bg-primary-container/20'
+						: 'bg-surface-container hover:scale-105 hover:bg-surface-container-high'}"
+					title={note.title}
+				>
+					<Icon size={19} class={textClass[note.tone]} />
+					{#if hovered?.id === note.id}
+						<span class="absolute top-0.5 right-0 h-8 w-1.5 rounded-l {barClass[note.tone]}"></span>
+					{:else}
+						<span class="absolute top-1 right-0 h-7 w-1 rounded-l {barClass[note.tone]}"></span>
+					{/if}
+				</button>
+			{/each}
+
+			<div class="my-0.5 h-px w-6 bg-surface-container"></div>
+
 			<button
-				data-note-id={note.id}
-				class="group relative flex size-9 items-center justify-center rounded-xl transition-all {hovered?.id ===
-				note.id
-					? 'scale-105 bg-primary-container/20'
-					: 'bg-surface-container hover:scale-105 hover:bg-surface-container-high'}"
-				title={note.title}
+				class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
+				title="Add Sticky Note"
 			>
-				<Icon size={19} class={textClass[note.tone]} />
-				{#if hovered?.id === note.id}
-					<span class="absolute top-0.5 right-0 h-8 w-1.5 rounded-l {barClass[note.tone]}"></span>
-				{:else}
-					<span class="absolute top-1 right-0 h-7 w-1 rounded-l {barClass[note.tone]}"></span>
-				{/if}
+				<Plus size={19} />
 			</button>
-		{/each}
-
-		<div class="my-0.5 h-px w-6 bg-surface-container"></div>
-
+		</div>
+	{:else}
+		<!-- Collapsed minimal tab -->
 		<button
-			class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
-			title="Add Sticky Note"
+			bind:this={railEl}
+			class="absolute top-0 right-0 flex h-full w-full items-center justify-center rounded-l-xl bg-surface-container-lowest/90 text-outline shadow-2xl backdrop-blur-2xl transition-colors hover:text-primary"
+			title="Expand dock"
+			onclick={expandRail}
 		>
-			<Plus size={19} />
+			<PanelRightOpen size={15} />
 		</button>
-	</div>
+	{/if}
 </div>

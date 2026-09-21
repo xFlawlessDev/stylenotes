@@ -10,7 +10,7 @@
 		Archive,
 		Settings,
 	} from '@lucide/svelte';
-	import type { Folder } from '$lib/content/content';
+	import type { Folder } from '$lib/stores/notes';
 
 	let {
 		folders,
@@ -18,12 +18,14 @@
 		active,
 		onselect,
 		oncreate,
+		onaddfolder,
 	}: {
 		folders: Folder[];
 		tags: string[];
 		active: string;
 		onselect: (id: string) => void;
 		oncreate: () => void;
+		onaddfolder?: () => void;
 	} = $props();
 
 	const tone: Record<string, string> = {
@@ -43,6 +45,10 @@
 		personal: User,
 		archive: Archive,
 	};
+
+	function iconFor(id: string) {
+		return folderIcon[id] ?? Boxes;
+	}
 
 	const chipTone = ['text-primary', 'text-secondary', 'text-tertiary'];
 </script>
@@ -77,11 +83,18 @@
 		<div class="flex min-h-0 flex-col gap-1 overflow-y-auto scrollbar-none">
 			<div class="mb-1 flex items-center justify-between px-1">
 				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</span>
-				<FolderPlus size={15} class="cursor-pointer text-outline transition-colors hover:text-on-surface" />
+				<button
+					class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+					aria-label="New folder"
+					title="New folder"
+					onclick={onaddfolder}
+				>
+					<FolderPlus size={15} />
+				</button>
 			</div>
 			<nav class="flex flex-col gap-0.5">
 				{#each folders as folder (folder.id)}
-					{@const Icon = folderIcon[folder.id] ?? Boxes}
+					{@const Icon = iconFor(folder.id)}
 					<button
 						class="relative flex items-center justify-between rounded-xl px-2 py-2 transition-all {active ===
 						folder.id

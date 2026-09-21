@@ -1,9 +1,27 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { Search, Bell, HardDrive, Sparkles } from '@lucide/svelte';
+	import { Search, Sparkles, Moon, Sun, Plus } from '@lucide/svelte';
+	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
+	import type { ThemeMode } from '$lib/stores/settings.svelte';
 
-	let { title = 'StyleNotes' }: { title?: string } = $props();
+	let {
+		title = 'StyleNotes',
+		mode = 'dark',
+		onpalette,
+		oncreate,
+		onsettings,
+		ontogglemode,
+		notifications,
+	}: {
+		title?: string;
+		mode?: ThemeMode;
+		onpalette?: () => void;
+		oncreate?: () => void;
+		onsettings?: () => void;
+		ontogglemode?: () => void;
+		notifications?: Snippet;
+	} = $props();
 
 	function win() {
 		return getCurrentWindow();
@@ -12,8 +30,9 @@
 
 <header
 	data-tauri-drag-region
-	class="glass-panel relative z-10 m-2.5 mb-0 flex h-12 shrink-0 items-center justify-between rounded-2xl px-3"
+	class="glass-panel relative z-30 m-2.5 mb-0 flex h-12 shrink-0 items-center justify-between rounded-2xl px-3"
 >
+	<!-- Brand -->
 	<div class="flex items-center gap-3">
 		<div class="flex items-center gap-2 pr-1">
 			<button
@@ -43,39 +62,61 @@
 
 		<div class="flex items-center gap-2">
 			<div
-				class="flex size-6 items-center justify-center rounded-lg bg-surface-container-high/70 text-primary ring-1 ring-inset ring-white/5"
+				class="flex size-6 items-center justify-center rounded-lg bg-surface-container-high text-primary ring-1 ring-inset ring-white/5"
 			>
-				<Sparkles size={14} />
+				<Sparkles size={13} />
 			</div>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
-			<span
-				class="ml-0.5 rounded-full bg-primary-container/25 px-2 py-0.5 text-label-sm font-label text-primary"
-				>Local-first</span
-			>
 		</div>
 	</div>
 
-	<div class="flex items-center gap-2">
-		<div class="glass-chip hidden items-center gap-1.5 rounded-full py-1 pr-3 pl-2.5 md:flex">
-			<HardDrive size={13} class="text-tertiary" />
-			<span class="text-label-sm font-label text-on-surface-variant">On this device</span>
-		</div>
+	<!-- Controls -->
+	<div class="flex items-center gap-1.5">
+		<button
+			class="glass-well flex h-8 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-left transition-colors hover:border-primary/30 md:w-72 lg:w-80"
+			aria-label="Open command palette"
+			onclick={onpalette}
+		>
+			<Search size={14} class="shrink-0 text-outline" />
+			<span class="hidden flex-1 truncate text-body-sm font-body text-outline md:block"
+				>Search notes and actions</span
+			>
+			<kbd
+				class="hidden shrink-0 rounded-md bg-surface-container-high/70 px-1.5 py-0.5 text-code-sm font-code text-outline md:block"
+				>Ctrl K</kbd
+			>
+		</button>
+
+		<div class="glass-divider mx-0.5 hidden h-5 w-px sm:block"></div>
+
+		<button
+			class="glass-chip flex h-8 items-center gap-1.5 rounded-full px-3 text-label-md font-label text-on-surface-variant transition-colors hover:text-on-surface"
+			onclick={oncreate}
+		>
+			<Plus size={14} class="text-tertiary" />
+			<span class="hidden lg:inline">New note</span>
+		</button>
+
 		<button
 			class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
-			aria-label="Search"
+			aria-label="Toggle theme"
+			title="Toggle light and dark"
+			onclick={ontogglemode}
 		>
-			<Search size={16} />
+			{#if mode === 'dark'}
+				<Sun size={16} />
+			{:else}
+				<Moon size={16} />
+			{/if}
 		</button>
-		<button
-			class="glass-chip relative flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
-			aria-label="Notifications"
-		>
-			<Bell size={16} />
-			<span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-secondary"></span>
-		</button>
+
+		{@render notifications?.()}
+
 		<button
 			class="flex size-8 items-center justify-center rounded-full bg-surface-container-high text-label-md font-label font-semibold text-primary ring-1 ring-inset ring-white/5 transition-transform hover:scale-105"
-			aria-label="Account"
+			aria-label="Open settings"
+			title="Settings"
+			onclick={onsettings}
 		>
 			AR
 		</button>

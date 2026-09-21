@@ -13,25 +13,33 @@ export type Note = {
   chars: number;
 };
 
-export type Folder = {
-  id: string;
-  label: string;
-  count: number;
-  tone: string;
-};
+export function countWords(body: string): number {
+  const text = stripMarkdown(body);
+  return text ? text.split(' ').length : 0;
+}
+
+export function buildExcerpt(body: string, limit = 150): string {
+  const text = stripMarkdown(body);
+  return text.length > limit ? `${text.slice(0, limit).trimEnd()}...` : text;
+}
+
+export function createNote(seed: Partial<Note> = {}): Note {
+  const body = seed.body ?? '';
+  return {
+    id: seed.id ?? crypto.randomUUID(),
+    title: seed.title ?? 'Untitled note',
+    folder: seed.folder ?? 'personal',
+    tags: seed.tags ?? [],
+    updated: seed.updated ?? 'Just now',
+    pinned: seed.pinned ?? false,
+    excerpt: seed.excerpt ?? buildExcerpt(body),
+    body,
+    words: seed.words ?? countWords(body),
+    chars: seed.chars ?? body.length,
+  };
+}
 
 type Frontmatter = Record<string, string | string[]>;
-
-const TONES = ['primary', 'secondary', 'tertiary', 'sky', 'violet', 'outline'];
-
-const folderLabels: Record<string, string> = {
-  all: 'All Notes',
-  work: 'Work',
-  ideas: 'Ideas',
-  dev: 'Development',
-  personal: 'Personal',
-  archive: 'Archive',
-};
 
 function parseFrontmatter(raw: string): { data: Frontmatter; body: string } {
   const match = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(raw);
@@ -85,16 +93,6 @@ export function plainText(body: string): string {
   return stripMarkdown(body);
 }
 
-function buildExcerpt(body: string, limit = 150): string {
-  const text = stripMarkdown(body);
-  return text.length > limit ? `${text.slice(0, limit).trimEnd()}...` : text;
-}
-
-function countWords(body: string): number {
-  const text = stripMarkdown(body);
-  return text ? text.split(' ').length : 0;
-}
-
 function buildNote(path: string, raw: string): Note {
   const { data, body } = parseFrontmatter(raw);
   const fileName = path.split('/').pop() ?? path;
@@ -123,22 +121,3 @@ const modules = import.meta.glob('./notes/*.md', {
 export const notes: Note[] = Object.entries(modules)
   .map(([path, raw]) => buildNote(path, raw))
   .sort((a, b) => Number(b.pinned) - Number(a.pinned));
-
-export function foldersFor(all: Note[]): Folder[] {
-  const present = new Set(all.map((note) => note.folder));
-  const folders: Folder[] = [
-    { id: 'all', label: folderLabels.all, count: all.length, tone: 'primary' },
-  ];
-
-  Object.entries(folderLabels).forEach(([id, label], index) => {
-    if (id === 'all' || !present.has(id)) return;
-    folders.push({
-      id,
-      label,
-      count: all.filter((note) => note.folder === id).length,
-      tone: TONES[index % TONES.length],
-    });
-  });
-
-  return folders;
-}

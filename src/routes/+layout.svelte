@@ -1,12 +1,11 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
+	import { hydrateSettings } from '$lib/stores/settings.svelte';
 
 	const { children } = $props();
 
-	onMount(() => {
-		document.documentElement.classList.add('dark');
-	});
+	onMount(() => hydrateSettings());
 </script>
 
 {@render children()}
