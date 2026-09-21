@@ -27,7 +27,7 @@ export function createNote(seed: Partial<Note> = {}): Note {
   const body = seed.body ?? '';
   return {
     id: seed.id ?? crypto.randomUUID(),
-    title: seed.title ?? 'Untitled note',
+    title: seed.title?.trim() || 'Untitled note',
     folder: seed.folder ?? 'personal',
     tags: seed.tags ?? [],
     updated: seed.updated ?? 'Just now',

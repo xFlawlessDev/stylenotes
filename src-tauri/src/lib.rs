@@ -1,13 +1,85 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+use tauri_plugin_sql::{Migration, MigrationKind};
+
+const DB_URL: &str = "sqlite:stylenotes.db";
+
+fn migrations() -> Vec<Migration> {
+    vec![
+        Migration {
+            version: 1,
+            description: "create_notes_folders_tags_notifications_settings",
+            sql: "
+                CREATE TABLE IF NOT EXISTS folders (
+                    id TEXT PRIMARY KEY,
+                    label TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE TABLE IF NOT EXISTS notes (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL DEFAULT 'Untitled note',
+                    folder TEXT NOT NULL DEFAULT 'personal',
+                    body TEXT NOT NULL DEFAULT '',
+                    excerpt TEXT NOT NULL DEFAULT '',
+                    words INTEGER NOT NULL DEFAULT 0,
+                    chars INTEGER NOT NULL DEFAULT 0,
+                    pinned INTEGER NOT NULL DEFAULT 0,
+                    updated TEXT NOT NULL DEFAULT 'Just now',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE TABLE IF NOT EXISTS tags (
+                    note_id TEXT NOT NULL,
+                    tag TEXT NOT NULL,
+                    PRIMARY KEY (note_id, tag),
+                    FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL DEFAULT 'tip',
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL DEFAULT '',
+                    time TEXT NOT NULL DEFAULT '',
+                    read INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    data TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add_folder_icon",
+            sql: "ALTER TABLE folders ADD COLUMN icon TEXT;",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "add_folder_position",
+            sql: "ALTER TABLE folders ADD COLUMN position INTEGER;",
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations(DB_URL, migrations())
+                .build(),
+        )
         .plugin(prevent_default())
         .setup(|app| {
             #[cfg(desktop)]
@@ -21,7 +93,6 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

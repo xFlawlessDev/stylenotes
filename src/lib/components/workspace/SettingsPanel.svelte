@@ -30,14 +30,12 @@
 	let {
 		open = false,
 		onclose,
-		onncreatenote,
 		onexport,
 		onresetdata,
 		notecount,
 	}: {
 		open?: boolean;
 		onclose: () => void;
-		onncreatenote: () => void;
 		onexport: () => void;
 		onresetdata: () => void;
 		notecount: number;
@@ -321,12 +319,6 @@
 									onclick={onexport}
 								>
 									<Download size={15} /> Export
-								</button>
-								<button
-									class="glass-chip flex items-center justify-center gap-2 rounded-xl py-2.5 text-label-md font-label text-on-surface transition-colors hover:text-primary"
-									onclick={onncreatenote}
-								>
-									<Sparkles size={15} /> New note
 								</button>
 							</div>
 						</div>

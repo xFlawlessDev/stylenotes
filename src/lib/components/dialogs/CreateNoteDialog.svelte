@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { FilePlus2 } from '@lucide/svelte';
+	import { AlertTriangle, FilePlus2 } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 
 	let {
@@ -19,30 +20,56 @@
 	let title = $state('');
 	let folder = $state('personal');
 	let body = $state('');
-	let touched = $state(false);
+	let confirming = $state(false);
+	let titleEl = $state<HTMLInputElement | null>(null);
 
 	const options = $derived(folders.filter((item) => item.id !== 'all'));
-	const error = $derived(touched && !title.trim() ? 'Give the note a title to continue.' : '');
+	const hasDraft = $derived(title.trim().length > 0 || body.trim().length > 0);
 
 	$effect(() => {
 		if (open) {
 			title = '';
 			body = '';
-			touched = false;
+			confirming = false;
 			folder = options.find((item) => item.id === 'personal')?.id ?? options[0]?.id ?? 'personal';
+			void tick().then(() => titleEl?.focus());
 		}
 	});
 
 	function submit() {
-		touched = true;
-		if (!title.trim()) return;
 		onsubmit({ title: title.trim(), folder, body });
 		open = false;
+	}
+
+	function requestClose() {
+		if (hasDraft && !confirming) {
+			confirming = true;
+			return;
+		}
+		open = false;
+	}
+
+	function onKeydown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+			event.preventDefault();
+			submit();
+		}
 	}
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="glass-dialog">
+	<Dialog.Content
+		class="glass-dialog"
+		showCloseButton={false}
+		onkeydown={onKeydown}
+		onEscapeKeydown={(event) => {
+			event.preventDefault();
+			requestClose();
+		}}
+		onInteractOutside={(event) => {
+			if (hasDraft) event.preventDefault();
+		}}
+	>
 		<Dialog.Header>
 			<div
 				class="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-container text-primary"
@@ -65,17 +92,16 @@
 			}}
 		>
 			<div class="flex flex-col gap-2">
-				<Label for="note-title" class="text-label-md font-label text-on-surface-variant">Title</Label>
+				<Label for="note-title" class="text-label-md font-label text-on-surface-variant"
+					>Title <span class="text-outline">(optional)</span></Label
+				>
 				<Input
 					id="note-title"
+					bind:ref={titleEl}
 					bind:value={title}
-					placeholder="e.g. Weekly review"
+					placeholder="Untitled note"
 					class="glass-well h-9 border-0 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50"
-					oninput={() => (touched = true)}
 				/>
-				{#if error}
-					<p class="text-label-sm font-label text-error">{error}</p>
-				{/if}
 			</div>
 
 			<div class="flex flex-col gap-2">
@@ -108,11 +134,37 @@
 				></textarea>
 			</div>
 
+			{#if confirming}
+				<div
+					class="flex items-center gap-2 rounded-xl bg-error-container/25 px-3 py-2 text-label-sm font-label text-error"
+				>
+					<AlertTriangle size={14} class="shrink-0" />
+					<span class="flex-1">Discard this draft? Your text will be lost.</span>
+					<button
+						type="button"
+						class="rounded-md px-2 py-1 text-on-surface-variant transition-colors hover:text-on-surface"
+						onclick={() => (confirming = false)}
+					>
+						Keep editing
+					</button>
+					<button
+						type="button"
+						class="rounded-md px-2 py-1 font-semibold text-error transition-colors hover:brightness-110"
+						onclick={() => (open = false)}
+					>
+						Discard
+					</button>
+				</div>
+			{/if}
+
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit">Create note</Button>
+				<Button type="button" variant="outline" onclick={requestClose}>Cancel</Button>
+				<Button type="submit">
+					Create note
+					<kbd class="ml-1.5 text-[10px] opacity-70">Ctrl ↵</kbd>
+				</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

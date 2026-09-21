@@ -7,7 +7,7 @@
     <title>StyleNotes</title>
     <script>
       try {
-        const raw = localStorage.getItem('stylenotes.settings.v1');
+        const raw = localStorage.getItem('stylenotes.theme.v1');
         const saved = raw ? JSON.parse(raw) : null;
         const root = document.documentElement;
         const mode = saved?.mode === 'light' ? 'light' : 'dark';

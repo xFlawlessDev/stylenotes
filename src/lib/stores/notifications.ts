@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { notificationsRepo } from '$lib/db';
 
 export type NotificationKind = 'reminder' | 'sync' | 'tip' | 'mention';
 
@@ -10,8 +10,6 @@ export type AppNotification = {
 	time: string;
 	read: boolean;
 };
-
-const KEY = 'stylenotes.notifications.v1';
 
 const seed: AppNotification[] = [
 	{
@@ -48,27 +46,32 @@ const seed: AppNotification[] = [
 	},
 ];
 
-export function loadNotifications(): AppNotification[] {
-	if (!browser) return seed.map((item) => ({ ...item }));
+export function seedNotifications(): AppNotification[] {
+	return seed.map((item) => ({ ...item }));
+}
+
+export async function loadNotifications(): Promise<AppNotification[]> {
 	try {
-		const raw = localStorage.getItem(KEY);
-		if (!raw) return seed.map((item) => ({ ...item }));
-		const parsed = JSON.parse(raw) as AppNotification[];
-		return Array.isArray(parsed) && parsed.length ? parsed : seed.map((item) => ({ ...item }));
+		const items = await notificationsRepo.list();
+		if (items.length) return items;
+		const defaults = seedNotifications();
+		await notificationsRepo.replaceAll(defaults);
+		return defaults;
 	} catch {
-		return seed.map((item) => ({ ...item }));
+		return seedNotifications();
 	}
 }
 
-export function saveNotifications(items: AppNotification[]) {
-	if (!browser) return;
+export async function persistNotifications(items: AppNotification[]): Promise<void> {
 	try {
-		localStorage.setItem(KEY, JSON.stringify(items));
+		await notificationsRepo.replaceAll(items);
 	} catch {
 		/* ignore */
 	}
 }
 
-export function resetNotifications(): AppNotification[] {
-	return seed.map((item) => ({ ...item }));
+export async function resetNotifications(): Promise<AppNotification[]> {
+	const defaults = seedNotifications();
+	await persistNotifications(defaults);
+	return defaults;
 }

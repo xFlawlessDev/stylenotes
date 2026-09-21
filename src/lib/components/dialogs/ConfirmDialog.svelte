@@ -45,7 +45,13 @@
 			class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 		>
 			<AlertDialog.Cancel variant="outline" onclick={oncancel}>{cancelLabel}</AlertDialog.Cancel>
-			<AlertDialog.Action variant={confirmVariant} onclick={onconfirm}>
+			<AlertDialog.Action
+				variant={confirmVariant}
+				onclick={() => {
+					open = false;
+					onconfirm?.();
+				}}
+			>
 				{confirmLabel}
 			</AlertDialog.Action>
 		</AlertDialog.Footer>

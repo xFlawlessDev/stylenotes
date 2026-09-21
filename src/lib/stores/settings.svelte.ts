@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { settingsRepo } from '$lib/db';
 
 export type ThemeMode = 'dark' | 'light';
 export type Accent = 'steel' | 'sage' | 'sand' | 'rose';
@@ -24,8 +25,6 @@ export const accents: { id: Accent; label: string; swatch: string }[] = [
 	{ id: 'rose', label: 'Rose', swatch: '#e3b6bd' },
 ];
 
-const KEY = 'stylenotes.settings.v1';
-
 const defaults: Settings = {
 	mode: 'dark',
 	accent: 'steel',
@@ -42,39 +41,35 @@ export function defaultSettings(): Settings {
 	return { ...defaults };
 }
 
-export function loadSettings(): Settings {
-	if (!browser) return { ...defaults };
-	try {
-		const raw = localStorage.getItem(KEY);
-		if (!raw) return { ...defaults };
-		return { ...defaults, ...(JSON.parse(raw) as Partial<Settings>) };
-	} catch {
-		return { ...defaults };
-	}
-}
-
-export function saveSettings(settings: Settings) {
-	if (!browser) return;
-	try {
-		localStorage.setItem(KEY, JSON.stringify(settings));
-	} catch {
-		/* ignore */
-	}
-}
-
-export const settings = $state<Settings>(loadSettings());
+export const settings = $state<Settings>({ ...defaults });
 
 let hydrated = false;
 
-export function hydrateSettings() {
+export async function hydrateSettings() {
 	if (hydrated || !browser) return;
 	hydrated = true;
+	try {
+		const stored = await settingsRepo.load();
+		if (stored) Object.assign(settings, defaults, stored);
+	} catch {
+		/* keep defaults when the database is unavailable */
+	}
 	applySettings();
 }
 
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function persistSettings() {
-	saveSettings(settings);
+	if (!browser) return;
+	if (persistTimer) clearTimeout(persistTimer);
+	persistTimer = setTimeout(() => {
+		void settingsRepo.save({ ...settings }).catch(() => {
+			/* ignore persistence failures */
+		});
+	}, 150);
 }
+
+const PREPAINT_KEY = 'stylenotes.theme.v1';
 
 export function applySettings() {
 	if (!browser) return;
@@ -84,6 +79,19 @@ export function applySettings() {
 	html.dataset.accent = settings.accent;
 	html.dataset.density = settings.density;
 	html.dataset.motion = settings.reduceMotion ? 'reduced' : 'full';
+	try {
+		localStorage.setItem(
+			PREPAINT_KEY,
+			JSON.stringify({
+				mode: settings.mode,
+				accent: settings.accent,
+				density: settings.density,
+				reduceMotion: settings.reduceMotion,
+			})
+		);
+	} catch {
+		/* ignore */
+	}
 }
 
 export function updateSettings(patch: Partial<Settings>) {
@@ -100,4 +108,12 @@ export function resetSettings() {
 	Object.assign(settings, defaults);
 	persistSettings();
 	applySettings();
+}
+
+export async function resetStoredSettings() {
+	try {
+		await settingsRepo.clear();
+	} catch {
+		/* ignore */
+	}
 }

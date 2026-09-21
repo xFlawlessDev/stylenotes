@@ -9,27 +9,38 @@
 		Pin,
 		Download,
 	} from '@lucide/svelte';
-	import { notes as seedNotes, buildExcerpt, countWords, createNote as makeNote } from '$lib/content/content';
+	import { buildExcerpt, countWords, createNote as makeNote } from '$lib/content/content';
 	import type { Note } from '$lib/content/content';
 	import {
 		foldersFor,
-		loadNotes,
-		saveNotes,
+		hydrateNotes,
+		persistNote,
+		persistNotes,
+		persistFolders,
+		removeNote,
 		clearNotes,
+		resetNotesToSeed,
 		exportNotes,
 		loadFolders,
-		saveFolders,
 		uniqueFolderId,
+		reorderFolders,
+		renameFolderInList,
+		setFolderIconInList,
+		removeFolderFromList,
+		reassignNotesFolder,
+		isCustomFolder,
 		type CustomFolder,
+		type Folder,
 	} from '$lib/stores/notes';
 	import {
 		settings,
 		hydrateSettings,
 		toggleMode,
+		resetStoredSettings,
 	} from '$lib/stores/settings.svelte';
 	import {
 		loadNotifications,
-		saveNotifications,
+		persistNotifications,
 		resetNotifications,
 		type AppNotification,
 	} from '$lib/stores/notifications';
@@ -44,9 +55,10 @@
 	import AddFolderDialog from '$lib/components/dialogs/AddFolderDialog.svelte';
 	import ConfirmDialog from '$lib/components/dialogs/ConfirmDialog.svelte';
 	import { Trash2, RotateCcw } from '@lucide/svelte';
+	import { toggleOverlay } from '$lib/windows';
 
-	let items = $state<Note[]>(loadNotes());
-	let customFolders = $state<CustomFolder[]>(loadFolders());
+	let items = $state<Note[]>([]);
+	let customFolders = $state<CustomFolder[]>([]);
 	let selectedId = $state('');
 	let activeFolder = $state('all');
 	let activeTag = $state<string | null>(null);
@@ -57,11 +69,17 @@
 	let folderOpen = $state(false);
 	let pendingDelete = $state<Note | null>(null);
 	let deleteOpen = $state(false);
+	let pendingFolder = $state<Folder | null>(null);
+	let folderDeleteOpen = $state(false);
 	let resetOpen = $state(false);
-	let notifications = $state<AppNotification[]>(loadNotifications());
+	let notifications = $state<AppNotification[]>([]);
 	let toast = $state('');
+	let newNoteToken = $state(0);
 
 	const folders = $derived(foldersFor(items, customFolders));
+	const folderLabelMap = $derived(
+		Object.fromEntries(folders.map((folder) => [folder.id, folder.label]))
+	);
 	const tags = $derived([...new Set(items.flatMap((note) => note.tags))]);
 	const visible = $derived.by(() => {
 		let list = activeFolder === 'all' ? items : items.filter((note) => note.folder === activeFolder);
@@ -73,24 +91,22 @@
 	);
 
 	$effect(() => {
-		saveNotes(items);
-	});
-
-	$effect(() => {
-		saveFolders(customFolders);
-	});
-
-	$effect(() => {
-		saveNotifications(notifications);
-	});
-
-	$effect(() => {
 		if (activeTag && !tags.includes(activeTag)) activeTag = null;
 	});
 
 	onMount(() => {
-		hydrateSettings();
-		if (!selectedId && items.length) selectedId = items[0].id;
+		void hydrateSettings();
+		void (async () => {
+			const [storedNotes, storedFolders, storedNotifications] = await Promise.all([
+				hydrateNotes(),
+				loadFolders(),
+				loadNotifications(),
+			]);
+			items = storedNotes;
+			customFolders = storedFolders;
+			notifications = storedNotifications;
+			if (!selectedId && items.length) selectedId = items[0].id;
+		})();
 	});
 
 	function showToast(message: string) {
@@ -104,26 +120,76 @@
 		createOpen = true;
 	}
 
-	function commitNewNote(data: { title: string; folder: string; body: string }) {
-		const note = makeNote(data);
+	async function persistNoteOrToast(note: Note) {
+		const ok = await persistNote(note);
+		if (!ok) showToast('Could not save note — changes may be lost');
+	}
+
+	async function commitNewNote(data: { title: string; folder: string; body: string }) {
+		const note = makeNote({ ...data, title: data.title.trim() || 'Untitled note' });
 		items = [note, ...items];
 		selectedId = note.id;
 		activeFolder = data.folder;
+		activeTag = null;
+		newNoteToken += 1;
 		showToast('Note created');
+		await persistNoteOrToast(note);
 	}
 
 	function openAddFolder() {
 		folderOpen = true;
 	}
 
-	function commitNewFolder(label: string) {
+	function commitNewFolder(label: string, icon?: string) {
 		const id = uniqueFolderId(label, folders.map((folder) => folder.id));
-		customFolders = [...customFolders, { id, label }];
+		const next = [...customFolders, { id, label, icon }];
+		customFolders = next;
 		activeFolder = id;
+		void persistFolders(next);
 		showToast(`Folder “${label}” created`);
 	}
 
+	function renameFolder(id: string, label: string) {
+		const next = renameFolderInList(customFolders, id, label);
+		customFolders = next;
+		void persistFolders(next);
+		showToast(`Folder renamed to “${label}”`);
+	}
+
+	function setFolderIcon(id: string, icon: string) {
+		const next = setFolderIconInList(customFolders, id, icon);
+		customFolders = next;
+		void persistFolders(next);
+	}
+
+	function deleteFolder(id: string) {
+		if (!isCustomFolder(id)) return;
+		pendingFolder = folders.find((folder) => folder.id === id) ?? null;
+		folderDeleteOpen = pendingFolder !== null;
+	}
+
+	function performDeleteFolder(id: string) {
+		if (!isCustomFolder(id)) return;
+		const next = removeFolderFromList(customFolders, id);
+		customFolders = next;
+		void persistFolders(next);
+		const remaining = reassignNotesFolder(items, id);
+		items = remaining;
+		void persistNotes(remaining);
+		if (activeFolder === id) activeFolder = 'all';
+		showToast('Folder removed');
+	}
+
+	function reorderFolder(fromId: string, toId: string) {
+		const next = reorderFolders(folders, fromId, toId);
+		customFolders = next;
+		void persistFolders(next);
+	}
+
+	let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 	function updateNote(id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>) {
+		let updated: Note | undefined;
 		items = items.map((note) => {
 			if (note.id !== id) return note;
 			const next: Note = { ...note, ...patch, updated: 'Just now' };
@@ -132,8 +198,16 @@
 				next.chars = patch.body.length;
 				next.excerpt = buildExcerpt(patch.body);
 			}
+			updated = next;
 			return next;
 		});
+
+		if (!updated) return;
+		const toSave = updated;
+		if (persistTimer) clearTimeout(persistTimer);
+		persistTimer = setTimeout(() => {
+			void persistNoteOrToast(toSave);
+		}, 250);
 	}
 
 	function deleteNote(id: string) {
@@ -148,6 +222,7 @@
 	function performDelete(id: string) {
 		items = items.filter((note) => note.id !== id);
 		if (selectedId === id) selectedId = items[0]?.id ?? '';
+		void removeNote(id);
 		showToast('Note deleted');
 	}
 
@@ -194,13 +269,19 @@
 		resetOpen = true;
 	}
 
-	function resetData() {
-		clearNotes();
-		items = [...seedNotes];
+	async function resetData() {
+		await clearNotes();
+		await resetStoredSettings();
+		const [fresh, freshNotifications] = await Promise.all([
+			resetNotesToSeed(),
+			resetNotifications(),
+		]);
+		items = fresh;
 		customFolders = [];
 		selectedId = items[0]?.id ?? '';
-		notifications = resetNotifications();
+		notifications = freshNotifications;
 		activeFolder = 'all';
+		activeTag = null;
 		showToast('Data reset to samples');
 	}
 
@@ -208,6 +289,7 @@
 		notifications = notifications.map((item) =>
 			item.id === id ? { ...item, read: true } : item
 		);
+		void persistNotifications(notifications);
 	}
 
 	function closePanels() {
@@ -294,8 +376,12 @@
 		onread={markRead}
 		onreadall={() => {
 			notifications = notifications.map((item) => ({ ...item, read: true }));
+			void persistNotifications(notifications);
 		}}
-		onclear={() => (notifications = [])}
+		onclear={() => {
+			notifications = [];
+			void persistNotifications([]);
+		}}
 		onclose={() => (notificationsOpen = false)}
 	/>
 {/snippet}
@@ -306,13 +392,13 @@
 			closePanels();
 			paletteOpen = true;
 		}}
-		oncreate={createNote}
 		onsettings={() => {
 			closePanels();
 			settingsOpen = true;
 		}}
 		mode={settings.mode}
 		ontogglemode={toggleMode}
+		ontoggledock={toggleOverlay}
 		notifications={notificationsSlot}
 	/>
 
@@ -325,6 +411,10 @@
 			onselect={selectFolder}
 			oncreate={createNote}
 			onaddfolder={openAddFolder}
+			onrenamefolder={renameFolder}
+			onfoldericon={setFolderIcon}
+			ondeletedfolder={deleteFolder}
+			onreorder={reorderFolder}
 			onselecttag={selectTag}
 		/>
 
@@ -332,19 +422,26 @@
 			notes={visible}
 			{selectedId}
 			total={items.length}
+			folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
+			resetToken={newNoteToken}
+			showFolder={activeFolder === 'all'}
+			folderLabels={folderLabelMap}
 			{activeTag}
 			onselect={(id) => (selectedId = id)}
 			onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
-			oncreate={createNote}
 			onselecttag={selectTag}
+			oncleartag={() => selectTag(null)}
+			onselectfolder={selectFolder}
 		/>
 
 		<NoteEditor
 			note={selected}
 			{folders}
+			focusToken={newNoteToken}
 			onupdate={updateNote}
 			ondelete={deleteNote}
 			onshare={shareNote}
+			onselectfolder={selectFolder}
 		/>
 	</div>
 
@@ -369,7 +466,6 @@
 	<SettingsPanel
 		open={settingsOpen}
 		onclose={() => (settingsOpen = false)}
-		onncreatenote={createNote}
 		onexport={exportAll}
 		onresetdata={askResetData}
 		notecount={items.length}
@@ -394,6 +490,26 @@
 			pendingDelete = null;
 		}}
 		oncancel={() => (pendingDelete = null)}
+	>
+		{#snippet icon()}
+			<Trash2 size={18} />
+		{/snippet}
+	</ConfirmDialog>
+
+	<ConfirmDialog
+		bind:open={folderDeleteOpen}
+		title="Delete this folder?"
+		description="The folder “{pendingFolder?.label ?? ''}” will be removed. Its {(pendingFolder?.count ??
+		0) === 1
+			? 'note'
+			: 'notes'} will move to Personal. This action cannot be undone."
+		confirmLabel="Delete folder"
+		confirmVariant="destructive"
+		onconfirm={() => {
+			if (pendingFolder) performDeleteFolder(pendingFolder.id);
+			pendingFolder = null;
+		}}
+		oncancel={() => (pendingFolder = null)}
 	>
 		{#snippet icon()}
 			<Trash2 size={18} />

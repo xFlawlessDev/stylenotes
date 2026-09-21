@@ -1,16 +1,10 @@
 <script lang="ts">
-	import {
-		PencilLine,
-		FolderPlus,
-		Boxes,
-		Briefcase,
-		Lightbulb,
-		Code2,
-		User,
-		Archive,
-	} from '@lucide/svelte';
+	import { PencilLine, FolderPlus, Boxes } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
+	import { defaultFolderIcons, resolveFolderIcon } from '$lib/content/folder-icons';
+	import { isCustomFolder } from '$lib/stores/notes';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import FolderRow from '$lib/components/workspace/FolderRow.svelte';
 
 	let {
 		folders,
@@ -21,6 +15,10 @@
 		oncreate,
 		onaddfolder,
 		onselecttag,
+		onrenamefolder,
+		onfoldericon,
+		ondeletedfolder,
+		onreorder,
 	}: {
 		folders: Folder[];
 		tags: string[];
@@ -30,7 +28,14 @@
 		oncreate: () => void;
 		onaddfolder?: () => void;
 		onselecttag?: (tag: string | null) => void;
+		onrenamefolder?: (id: string, label: string) => void;
+		onfoldericon?: (id: string, icon: string) => void;
+		ondeletedfolder?: (id: string) => void;
+		onreorder?: (fromId: string, toId: string) => void;
 	} = $props();
+
+	let editingId = $state<string | null>(null);
+	let draggingId = $state<string | null>(null);
 
 	const tone: Record<string, string> = {
 		primary: 'text-primary',
@@ -41,17 +46,8 @@
 		outline: 'text-outline',
 	};
 
-	const folderIcon: Record<string, typeof Boxes> = {
-		all: Boxes,
-		work: Briefcase,
-		ideas: Lightbulb,
-		dev: Code2,
-		personal: User,
-		archive: Archive,
-	};
-
-	function iconFor(id: string) {
-		return folderIcon[id] ?? Boxes;
+	function iconFor(folder: Folder) {
+		return resolveFolderIcon(folder.icon) ?? defaultFolderIcons[folder.id] ?? Boxes;
 	}
 
 	const chipTone = ['text-primary', 'text-secondary', 'text-tertiary'];
@@ -87,49 +83,54 @@
 		<div class="flex min-h-0 flex-col gap-1 overflow-y-auto scrollbar-none">
 			<div class="mb-1 flex items-center justify-between px-1">
 				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</span>
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<button
-								{...props}
-								class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
-								aria-label="New folder"
-								onclick={onaddfolder}
-							>
-								<FolderPlus size={15} />
-							</button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>New folder</Tooltip.Content>
-				</Tooltip.Root>
+				<div class="flex items-center gap-0.5">
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+									aria-label="New folder"
+									onclick={onaddfolder}
+								>
+									<FolderPlus size={15} />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>New folder</Tooltip.Content>
+					</Tooltip.Root>
+				</div>
 			</div>
-			<nav class="flex flex-col gap-0.5">
+			<nav class="flex flex-col gap-0.5" aria-label="Folders">
 				{#each folders as folder (folder.id)}
-					{@const Icon = iconFor(folder.id)}
-					<button
-						class="relative flex items-center justify-between rounded-xl px-2 py-2 transition-all {active ===
-						folder.id
-							? 'glass-chip text-on-surface'
-							: 'text-on-surface-variant hover:bg-surface-container/50 hover:text-on-surface'}"
-						onclick={() => onselect(folder.id)}
-					>
-						{#if active === folder.id}
-							<span
-								class="absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-primary"
-							></span>
-						{/if}
-						<span class="flex items-center gap-2">
-							<Icon size={17} class={active === folder.id ? 'text-primary' : tone[folder.tone]} />
-							<span class="text-body-md font-body font-medium">{folder.label}</span>
-						</span>
-						<span
-							class="rounded-md px-1.5 py-0.5 text-code-sm font-code {active === folder.id
-								? 'text-primary'
-								: 'text-outline'}"
-						>
-							{folder.count}
-						</span>
-					</button>
+					<FolderRow
+						{folder}
+						active={active === folder.id}
+						editing={editingId === folder.id}
+						icon={iconFor(folder)}
+						toneClass={tone[folder.tone]}
+						draggable={folder.id !== 'all' && !!onreorder}
+						deletable={isCustomFolder(folder.id)}
+						onselect={() => onselect(folder.id)}
+						onedit={folder.id === 'all' ? undefined : () => {
+							editingId = editingId === folder.id ? null : folder.id;
+						}}
+						onrename={(label) => {
+							onrenamefolder?.(folder.id, label);
+							editingId = null;
+						}}
+						onicon={(icon) => onfoldericon?.(folder.id, icon)}
+						ondelete={() => {
+							ondeletedfolder?.(folder.id);
+							editingId = null;
+						}}
+						ondragstart={(id) => (draggingId = id)}
+						ondrop={(id) => {
+							if (draggingId && draggingId !== id) onreorder?.(draggingId, id);
+							draggingId = null;
+						}}
+						ondragend={() => (draggingId = null)}
+					/>
 				{/each}
 			</nav>
 		</div>

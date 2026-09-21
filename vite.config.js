@@ -12,6 +12,12 @@ export default defineConfig(() => ({
   resolve: {
     conditions: ["browser"],
   },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.{test,spec}.{js,ts}"],
+    setupFiles: ["./vitest-setup.ts"],
+    clearMocks: true,
+  },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

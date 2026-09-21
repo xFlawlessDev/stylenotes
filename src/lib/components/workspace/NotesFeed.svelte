@@ -1,30 +1,47 @@
 <script lang="ts">
-	import { Search, Pin, FileText, Plus, X, Tag } from '@lucide/svelte';
+	import { Search, Pin, FileText, X, Tag } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		notes,
 		selectedId,
 		total,
+		folderLabel = 'All Notes',
 		activeTag = null,
+		resetToken = 0,
+		showFolder = false,
+		folderLabels = {},
 		onselect,
 		onpin,
-		oncreate,
 		onselecttag,
+		oncleartag,
+		onselectfolder,
 	}: {
 		notes: Note[];
 		selectedId: string;
 		total: number;
+		folderLabel?: string;
 		activeTag?: string | null;
+		resetToken?: number;
+		showFolder?: boolean;
+		folderLabels?: Record<string, string>;
 		onselect: (id: string) => void;
 		onpin: (id: string) => void;
-		oncreate: () => void;
 		onselecttag?: (tag: string) => void;
+		oncleartag?: () => void;
+		onselectfolder?: (id: string) => void;
 	} = $props();
 
 	let query = $state('');
 	let tab = $state<'all' | 'pinned'>('all');
+
+	$effect(() => {
+		void resetToken;
+		query = '';
+		tab = 'all';
+	});
 
 	const filtered = $derived(
 		notes.filter((note) => {
@@ -38,6 +55,29 @@
 
 <section class="glass-panel flex w-[300px] shrink-0 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
 	<div class="flex flex-col gap-2">
+		<Breadcrumb.Root class="px-1 pt-1">
+			<Breadcrumb.List class="text-label-sm font-label text-outline uppercase">
+				<Breadcrumb.Item>
+					<button
+						type="button"
+						class="transition-colors hover:text-on-surface"
+						onclick={() => onselectfolder?.('all')}
+					>
+						{folderLabel}
+					</button>
+				</Breadcrumb.Item>
+				{#if activeTag}
+					<Breadcrumb.Separator class="text-outline/60 [&>svg]:size-3" />
+					<Breadcrumb.Item>
+						<Breadcrumb.Page class="flex items-center gap-1 normal-case text-primary">
+							<Tag size={11} />
+							{activeTag}
+						</Breadcrumb.Page>
+					</Breadcrumb.Item>
+				{/if}
+			</Breadcrumb.List>
+		</Breadcrumb.Root>
+
 		<div class="relative w-full">
 			<Search size={16} class="pointer-events-none absolute top-2.5 left-3 text-outline" />
 			<input
@@ -73,7 +113,7 @@
 				<button
 					class="flex size-5 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary-container/40"
 					aria-label="Clear tag filter"
-					onclick={() => onselecttag?.(activeTag)}
+					onclick={() => (oncleartag ? oncleartag() : onselecttag?.(activeTag))}
 				>
 					<X size={13} />
 				</button>
@@ -101,6 +141,24 @@
 					<span
 						class="absolute top-3 bottom-3 left-0 w-[3px] rounded-r-full bg-primary"
 					></span>
+				{/if}
+				{#if showFolder}
+					<Breadcrumb.Root class="mb-1">
+						<Breadcrumb.List class="gap-1 text-code-sm font-code text-outline">
+							<Breadcrumb.Item>
+								<button
+									type="button"
+									class="transition-colors group-hover:text-primary"
+									onclick={(event) => {
+										event.stopPropagation();
+										onselectfolder?.(note.folder);
+									}}
+								>
+									{folderLabels[note.folder] ?? note.folder}
+								</button>
+							</Breadcrumb.Item>
+						</Breadcrumb.List>
+					</Breadcrumb.Root>
 				{/if}
 				<div class="mb-1 flex items-start justify-between gap-2">
 					<h2
@@ -167,12 +225,4 @@
 			</div>
 		{/if}
 	</div>
-
-	<button
-		class="glass-well flex h-9 w-full items-center justify-center gap-1.5 rounded-xl text-label-md font-label text-on-surface-variant transition-colors hover:text-on-surface"
-		onclick={oncreate}
-	>
-		<Plus size={15} />
-		New Note
-	</button>
 </section>

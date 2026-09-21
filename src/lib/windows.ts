@@ -66,7 +66,11 @@ export async function toggleOverlay() {
     await overlay.hide();
   } else {
     await overlay.show();
-    await overlay.setFocus();
+    try {
+      await overlay.setFocus();
+    } catch {
+      /* overlay is not focusable; showing is enough */
+    }
   }
 }
 

@@ -9,9 +9,6 @@
 	} from '@tauri-apps/api/window';
 	import {
 		Rocket,
-		ShoppingBasket,
-		Key,
-		Palette,
 		Plus,
 		Pin,
 		ArrowUpRight,
@@ -23,9 +20,16 @@
 		Square,
 		PanelRightClose,
 		PanelRightOpen,
+		Briefcase,
+		Lightbulb,
+		Code2,
+		User,
+		Boxes,
 	} from '@lucide/svelte';
 	import { isTauri, openWorkspace } from '$lib/windows';
 	import { verticalDrag } from '$lib/drag';
+	import { hydrateNotes, removeNote, parseChecklist } from '$lib/stores/notes';
+	import type { Note } from '$lib/content/content';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	type Tone = 'secondary' | 'tertiary' | 'error' | 'primary';
@@ -43,72 +47,76 @@
 		checklist: { text: string; done: boolean }[];
 	};
 
-	const notes: RailNote[] = [
-		{
-			id: 'sprint',
-			tone: 'secondary',
-			icon: Rocket,
-			label: 'Sprint',
-			title: 'Architecture Plan: NoteDock Engine',
-			excerpt:
-				'Multi-window IPC routing patterns, SQLite schema synchronizer, and zero-latency floating dock protocol.',
-			edited: '2m ago',
-			tags: ['#Dev', '#Sprint'],
-			pinned: true,
-			checklist: [
-				{ text: 'SQLite cascade deletions', done: true },
-				{ text: 'Window drag region', done: true },
-				{ text: 'IPC benchmark', done: false },
-			],
-		},
-		{
-			id: 'personal',
-			tone: 'tertiary',
-			icon: ShoppingBasket,
-			label: 'Personal',
-			title: 'Grocery & Household Supplies',
-			excerpt:
-				'Oat milk, cold brew concentrate, almonds, spinach, Greek yogurt, and dish soap refill.',
-			edited: '1h ago',
-			tags: ['#Home'],
-			checklist: [
-				{ text: 'Oat milk + cold brew', done: false },
-				{ text: 'Spinach & yogurt', done: false },
-				{ text: 'Dish soap refill', done: true },
-			],
-		},
-		{
-			id: 'dev',
-			tone: 'error',
-			icon: Key,
-			label: 'Dev',
-			title: 'API Tokens & Rotation Keys',
-			excerpt:
-				'Rotate staging credentials weekly. Production keys live in the encrypted vault, never in plaintext.',
-			edited: '3h ago',
-			tags: ['#Security'],
-			checklist: [
-				{ text: 'Rotate staging token', done: true },
-				{ text: 'Move prod key to vault', done: false },
-			],
-		},
-		{
-			id: 'ideas',
-			tone: 'primary',
-			icon: Palette,
-			label: 'Ideas',
-			title: 'Glass Shader & Motion Specs',
-			excerpt:
-				'Adjust chromatic aberration on docked tiles. Spring curves (mass 0.8, stiffness 220) for rail expansion.',
-			edited: '4m ago',
-			tags: ['#Design'],
-			pinned: true,
-			checklist: [
-				{ text: 'backdrop-filter: blur(28px)', done: true },
-				{ text: 'GLSL chromatic border', done: false },
-			],
-		},
-	];
+	const folderIcons: Record<string, typeof Boxes> = {
+		work: Briefcase,
+		ideas: Lightbulb,
+		dev: Code2,
+		personal: User,
+		archive: Boxes,
+	};
+
+	const folderTones: Record<string, Tone> = {
+		work: 'secondary',
+		ideas: 'primary',
+		dev: 'error',
+		personal: 'tertiary',
+		archive: 'primary',
+	};
+
+	const fallbackIcon = (id: string) => folderIcons[id] ?? Rocket;
+
+	function toRailNote(note: Note): RailNote {
+		const label = note.folder.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+		return {
+			id: note.id,
+			tone: folderTones[note.folder] ?? 'primary',
+			icon: fallbackIcon(note.folder),
+			label: label || 'Notes',
+			title: note.title,
+			excerpt: note.excerpt,
+			edited: note.updated,
+			tags: note.tags.map((tag) => `#${tag}`),
+			pinned: note.pinned,
+			checklist: parseChecklist(note.body),
+		};
+	}
+
+	let notes = $state<RailNote[]>([]);
+
+	async function loadNotes() {
+		try {
+			const stored = await hydrateNotes();
+			notes = stored.slice(0, 8).map(toRailNote);
+		} catch {
+			notes = [];
+		}
+	}
+
+	async function copyNote(note: RailNote | null) {
+		if (!note) return;
+		const text = `${note.title}\n\n${note.excerpt}`;
+		try {
+			await navigator.clipboard.writeText(text);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	async function editNote(note: RailNote | null) {
+		if (!note) return;
+		await openWorkspaceAndClose();
+	}
+
+	async function removeRailNote(note: RailNote | null) {
+		if (!note) return;
+		try {
+			await removeNote(note.id);
+		} catch {
+			/* ignore */
+		}
+		hovered = null;
+		await loadNotes();
+	}
 
 	const barClass: Record<Tone, string> = {
 		secondary: 'bg-secondary',
@@ -202,7 +210,24 @@
 	}
 
 	onMount(() => {
-		if (!isTauri) return;
+		void loadNotes();
+
+		let unlisten: (() => void) | undefined;
+		if (isTauri) {
+			void getCurrentWindow()
+				.onFocusChanged(({ payload: focused }) => {
+					if (focused) void loadNotes();
+				})
+				.then((fn) => (unlisten = fn));
+		} else {
+			const onFocus = () => void loadNotes();
+			window.addEventListener('focus', onFocus);
+			unlisten = () => window.removeEventListener('focus', onFocus);
+		}
+
+		if (!isTauri) {
+			return () => unlisten?.();
+		}
 
 		void setIgnore(true);
 
@@ -250,7 +275,10 @@
 		};
 		timer = setTimeout(tick, POLL_MS);
 
-		return () => clearTimeout(timer);
+		return () => {
+			clearTimeout(timer);
+			unlisten?.();
+		};
 	});
 </script>
 
@@ -318,6 +346,7 @@
 									{...props}
 									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
 									aria-label="Edit"
+									onclick={() => editNote(hovered)}
 								>
 									<NotebookPen size={15} />
 								</button>
@@ -332,6 +361,7 @@
 									{...props}
 									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-secondary"
 									aria-label="Copy"
+									onclick={() => copyNote(hovered)}
 								>
 									<Copy size={15} />
 								</button>
@@ -346,6 +376,7 @@
 									{...props}
 									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
 									aria-label="Rename"
+									onclick={() => editNote(hovered)}
 								>
 									<Pencil size={15} />
 								</button>
@@ -360,6 +391,7 @@
 									{...props}
 									class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error-container/40 hover:text-error"
 									aria-label="Delete"
+									onclick={() => removeRailNote(hovered)}
 								>
 									<Trash2 size={15} />
 								</button>
@@ -448,6 +480,7 @@
 							{...props}
 							class="flex size-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-md transition-all hover:scale-105"
 							aria-label="Add Sticky Note"
+							onclick={openWorkspaceAndClose}
 						>
 							<Plus size={19} />
 						</button>

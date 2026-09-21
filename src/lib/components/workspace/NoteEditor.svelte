@@ -1,10 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { marked } from 'marked';
 	import {
-		Pin,
-		Share2,
-		Trash2,
 		Tag,
 		X,
 		Bold,
@@ -18,45 +15,74 @@
 		Quote,
 		Minus,
 		PenLine,
-		Columns2,
-		Eye,
 		Check,
 	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
+	import { toggleChecklistItem } from '$lib/stores/notes';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
+	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>;
 
+	const ARCHIVE_FOLDER = 'archive';
+	const RESTORE_FOLDER = 'personal';
+
 	let {
 		note,
 		folders,
+		focusToken = 0,
 		onupdate,
 		ondelete,
 		onshare,
+		onselectfolder,
 	}: {
 		note?: Note;
 		folders: Folder[];
+		focusToken?: number;
 		onupdate: (id: string, patch: Patch) => void;
 		ondelete: (id: string) => void;
 		onshare?: (note: Note) => void;
+		onselectfolder?: (id: string) => void;
 	} = $props();
 
-	let aurora = $state('');
 	let title = $state('');
 	let draft = $state('');
 	let html = $state('');
 	let textareaEl = $state<HTMLTextAreaElement>();
+	let previewEl = $state<HTMLDivElement>();
 	let tagDialogOpen = $state(false);
+	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
 
-	const view = $derived(settings.editorView);
-	const folderOptions = $derived(folders.filter((folder) => folder.id !== 'all'));
+	const view = $derived(
+		viewOverride && viewOverride.id === note?.id ? viewOverride.view : settings.editorView
+	);
+	const folderLabel = $derived(
+		folders.find((folder) => folder.id === note?.folder)?.label ?? note?.folder ?? ''
+	);
 
 	$effect(() => {
 		title = note?.title ?? '';
 		draft = note?.body ?? '';
+	});
+
+	$effect(() => {
+		const token = focusToken;
+		if (!token) return;
+		untrack(() => {
+			if (!note) return;
+			if (settings.editorView === 'preview') {
+				viewOverride = { id: note.id, view: 'write' };
+			}
+			void tick().then(() => {
+				textareaEl?.focus();
+				const end = textareaEl?.value.length ?? 0;
+				textareaEl?.setSelectionRange(end, end);
+			});
+		});
 	});
 
 	$effect(() => {
@@ -88,34 +114,6 @@
 		return () => {
 			cancelled = true;
 		};
-	});
-
-	onMount(() => {
-		if (typeof Worker === 'undefined') return;
-		let worker: Worker;
-		try {
-			worker = new Worker(new URL('../../workers/drift.js', import.meta.url), { type: 'module' });
-		} catch {
-			return;
-		}
-
-		const root = document.documentElement;
-		const send = () =>
-			worker.postMessage({
-				palette: {
-					a: 'var(--aurora-1)',
-					b: 'var(--aurora-2)',
-					c: 'var(--aurora-3)',
-				},
-				light: root.classList.contains('light'),
-			});
-
-		worker.onmessage = (event) => {
-			aurora = event.data.aurora;
-		};
-		send();
-
-		return () => worker.terminate();
 	});
 
 	function commitBody(value: string) {
@@ -157,25 +155,31 @@
 	}
 
 	const inlineTools = [
-		{ icon: Bold, run: () => wrapSelection('**') },
-		{ icon: Italic, run: () => wrapSelection('*') },
-		{ icon: Strikethrough, run: () => wrapSelection('~~') },
-		{ icon: Code2, run: () => wrapSelection('`') },
-		{ icon: Link, run: () => wrapSelection('[', '](https://)', 'title') },
+		{ icon: Bold, title: 'Bold', run: () => wrapSelection('**') },
+		{ icon: Italic, title: 'Italic', run: () => wrapSelection('*') },
+		{ icon: Strikethrough, title: 'Strikethrough', run: () => wrapSelection('~~') },
+		{ icon: Code2, title: 'Inline code', run: () => wrapSelection('`') },
+		{ icon: Link, title: 'Link', run: () => wrapSelection('[', '](https://)', 'title') },
 	];
 	const blockTools = [
-		{ icon: Heading2, run: () => prefixLines('## ') },
-		{ icon: List, run: () => prefixLines('- ') },
-		{ icon: ListChecks, run: () => prefixLines('- [ ] ') },
-		{ icon: Quote, run: () => prefixLines('> ') },
-		{ icon: Minus, run: () => commitBody(`${draft}\n\n---\n`) },
+		{ icon: Heading2, title: 'Heading', run: () => prefixLines('## ') },
+		{ icon: List, title: 'Bullet list', run: () => prefixLines('- ') },
+		{ icon: ListChecks, title: 'Checklist', run: () => prefixLines('- [ ] ') },
+		{ icon: Quote, title: 'Quote', run: () => prefixLines('> ') },
+		{ icon: Minus, title: 'Divider', run: () => commitBody(`${draft}\n\n---\n`) },
 	];
 
-	const views: { id: EditorView; icon: typeof Eye; title: string }[] = [
-		{ id: 'write', icon: PenLine, title: 'Write' },
-		{ id: 'split', icon: Columns2, title: 'Split' },
-		{ id: 'preview', icon: Eye, title: 'Preview' },
-	];
+	function changeView(next: EditorView) {
+		viewOverride = null;
+		updateSettings({ editorView: next });
+	}
+
+	const archived = $derived(note?.folder === ARCHIVE_FOLDER);
+
+	function toggleArchive() {
+		if (!note) return;
+		onupdate(note.id, { folder: archived ? RESTORE_FOLDER : ARCHIVE_FOLDER });
+	}
 
 	function addTag() {
 		if (!note) return;
@@ -191,16 +195,21 @@
 		if (!note) return;
 		onupdate(note.id, { tags: note.tags.filter((item) => item !== tag) });
 	}
+
+	function togglePreviewCheckbox(event: MouseEvent) {
+		if (!note || !previewEl) return;
+		const target = event.target as HTMLElement;
+		const input = target.closest('input[type="checkbox"]') as HTMLInputElement | null;
+		if (!input || !previewEl.contains(input)) return;
+		event.preventDefault();
+		const boxes = Array.from(previewEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+		const index = boxes.indexOf(input);
+		if (index < 0) return;
+		commitBody(toggleChecklistItem(draft, index));
+	}
 </script>
 
 <main class="glass-panel relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl">
-	{#if aurora && !settings.reduceMotion}
-		<div
-			class="pointer-events-none absolute inset-0 opacity-60 blur-[3px]"
-			style="background-image: {aurora};"
-		></div>
-	{/if}
-
 	<div class="relative z-10 flex min-h-0 flex-1 flex-col">
 		{#if note}
 			{#if settings.focusMode}
@@ -216,96 +225,39 @@
 					</button>
 				</div>
 			{:else}
-				<div class="flex h-12 shrink-0 items-center justify-between px-4">
-					<label class="flex items-center gap-1.5 text-label-md font-label text-on-surface-variant">
-						<select
-							class="cursor-pointer appearance-none bg-transparent capitalize text-primary focus:outline-none"
-							value={note.folder}
-							onchange={(event) =>
-								onupdate(note.id, { folder: (event.currentTarget as HTMLSelectElement).value })}
+				<div class="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
+					<Breadcrumb.Root class="min-w-0">
+						<Breadcrumb.List
+							class="gap-1.5 text-label-md font-label text-on-surface-variant sm:gap-1.5"
 						>
-							{#each folderOptions as folder (folder.id)}
-								<option class="bg-surface-container text-on-surface" value={folder.id}>
-									{folder.label}
-								</option>
-							{/each}
-						</select>
-						<span class="text-outline">/</span>
-						<span class="truncate text-on-surface">{note.title || 'Untitled'}</span>
-					</label>
+							<Breadcrumb.Item>
+								<button
+									type="button"
+									class="text-primary capitalize transition-colors hover:brightness-110"
+									onclick={() => onselectfolder?.(note.folder)}
+								>
+									{folderLabel}
+								</button>
+							</Breadcrumb.Item>
+							<Breadcrumb.Separator class="text-outline [&>svg]:size-3.5" />
+							<Breadcrumb.Item>
+								<Breadcrumb.Page class="truncate text-on-surface">
+									{note.title || 'Untitled'}
+								</Breadcrumb.Page>
+							</Breadcrumb.Item>
+						</Breadcrumb.List>
+					</Breadcrumb.Root>
 
-					<div class="flex items-center gap-1">
-						<div class="glass-well mr-1 hidden items-center rounded-lg p-0.5 sm:flex">
-							{#each views as item (item.id)}
-								{@const Icon = item.icon}
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										{#snippet child({ props })}
-											<button
-												{...props}
-												class="flex size-7 items-center justify-center rounded-md transition-colors {view ===
-												item.id
-													? 'bg-surface-container-high/80 text-primary'
-													: 'text-outline hover:text-on-surface'}"
-												aria-label={item.title}
-												onclick={() => updateSettings({ editorView: item.id })}
-											>
-												<Icon size={15} />
-											</button>
-										{/snippet}
-									</Tooltip.Trigger>
-									<Tooltip.Content>{item.title}</Tooltip.Content>
-								</Tooltip.Root>
-							{/each}
-						</div>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {note.pinned
-											? 'text-primary'
-											: 'text-on-surface-variant hover:text-on-surface'}"
-										aria-label="Pin note"
-										onclick={() => onupdate(note.id, { pinned: !note.pinned })}
-									>
-										<Pin size={16} />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content>{note.pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
-						</Tooltip.Root>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
-										aria-label="Share note"
-										onclick={() => onshare?.(note)}
-									>
-										<Share2 size={16} />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content>Share note</Tooltip.Content>
-						</Tooltip.Root>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
-										aria-label="Delete note"
-										onclick={() => ondelete(note.id)}
-									>
-										<Trash2 size={16} />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content>Delete note</Tooltip.Content>
-						</Tooltip.Root>
-					</div>
+					<NoteToolbar
+						{view}
+						pinned={note.pinned}
+						{archived}
+						onview={changeView}
+						ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
+						ontogglearchive={toggleArchive}
+						onshare={() => onshare?.(note)}
+						ondelete={() => ondelete(note.id)}
+					/>
 				</div>
 			{/if}
 
@@ -348,21 +300,39 @@
 					class="glass-well mx-6 flex shrink-0 items-center gap-0.5 overflow-x-auto rounded-xl px-1.5 py-1 text-on-surface-variant scrollbar-none"
 				>
 					{#each inlineTools as tool}
-						<button
-							class="flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-high/70 hover:text-on-surface"
-							onclick={tool.run}
-						>
-							<tool.icon size={16} />
-						</button>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										class="flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-high/70 hover:text-on-surface"
+										aria-label={tool.title}
+										onclick={tool.run}
+									>
+										<tool.icon size={16} />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>{tool.title}</Tooltip.Content>
+						</Tooltip.Root>
 					{/each}
 					<span class="mx-1 h-4 w-px shrink-0 bg-outline-variant/40"></span>
 					{#each blockTools as tool}
-						<button
-							class="flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-high/70 hover:text-on-surface"
-							onclick={tool.run}
-						>
-							<tool.icon size={16} />
-						</button>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										class="flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-high/70 hover:text-on-surface"
+										aria-label={tool.title}
+										onclick={tool.run}
+									>
+										<tool.icon size={16} />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>{tool.title}</Tooltip.Content>
+						</Tooltip.Root>
 					{/each}
 				</div>
 			{/if}
@@ -387,7 +357,11 @@
 							placeholder="Write in Markdown..."
 							class="scrollbar-none h-full w-full resize-none bg-transparent px-4 py-4 text-body-md font-body leading-relaxed text-on-surface-variant placeholder:text-outline focus:outline-none"
 						></textarea>
-						<div class="scrollbar-none h-full overflow-y-auto px-5 py-4">
+						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+						<div
+							class="scrollbar-none h-full overflow-y-auto px-5 py-4"
+							onclick={togglePreviewCheckbox}
+						>
 							{#if html}
 								<div class="markdown-body">{@html html}</div>
 							{:else}
@@ -396,7 +370,12 @@
 						</div>
 					</div>
 				{:else}
-					<div class="scrollbar-none h-full overflow-y-auto px-6 py-4">
+					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+					<div
+						bind:this={previewEl}
+						class="scrollbar-none h-full overflow-y-auto px-6 py-4"
+						onclick={togglePreviewCheckbox}
+					>
 						{#if html}
 							<div class="markdown-body mx-auto max-w-2xl">{@html html}</div>
 						{:else}

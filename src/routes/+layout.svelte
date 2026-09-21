@@ -6,7 +6,9 @@
 
 	const { children } = $props();
 
-	onMount(() => hydrateSettings());
+	onMount(() => {
+		void hydrateSettings();
+});
 </script>
 
 <Tooltip>

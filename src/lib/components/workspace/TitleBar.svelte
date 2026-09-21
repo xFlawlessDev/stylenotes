@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { Search, Moon, Sun, Plus } from '@lucide/svelte';
+	import { Search, Moon, Sun, PanelRight } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
@@ -10,17 +10,17 @@
 		title = 'StyleNotes',
 		mode = 'dark',
 		onpalette,
-		oncreate,
 		onsettings,
 		ontogglemode,
+		ontoggledock,
 		notifications,
 	}: {
 		title?: string;
 		mode?: ThemeMode;
 		onpalette?: () => void;
-		oncreate?: () => void;
 		onsettings?: () => void;
 		ontogglemode?: () => void;
+		ontoggledock?: () => void;
 		notifications?: Snippet;
 	} = $props();
 
@@ -90,13 +90,21 @@
 
 		<div class="glass-divider mx-0.5 hidden h-5 w-px sm:block"></div>
 
-		<button
-			class="glass-chip flex h-8 items-center gap-1.5 rounded-full px-3 text-label-md font-label text-on-surface-variant transition-colors hover:text-on-surface"
-			onclick={oncreate}
-		>
-			<Plus size={14} class="text-tertiary" />
-			<span class="hidden lg:inline">New note</span>
-		</button>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<button
+						{...props}
+						class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+						aria-label="Toggle dock"
+						onclick={ontoggledock}
+					>
+						<PanelRight size={16} />
+					</button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Toggle dock</Tooltip.Content>
+		</Tooltip.Root>
 
 		<Tooltip.Root>
 			<Tooltip.Trigger>
