@@ -70,5 +70,13 @@ export async function toggleOverlay() {
   }
 }
 
+export async function revealCurrentWindow() {
+  if (!isTauri) return;
+  const win = getCurrentWindow();
+  if (!(await win.isVisible())) {
+    await win.show();
+  }
+}
+
 export const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
