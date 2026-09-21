@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import SelectField from '$lib/components/fields/SelectField.svelte';
 	import { AlertTriangle, FilePlus2 } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 
@@ -105,20 +106,14 @@
 			</div>
 
 			<div class="flex flex-col gap-2">
-				<Label for="note-folder" class="text-label-md font-label text-on-surface-variant"
+				<Label class="text-label-md font-label text-on-surface-variant"
 					>Folder</Label
 				>
-				<select
-					id="note-folder"
+				<SelectField
+					label="Folder"
+					options={options.map((option) => ({ value: option.id, label: option.label }))}
 					bind:value={folder}
-					class="glass-well h-9 w-full cursor-pointer rounded-lg px-3 text-body-md font-body text-on-surface focus:border-primary/50 focus:outline-none"
-				>
-					{#each options as option (option.id)}
-						<option class="bg-surface-container text-on-surface" value={option.id}>
-							{option.label}
-						</option>
-					{/each}
-				</select>
+				/>
 			</div>
 
 			<div class="flex flex-col gap-2">
