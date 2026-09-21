@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { Search, Sparkles, Moon, Sun, Plus } from '@lucide/svelte';
+	import { Search, Moon, Sun, Plus } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
@@ -62,11 +62,11 @@
 		<div class="glass-divider h-5 w-px"></div>
 
 		<div class="flex items-center gap-2">
-			<div
-				class="flex size-6 items-center justify-center rounded-lg bg-surface-container-high text-primary ring-1 ring-inset ring-white/5"
-			>
-				<Sparkles size={13} />
-			</div>
+			<img
+				src="/icon-128.png"
+				alt="StyleNotes"
+				class="size-6 rounded-lg object-cover ring-1 ring-inset ring-white/5"
+			/>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
 		</div>
 	</div>
