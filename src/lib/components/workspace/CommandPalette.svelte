@@ -145,7 +145,12 @@
 	});
 
 	$effect(() => {
-		const el = listEl?.querySelector<HTMLElement>('[data-active="true"]');
+		// Reading `items` and `activeIndex` is what makes this re-run on every
+		// arrow press and keystroke — without them it only ran when the list mounted.
+		const results = items;
+		const index = activeIndex;
+		if (!open || results.length === 0) return;
+		const el = listEl?.querySelector<HTMLElement>(`[data-index="${index}"]`);
 		el?.scrollIntoView({ block: 'nearest' });
 	});
 
@@ -230,7 +235,7 @@
 							{@const index = items.indexOf(item)}
 							{@const Icon = item.icon}
 							<button
-								data-active={index === activeIndex}
+								data-index={index}
 								class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors {index ===
 								activeIndex
 									? 'glass-chip text-on-surface'
