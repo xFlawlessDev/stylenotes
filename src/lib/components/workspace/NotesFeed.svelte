@@ -94,7 +94,7 @@
 		</button>
 
 		<div class="relative w-full">
-			<Search size={16} class="pointer-events-none absolute top-2.5 left-3 text-outline" />
+			<Search size={16} class="pointer-events-none absolute top-2.5 left-3 z-10 text-on-surface-variant" />
 			<input
 				bind:value={query}
 				class="glass-well h-9 w-full rounded-xl pr-3 pl-9 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none"

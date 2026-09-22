@@ -122,7 +122,7 @@
 	</button>
 
 	<div class="relative w-full">
-		<Search size={15} class="pointer-events-none absolute top-2.5 left-3 text-outline" />
+		<Search size={15} class="pointer-events-none absolute top-2.5 left-3 z-10 text-on-surface-variant" />
 		<input
 			value={query}
 			oninput={(event) => onquery(event.currentTarget.value)}
