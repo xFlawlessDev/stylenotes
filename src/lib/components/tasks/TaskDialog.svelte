@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/base';
 	import { ListTodo } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder } from '$lib/stores/notes';
@@ -138,12 +138,16 @@
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
 				<Button
-					type="button"
 					variant="outline"
-					size={compact ? 'sm' : 'default'}
+					size={compact ? 'sm' : 'md'}
 					onclick={() => (open = false)}>Cancel</Button
 				>
-				<Button type="submit" size={compact ? 'sm' : 'default'} disabled={!title.trim() || dateError}>
+				<Button
+					variant="primary"
+					type="submit"
+					size={compact ? 'sm' : 'md'}
+					disabled={!title.trim() || dateError}
+				>
 					{task ? 'Save task' : 'Create task'}
 				</Button>
 			</Dialog.Footer>

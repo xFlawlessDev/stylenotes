@@ -4,6 +4,7 @@
 	import { defaultFolderIcons, resolveFolderIcon } from '$lib/content/folder-icons';
 	import { isCustomFolder } from '$lib/stores/notes';
 	import { pointerReorder } from '$lib/content/pointer-reorder';
+	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import FolderRow from '$lib/components/workspace/FolderRow.svelte';
 
@@ -100,17 +101,22 @@
 				<span class="text-headline-sm font-headline leading-tight text-on-surface">StyleNotes</span>
 				<span class="text-label-sm font-label truncate text-outline">Your private notebook</span>
 			</div>
-			<button
-				class="ml-auto flex size-7 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface lg:hidden"
+			<Button
+				size="icon-sm"
+				class="ml-auto text-outline lg:hidden"
 				aria-label="Close folders"
 				onclick={onclose}
 			>
 				<X size={16} />
-			</button>
+			</Button>
 		</div>
 
-		<button
-			class="emphasis-container flex h-10 w-full items-center justify-between rounded-2xl px-3 text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
+		<Button
+			variant="tonal"
+			size="lg"
+			shape="tile"
+			block
+			class="justify-between px-3 active:scale-[0.99]"
 			onclick={oncreate}
 		>
 			<span class="flex items-center gap-2">
@@ -120,7 +126,7 @@
 			<kbd class="rounded-md bg-surface-container-lowest/40 px-1.5 py-0.5 text-code-sm font-code"
 				>Ctrl N</kbd
 			>
-		</button>
+		</Button>
 
 		<div class="flex min-h-0 flex-col gap-1 overflow-y-auto scrollbar-none">
 			<div class="mb-1 flex items-center justify-between px-1">
@@ -129,14 +135,15 @@
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
-								<button
+								<Button
 									{...props}
-									class="flex size-5 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+									size="icon-xs"
+									class="text-outline"
 									aria-label="New folder"
 									onclick={onaddfolder}
 								>
 									<FolderPlus size={15} />
-								</button>
+								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>New folder</Tooltip.Content>
@@ -178,29 +185,33 @@
 				<div class="flex items-center justify-between">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase">Tags</span>
 					{#if activeTag}
-						<button
-							class="text-label-sm font-label text-primary transition-colors hover:brightness-110"
+						<Button
+							variant="ghost"
+							size="xs"
+							class="px-0 text-primary hover:bg-transparent"
 							onclick={() => onselecttag?.(null)}
 						>
 							Clear
-						</button>
+						</Button>
 					{/if}
 				</div>
 				<div class="flex flex-wrap gap-1.5">
 					{#each tags as tag, i}
-						<button
-							class="glass-chip rounded-full px-2.5 py-1 text-code-sm font-code transition-all hover:scale-105 {activeTag ===
-							tag
+						<Button
+							variant="secondary"
+							size="xs"
+							shape="pill"
+							class="px-2.5 font-code text-code-sm hover:scale-105 {activeTag === tag
 								? 'text-on-surface ring-1 ring-inset ring-primary/60'
 								: chipTone[i % chipTone.length]}"
 							aria-pressed={activeTag === tag}
 							onclick={() => {
-							onselecttag?.(activeTag === tag ? null : tag);
-							onclose?.();
-						}}
+								onselecttag?.(activeTag === tag ? null : tag);
+								onclose?.();
+							}}
 						>
 							#{tag}
-						</button>
+						</Button>
 					{/each}
 				</div>
 			</div>

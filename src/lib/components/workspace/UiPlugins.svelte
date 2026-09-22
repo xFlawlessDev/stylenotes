@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from '@lucide/svelte';
+	import { Button, Switch } from '$lib/components/base';
 	import { describeUiPlugin } from '$lib/content/ui-plugin-css';
 	import {
 		clearUiPlugins,
@@ -18,11 +19,6 @@
 	let editingId = $state<string | null>(null);
 	let confirmId = $state<string | null>(null);
 	let confirmClear = $state(false);
-
-	const rowIcon =
-		'flex size-6 items-center justify-center rounded-full text-outline transition-colors hover:text-on-surface disabled:opacity-30';
-	const deleteIcon =
-		'flex size-6 items-center justify-center rounded-full text-outline transition-colors hover:text-error';
 
 	const editing = $derived(uiPlugins.find((plugin) => plugin.id === editingId) ?? null);
 	const error = $derived(uiPluginError());
@@ -59,12 +55,14 @@
 	<div class="flex items-center justify-between gap-2">
 		<span class="text-label-sm font-label tracking-wider text-outline uppercase">UI plugins</span>
 		{#if !editing}
-			<button
-				class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface transition-colors hover:text-primary"
+			<Button
+				variant="secondary"
+				size="xs"
+				shape="pill"
 				onclick={() => void startCreate()}
 			>
 				<Plus size={13} /> New plugin
-			</button>
+			</Button>
 		{/if}
 	</div>
 
@@ -78,13 +76,14 @@
 			class="flex items-center justify-between gap-2 rounded-2xl bg-error-container/30 px-3 py-2"
 		>
 			<span class="text-body-sm font-body text-on-error-container">{error}</span>
-			<button
+			<Button
+				size="icon-xs"
 				class="shrink-0 text-on-error-container"
 				aria-label="Dismiss error"
 				onclick={dismissUiPluginError}
 			>
 				<X size={14} />
-			</button>
+			</Button>
 		</div>
 	{/if}
 
@@ -101,74 +100,74 @@
 					class="rounded-2xl bg-surface-container-lowest/30 p-2.5 transition-colors hover:bg-surface-container/40"
 				>
 					<div class="flex items-center gap-2.5">
-						<button
-							class="relative h-5 w-9 shrink-0 rounded-full transition-colors {plugin.enabled
-								? 'emphasis-primary'
-								: 'bg-surface-container-highest'}"
-							role="switch"
-							aria-checked={plugin.enabled}
-							aria-label="Enable {plugin.name}"
-							onclick={() => void toggleUiPlugin(plugin.id, !plugin.enabled)}
-						>
-							<span
-								class="absolute top-0.5 size-4 rounded-full transition-transform {plugin.enabled
-									? 'right-0.5 bg-on-primary'
-									: 'left-0.5 bg-outline'}"
-							></span>
-						</button>
+						<Switch
+							checked={plugin.enabled}
+							label="Enable {plugin.name}"
+							onchange={(checked) => void toggleUiPlugin(plugin.id, checked)}
+						/>
 
-						<button
-							class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+						<Button
+							bare
+							class="min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
 							onclick={() => (editingId = plugin.id)}
 						>
 							<span class="truncate text-body-md font-body text-on-surface">{plugin.name}</span>
 							<span class="truncate text-label-sm font-label {plugin.enabled ? 'text-outline' : 'text-outline/60'}"
 								>{describeUiPlugin(plugin)}</span
 							>
-						</button>
+						</Button>
 
 						<div class="flex shrink-0 items-center gap-0.5">
 							{#if confirmId === plugin.id}
 								<span class="text-label-sm font-label text-error">Delete?</span>
-								<button
-									class="glass-chip rounded-md px-2 py-1 text-label-sm font-label text-error"
-									onclick={() => void confirmDelete(plugin.id)}>Yes</button
+								<Button
+									variant="secondary"
+									size="xs"
+									class="text-error"
+									onclick={() => void confirmDelete(plugin.id)}>Yes</Button
 								>
-								<button
-									class="glass-chip rounded-md px-2 py-1 text-label-sm font-label text-on-surface-variant"
-									onclick={() => (confirmId = null)}>No</button
+								<Button
+									variant="secondary"
+									size="xs"
+									class="text-on-surface-variant"
+									onclick={() => (confirmId = null)}>No</Button
 								>
 							{:else}
-								<button
-									class={rowIcon}
+								<Button
+									size="icon-xs"
+									shape="pill"
 									disabled={index === 0}
 									aria-label="Move {plugin.name} up"
 									onclick={() => void moveUiPlugin(plugin.id, -1)}
 								>
 									<ChevronUp size={14} />
-								</button>
-								<button
-									class={rowIcon}
+								</Button>
+								<Button
+									size="icon-xs"
+									shape="pill"
 									disabled={index === uiPlugins.length - 1}
 									aria-label="Move {plugin.name} down"
 									onclick={() => void moveUiPlugin(plugin.id, 1)}
 								>
 									<ChevronDown size={14} />
-								</button>
-								<button
-									class={rowIcon}
+								</Button>
+								<Button
+									size="icon-xs"
+									shape="pill"
 									aria-label="Edit {plugin.name}"
 									onclick={() => (editingId = plugin.id)}
 								>
 									<Pencil size={14} />
-								</button>
-								<button
-									class={deleteIcon}
+								</Button>
+								<Button
+									variant="danger-ghost"
+									size="icon-xs"
+									shape="pill"
 									aria-label="Delete {plugin.name}"
 									onclick={() => (confirmId = plugin.id)}
 								>
 									<Trash2 size={14} />
-								</button>
+								</Button>
 							{/if}
 						</div>
 					</div>
@@ -179,22 +178,28 @@
 		{#if confirmClear}
 			<div class="flex items-center gap-2">
 				<span class="text-label-sm font-label text-error">Remove every plugin?</span>
-				<button
-					class="glass-chip rounded-md px-2 py-1 text-label-sm font-label text-error"
-					onclick={() => void clearAll()}>Yes</button
+				<Button
+					variant="secondary"
+					size="xs"
+					class="text-error"
+					onclick={() => void clearAll()}>Yes</Button
 				>
-				<button
-					class="glass-chip rounded-md px-2 py-1 text-label-sm font-label text-on-surface-variant"
-					onclick={() => (confirmClear = false)}>No</button
+				<Button
+					variant="secondary"
+					size="xs"
+					class="text-on-surface-variant"
+					onclick={() => (confirmClear = false)}>No</Button
 				>
 			</div>
 		{:else}
-			<button
-				class="self-start text-label-sm font-label text-outline transition-colors hover:text-error"
+			<Button
+				variant="danger-ghost"
+				size="xs"
+				class="self-start"
 				onclick={() => (confirmClear = true)}
 			>
 				Remove all plugins
-			</button>
+			</Button>
 		{/if}
 	{/if}
 </div>

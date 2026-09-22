@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowUpRight, FileText, X } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import type { Note } from '$lib/content/content';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -61,25 +62,31 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
+						variant="secondary"
+						size="icon-sm"
+						class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
 						aria-label="Remove from dock"
 						onclick={() => onremove(note)}
 					>
 						<X size={15} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Remove from dock</Tooltip.Content>
 		</Tooltip.Root>
 	</div>
 
-	<button
-		class="emphasis-container flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-headline-sm font-headline text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
+	<Button
+		variant="tonal"
+		size="md"
+		shape="tile"
+		block
+		class="gap-1.5 px-3 py-1.5 font-headline text-headline-sm active:scale-[0.99]"
 		onclick={onopen}
 	>
 		<span class="relative">Edit note</span>
 		<ArrowUpRight size={14} />
-	</button>
+	</Button>
 </div>

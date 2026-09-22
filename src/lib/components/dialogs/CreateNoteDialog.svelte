@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, Field, Input, Select, Textarea } from '$lib/components/base';
 	import { AlertTriangle, FilePlus2 } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 
@@ -92,42 +89,32 @@
 				submit();
 			}}
 		>
-			<div class="flex flex-col gap-2">
-				<Label for="note-title" class="text-label-md font-label text-on-surface-variant"
-					>Title <span class="text-outline">(optional)</span></Label
-				>
+			<Field label="Title" hint="optional" for="note-title">
 				<Input
 					id="note-title"
 					bind:ref={titleEl}
 					bind:value={title}
+					size="lg"
 					placeholder="Untitled note"
-					class="glass-well h-9 border-0 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50"
 				/>
-			</div>
+			</Field>
 
-			<div class="flex flex-col gap-2">
-				<Label class="text-label-md font-label text-on-surface-variant"
-					>Folder</Label
-				>
-				<SelectField
+			<Field label="Folder">
+				<Select
 					label="Folder"
 					options={options.map((option) => ({ value: option.id, label: option.label }))}
 					bind:value={folder}
 				/>
-			</div>
+			</Field>
 
-			<div class="flex flex-col gap-2">
-				<Label for="note-body" class="text-label-md font-label text-on-surface-variant"
-					>Start writing <span class="text-outline">(optional)</span></Label
-				>
-				<textarea
+			<Field label="Start writing" hint="optional" for="note-body">
+				<Textarea
 					id="note-body"
 					bind:value={body}
-					rows="3"
+					rows={3}
 					placeholder="A first thought, a to-do, anything."
-					class="glass-well w-full resize-none rounded-lg px-3 py-2 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none"
-				></textarea>
-			</div>
+				/>
+			</Field>
 
 			{#if confirming}
 				<div
@@ -135,28 +122,23 @@
 				>
 					<AlertTriangle size={14} class="shrink-0" />
 					<span class="flex-1">Discard this draft? Your text will be lost.</span>
-					<button
-						type="button"
-						class="rounded-md px-2 py-1 text-on-surface-variant transition-colors hover:text-on-surface"
-						onclick={() => (confirming = false)}
-					>
-						Keep editing
-					</button>
-					<button
-						type="button"
-						class="rounded-md px-2 py-1 font-semibold text-error transition-colors hover:brightness-110"
+					<Button size="xs" onclick={() => (confirming = false)}>Keep editing</Button>
+					<Button
+						variant="ghost"
+						size="xs"
+						class="font-semibold text-error hover:bg-error-container/40"
 						onclick={() => (open = false)}
 					>
 						Discard
-					</button>
+					</Button>
 				</div>
 			{/if}
 
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button type="button" variant="outline" onclick={requestClose}>Cancel</Button>
-				<Button type="submit">
+				<Button variant="outline" onclick={requestClose}>Cancel</Button>
+				<Button variant="primary" type="submit">
 					Create note
 					<kbd class="ml-1.5 text-[10px] opacity-70">Ctrl ↵</kbd>
 				</Button>

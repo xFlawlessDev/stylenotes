@@ -9,6 +9,7 @@
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { settings, type EditorView } from '$lib/stores/settings.svelte';
+	import { Textarea } from '$lib/components/base';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
@@ -26,7 +27,7 @@
 	} = $props();
 
 	let draft = $state('');
-	let textareaEl = $state<HTMLTextAreaElement>();
+	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
 	let guideOpen = $state(false);
 	let focusedOnce = false;
@@ -157,26 +158,30 @@
 
 		<div class="grid min-h-0 flex-1 overflow-hidden">
 			{#if view === 'write'}
-				<textarea
-					bind:this={textareaEl}
+				<Textarea
+					bind:ref={textareaEl}
 					value={draft}
 					oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
 					onkeydown={onEditorKeydown}
 					spellcheck={settings.spellcheck}
+					variant="bare"
+					size="md"
 					placeholder="Start writing. Use the toolbar or shortcuts to format..."
-					class="scrollbar-none h-full w-full resize-none bg-transparent px-4 py-3 text-body-md font-body leading-relaxed text-on-surface-variant placeholder:text-outline focus:outline-none"
-				></textarea>
+					class="scrollbar-none h-full w-full px-4 py-3 leading-relaxed text-on-surface-variant"
+				></Textarea>
 			{:else if view === 'split'}
 				<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
-					<textarea
-						bind:this={textareaEl}
+					<Textarea
+						bind:ref={textareaEl}
 						value={draft}
 						oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
 						onkeydown={onEditorKeydown}
 						spellcheck={settings.spellcheck}
+						variant="bare"
+						size="sm"
 						placeholder="Write here..."
-						class="scrollbar-none h-full w-full resize-none bg-transparent px-3 py-3 text-body-sm font-body leading-relaxed text-on-surface-variant placeholder:text-outline focus:outline-none"
-					></textarea>
+						class="scrollbar-none h-full w-full px-3 py-3 leading-relaxed text-on-surface-variant"
+					></Textarea>
 					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 					<div
 						bind:this={previewEl}

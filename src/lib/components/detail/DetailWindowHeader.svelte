@@ -2,6 +2,7 @@
 	import type { Component, Snippet } from 'svelte';
 	import { ArrowUpRight, Minus, Pin, PinOff, PictureInPicture2, X } from '@lucide/svelte';
 	import { openWorkspace } from '$lib/windows';
+	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
@@ -32,8 +33,7 @@
 		actions?: Snippet;
 	} = $props();
 
-	const buttonClass =
-		'flex size-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:text-on-surface';
+	const buttonClass = 'text-on-surface-variant';
 </script>
 
 <header
@@ -58,17 +58,15 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						type="button"
-						class="flex size-6 items-center justify-center rounded-md transition-colors {docked
-							? 'text-primary'
-							: 'text-on-surface-variant hover:text-on-surface'}"
+						bare
+						class="size-6 rounded-md {docked ? 'text-primary' : 'text-on-surface-variant'}"
 						aria-label={docked ? 'Remove from dock' : 'Add to dock'}
 						onclick={ontoggledock}
 					>
 						<PictureInPicture2 size={13} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>{docked ? 'Remove from dock' : 'Add to dock'}</Tooltip.Content>
@@ -77,12 +75,12 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						type="button"
-						class="flex size-6 items-center justify-center rounded-md transition-colors {alwaysOnTop
+						bare
+						class="size-6 rounded-md {alwaysOnTop
 							? 'text-primary'
-							: 'text-on-surface-variant hover:text-on-surface'}"
+							: 'text-on-surface-variant'}"
 						aria-label={alwaysOnTop ? 'Unpin window' : 'Keep window on top'}
 						onclick={ontoggletop}
 					>
@@ -91,7 +89,7 @@
 						{:else}
 							<PinOff size={13} />
 						{/if}
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>{alwaysOnTop ? 'Unpin window' : 'Keep window on top'}</Tooltip.Content>
@@ -100,15 +98,15 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						type="button"
-						class={buttonClass}
+						bare
+						class="size-6 rounded-md {buttonClass}"
 						aria-label="Open in Workspace"
 						onclick={() => void openWorkspace()}
 					>
 						<ArrowUpRight size={13} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Open in Workspace</Tooltip.Content>
@@ -116,21 +114,21 @@
 
 		<span class="mx-0.5 h-4 w-px bg-hairline/70"></span>
 
-		<button
-			type="button"
-			class="flex size-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container/70 hover:text-on-surface"
+		<Button
+			bare
+			class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
 			aria-label="Minimize"
 			onclick={onminimize}
 		>
 			<Minus size={13} />
-		</button>
-		<button
-			type="button"
-			class="flex size-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-window-close/20 hover:text-on-surface"
+		</Button>
+		<Button
+			bare
+			class="size-6 rounded-md text-on-surface-variant hover:bg-window-close/20 hover:text-on-surface"
 			aria-label="Close window"
 			onclick={onclose}
 		>
 			<X size={13} />
-		</button>
+		</Button>
 	</div>
 </header>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { RotateCcw } from '@lucide/svelte';
-	import * as Select from '$lib/components/ui/select';
+	import { Button, Select } from '$lib/components/base';
 	import {
 		TASK_PRIORITIES,
 		priorityMeta,
@@ -38,57 +38,34 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-2">
-	<Select.Root
-		type="single"
+	<Select
+		variant="chip"
+		size="sm"
+		label="Filter by priority"
+		placeholder="All priorities"
+		options={priorityItems}
 		value={priority}
-		items={priorityItems}
-		onValueChange={(value) => value && onchangepriority(value as TaskPriorityFilter)}
-	>
-		<Select.Trigger
-			size="sm"
-			aria-label="Filter by priority"
-			class="glass-chip h-7 rounded-full border-0 px-3 text-label-md font-label text-on-surface shadow-none data-placeholder:text-outline focus-visible:ring-primary/40"
-		>
-			<Select.Value placeholder="All priorities" />
-		</Select.Trigger>
-		<Select.Content class="glass-solid">
-			{#each priorityItems as item (item.value)}
-				<Select.Item value={item.value} label={item.label} class="font-label text-label-md">
-					{item.label}
-				</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
+		onchange={(value) => value && onchangepriority(value as TaskPriorityFilter)}
+	/>
 
-	<Select.Root
-		type="single"
+	<Select
+		variant="chip"
+		size="sm"
+		label="Filter by due date"
+		placeholder="Any date"
+		options={dueItems}
 		value={due}
-		items={dueItems}
-		onValueChange={(value) => value && onchangedue(value as TaskDueFilter)}
-	>
-		<Select.Trigger
-			size="sm"
-			aria-label="Filter by due date"
-			class="glass-chip h-7 rounded-full border-0 px-3 text-label-md font-label text-on-surface shadow-none data-placeholder:text-outline focus-visible:ring-primary/40"
-		>
-			<Select.Value placeholder="Any date" />
-		</Select.Trigger>
-		<Select.Content class="glass-solid">
-			{#each dueItems as item (item.value)}
-				<Select.Item value={item.value} label={item.label} class="font-label text-label-md">
-					{item.label}
-				</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
+		onchange={(value) => value && onchangedue(value as TaskDueFilter)}
+	/>
 
 	{#if dirty}
-		<button
-			type="button"
-			class="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-label-md font-label text-outline transition-colors hover:text-on-surface"
+		<Button
+			size="sm"
+			shape="pill"
+			class="gap-1.5 px-2.5 text-outline"
 			onclick={onreset}
 		>
 			<RotateCcw size={13} /> Reset
-		</button>
+		</Button>
 	{/if}
 </div>

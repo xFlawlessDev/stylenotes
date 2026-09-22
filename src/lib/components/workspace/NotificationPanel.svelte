@@ -10,6 +10,7 @@
 		Trash2,
 	} from '@lucide/svelte';
 	import type { NotificationKind } from '$lib/stores/notifications';
+	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	export type Notification = {
@@ -60,9 +61,12 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip relative flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+					variant="secondary"
+					size="icon"
+					shape="pill"
+					class="relative text-on-surface-variant"
 					aria-label="Notifications"
 					onclick={ontoggle}
 				>
@@ -74,7 +78,7 @@
 							{unreadCount}
 						</span>
 					{/if}
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Notifications</Tooltip.Content>
@@ -101,12 +105,13 @@
 				{/if}
 			</div>
 			{#if notifications.length > 0}
-				<button
-					class="text-label-sm font-label text-primary transition-colors hover:brightness-110"
+				<Button
+					bare
+					class="text-label-sm text-primary hover:brightness-110"
 					onclick={onreadall}
 				>
 					Mark all read
-				</button>
+				</Button>
 			{/if}
 		</div>
 
@@ -114,18 +119,14 @@
 
 		<div class="scrollbar-none flex max-h-[300px] flex-1 flex-col overflow-y-auto p-1.5">
 			{#if notifications.length === 0}
-				<div class="flex flex-col items-center gap-2 py-10 text-center">
-					<div class="glass-well flex size-11 items-center justify-center rounded-2xl text-outline">
-						<BellOff size={19} />
-					</div>
-					<p class="text-body-sm font-body text-outline">You are all caught up.</p>
-				</div>
+				<EmptyState icon={BellOff} title="You are all caught up." class="flex-none" />
 			{/if}
 
 			{#each notifications as item (item.id)}
 				{@const Icon = kindIcon[item.kind] ?? Bell}
-				<button
-					class="group relative flex w-full gap-3 rounded-xl p-2.5 text-left transition-colors {item.read
+				<Button
+					bare
+					class="group relative w-full justify-start gap-3 rounded-xl p-2.5 text-left {item.read
 						? 'hover:bg-surface-container/40'
 						: 'bg-surface-container/55 hover:bg-surface-container/70'}"
 					onclick={() => onread(item.id)}
@@ -152,20 +153,17 @@
 						>
 						<span class="text-code-sm font-code text-outline">{item.time}</span>
 					</span>
-				</button>
+				</Button>
 			{/each}
 		</div>
 
 		{#if notifications.length > 0}
 			<div class="glass-divider h-px"></div>
 			<div class="flex items-center justify-between px-3.5 py-2">
-				<button
-					class="flex items-center gap-1.5 text-label-sm font-label text-outline transition-colors hover:text-on-surface"
-					onclick={onclear}
-				>
+				<Button bare class="gap-1.5 text-label-sm text-outline" onclick={onclear}>
 					<Trash2 size={13} />
 					Clear all
-				</button>
+				</Button>
 				<span class="flex items-center gap-1.5 text-label-sm font-label text-tertiary">
 					<Check size={13} />
 					Saved locally

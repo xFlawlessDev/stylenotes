@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FileText } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import type { Note } from '$lib/content/content';
 	import { dockItemBar, type DockEdge } from '$lib/dock';
 
@@ -19,12 +20,14 @@
 </script>
 
 <!-- No tooltip here: the hover card next to the rail already shows the note. -->
-<button
+<Button
 	data-dock-id={note.id}
 	data-dock-kind="note"
-	class="glass-chip group relative flex size-9 shrink-0 items-center justify-center rounded-xl transition-all {active
+	variant="secondary"
+	size="icon-lg"
+	class="group relative shrink-0 {active
 		? 'scale-105 ring-1 ring-inset ring-tertiary/60'
-		: 'hover:scale-105 hover:text-on-surface'}"
+		: 'hover:scale-105'}"
 	aria-label="{note.title} — double-click to open note window"
 	ondblclick={() => onopen(note)}
 	onclick={(event) => {
@@ -35,4 +38,4 @@
 >
 	<FileText size={18} class={note.pinned ? 'text-tertiary' : 'text-on-surface-variant'} />
 	<span class="{bar} {note.pinned ? 'bg-tertiary' : 'bg-outline'}"></span>
-</button>
+</Button>

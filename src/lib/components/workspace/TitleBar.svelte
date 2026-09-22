@@ -13,6 +13,7 @@
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
+	import { Button, SegmentedControl } from '$lib/components/base';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -105,45 +106,45 @@
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
 		</div>
 
-		<div class="glass-well ml-1 hidden items-center rounded-full p-0.5 sm:flex">
-			{#each sections as item (item.id)}
-				{@const Icon = item.icon}
-				<button
-					class="flex items-center gap-1.5 rounded-full px-3 py-1 text-label-md font-label transition-all {section ===
-					item.id
-						? 'glass-chip font-medium text-on-surface'
-						: 'text-outline hover:text-on-surface'}"
-					aria-pressed={section === item.id}
-					onclick={() => onsection?.(item.id)}
-				>
-					<Icon size={14} /> {item.label}
-				</button>
-			{/each}
-		</div>
+		<SegmentedControl
+			value={section}
+			items={sections}
+			ariaLabel="Workspace section"
+			class="ml-1 hidden rounded-full sm:flex"
+			itemClass="rounded-full px-3 text-label-md"
+			onchange={(id) => onsection?.(id as 'notes' | 'tasks')}
+		/>
 	</div>
 
 	<!-- Controls -->
 	<div class="flex items-center gap-1.5">
 		{#if section === 'notes' && showpanelbuttons}
 			<div class="flex items-center gap-0.5">
-				<button
-					class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface lg:hidden"
+				<Button
+					variant="secondary"
+					size="icon"
+					shape="pill"
+					class="text-on-surface-variant lg:hidden"
 					aria-label="Open folders"
 					onclick={onopenfolders}
 				>
 					<FolderTree size={16} />
-				</button>
-				<button
-					class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface md:hidden"
+				</Button>
+				<Button
+					variant="secondary"
+					size="icon"
+					shape="pill"
+					class="text-on-surface-variant md:hidden"
 					aria-label="Open notes list"
 					onclick={onopennotes}
 				>
 					<Rows3 size={16} />
-				</button>
+				</Button>
 			</div>
 		{/if}
-		<button
-			class="glass-well flex h-8 min-w-0 items-center gap-2 rounded-full pr-2 pl-3 text-left transition-all hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-72 lg:w-80"
+		<Button
+			shape="pill"
+			class="glass-well h-8 min-w-0 justify-start gap-2 pr-2 pl-3 text-left hover:bg-transparent hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-72 lg:w-80"
 			aria-label="Open command palette"
 			onclick={onpalette}
 		>
@@ -155,21 +156,24 @@
 				class="hidden shrink-0 rounded-md bg-surface-container-high/70 px-1.5 py-0.5 text-code-sm font-code text-outline md:block"
 				>Ctrl K</kbd
 			>
-		</button>
+		</Button>
 
 		<div class="glass-divider mx-0.5 hidden h-5 w-px sm:block"></div>
 
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+						variant="secondary"
+						size="icon"
+						shape="pill"
+						class="text-on-surface-variant"
 						aria-label="Toggle dock"
 						onclick={ontoggledock}
 					>
 						<PanelRight size={16} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Toggle dock</Tooltip.Content>
@@ -178,9 +182,12 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface"
+						variant="secondary"
+						size="icon"
+						shape="pill"
+						class="text-on-surface-variant"
 						aria-label="Toggle theme"
 						onclick={ontogglemode}
 					>
@@ -189,7 +196,7 @@
 						{:else}
 							<Moon size={16} />
 						{/if}
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Toggle light and dark</Tooltip.Content>
@@ -200,14 +207,17 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="emphasis-container flex size-8 items-center justify-center rounded-full text-label-md font-label font-semibold text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all hover:scale-105"
+						variant="tonal"
+						size="icon"
+						shape="pill"
+						class="font-semibold hover:scale-105"
 						aria-label="Open settings"
 						onclick={onsettings}
 					>
 						<SettingsIcon size={16} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Settings</Tooltip.Content>

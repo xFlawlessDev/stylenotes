@@ -578,6 +578,77 @@ html[data-motion='reduced'] *::after {
 		);
 	}
 
+	/* Range input matched to the emphasis surfaces (used by Slider.svelte) */
+	.range-glass {
+		appearance: none;
+		-webkit-appearance: none;
+		width: 100%;
+		height: 1rem;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.range-glass::-webkit-slider-runnable-track {
+		height: 0.25rem;
+		border-radius: 9999px;
+		background-color: color-mix(in oklab, var(--color-surface-container-highest) 85%, transparent);
+	}
+
+	.range-glass::-webkit-slider-thumb {
+		appearance: none;
+		-webkit-appearance: none;
+		margin-top: -0.375rem;
+		width: 1rem;
+		height: 1rem;
+		border-radius: 9999px;
+		border: 1px solid var(--emphasis-ring);
+		background-color: var(--emphasis-bg);
+		background-image: linear-gradient(
+			to bottom,
+			var(--emphasis-gradient-start),
+			var(--emphasis-gradient-end)
+		);
+		box-shadow: 0 1px 3px var(--glass-shadow);
+		transition: transform 0.15s ease;
+	}
+
+	.range-glass:hover::-webkit-slider-thumb {
+		transform: scale(1.08);
+	}
+
+	.range-glass:focus-visible {
+		outline: none;
+	}
+
+	.range-glass:focus-visible::-webkit-slider-thumb {
+		box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 35%, transparent);
+	}
+
+	.range-glass:disabled {
+		cursor: not-allowed;
+		opacity: 0.4;
+	}
+
+	/* Native color input reshaped into a glass swatch (used by ColorField.svelte) */
+	.color-swatch {
+		appearance: none;
+		-webkit-appearance: none;
+		padding: 0;
+		border: 1px solid var(--color-outline-variant);
+		border-radius: 0.5rem;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.color-swatch::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+
+	.color-swatch::-webkit-color-swatch {
+		border: none;
+		border-radius: 0.375rem;
+	}
+
 	/* Kumo-style emphasis surfaces: accent-derived top-lit gradient */
 	.emphasis-primary {
 		background-color: var(--emphasis-bg);

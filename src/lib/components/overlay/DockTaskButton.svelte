@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Circle, CircleCheck, CircleDashed, Eye } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import { dockItemBar, type DockEdge } from '$lib/dock';
 	import {
 		taskPriority,
@@ -47,12 +48,14 @@
 </script>
 
 <!-- No tooltip here: the hover card next to the rail already shows the task. -->
-<button
+<Button
 	data-dock-id={task.id}
 	data-dock-kind="task"
-	class="glass-chip group relative flex size-9 shrink-0 items-center justify-center rounded-xl transition-all {active
+	variant="secondary"
+	size="icon-lg"
+	class="group relative shrink-0 {active
 		? 'scale-105 ring-1 ring-inset ring-primary/60'
-		: 'hover:scale-105 hover:text-on-surface'}"
+		: 'hover:scale-105'}"
 	aria-label="{task.title} — double-click to open task window"
 	ondblclick={() => onopen(task)}
 	onclick={(event) => {
@@ -63,4 +66,4 @@
 >
 	<Icon size={19} class={priorityText[priority]} />
 	<span class="{bar} {priorityBar[priority]}"></span>
-</button>
+</Button>

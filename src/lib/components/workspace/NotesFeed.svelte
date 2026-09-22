@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { Search, Pin, FileText, X, Tag } from '@lucide/svelte';
+	import { Pin, FileText, X, Tag } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import { Button, EmptyState, SearchInput, SegmentedControl } from '$lib/components/base';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -66,13 +67,13 @@
 		<Breadcrumb.Root class="px-1 pt-1">
 			<Breadcrumb.List class="text-label-sm font-label text-outline uppercase">
 				<Breadcrumb.Item>
-					<button
-						type="button"
+					<Button
+						bare
 						class="transition-colors hover:text-on-surface"
 						onclick={() => onselectfolder?.('all')}
 					>
 						{folderLabel}
-					</button>
+					</Button>
 				</Breadcrumb.Item>
 				{#if activeTag}
 					<Breadcrumb.Separator class="text-outline/60 [&>svg]:size-3" />
@@ -85,37 +86,32 @@
 				{/if}
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
-		<button
-			class="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface md:hidden"
+		<Button
+			size="icon-sm"
+			class="absolute top-2.5 right-2.5 text-outline md:hidden"
 			aria-label="Close notes list"
 			onclick={onclose}
 		>
 			<X size={15} />
-		</button>
+		</Button>
 
-		<div class="relative w-full">
-			<Search size={16} class="pointer-events-none absolute top-2.5 left-3 z-10 text-on-surface-variant" />
-			<input
-				bind:value={query}
-				class="glass-well h-9 w-full rounded-xl pr-3 pl-9 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none"
-				placeholder="Search notes and tags"
-				type="text"
-			/>
-		</div>
+		<SearchInput
+			bind:value={query}
+			placeholder="Search notes and tags"
+			ariaLabel="Search notes and tags"
+		/>
 
-		<div class="glass-well flex items-center rounded-xl p-0.5">
-			{#each [{ k: 'all' as const, l: `All (${total})` }, { k: 'pinned' as const, l: 'Pinned' }] as t}
-				<button
-					class="flex-1 rounded-lg py-1.5 text-center text-label-md font-label transition-all {tab ===
-					t.k
-						? 'glass-chip font-medium text-on-surface'
-						: 'text-outline hover:text-on-surface'}"
-					onclick={() => (tab = t.k)}
-				>
-					{t.l}
-				</button>
-			{/each}
-		</div>
+		<SegmentedControl
+			value={tab}
+			items={[
+				{ id: 'all', label: `All (${total})` },
+				{ id: 'pinned', label: 'Pinned' }
+			]}
+			size="sm"
+			ariaLabel="Note filters"
+			itemClass="text-label-md"
+			onchange={(id) => (tab = id as 'all' | 'pinned')}
+		/>
 
 		{#if activeTag}
 			<div
@@ -125,13 +121,14 @@
 					<Tag size={12} />
 					Filtering by #{activeTag}
 				</span>
-				<button
-					class="flex size-5 items-center justify-center rounded-md text-on-primary-container transition-colors hover:bg-on-primary-container/15"
+				<Button
+					size="icon-xs"
+					class="text-on-primary-container hover:bg-on-primary-container/15"
 					aria-label="Clear tag filter"
 					onclick={() => (oncleartag ? oncleartag() : onselecttag?.(activeTag))}
 				>
 					<X size={13} />
-				</button>
+				</Button>
 			</div>
 		{/if}
 	</div>
@@ -161,16 +158,16 @@
 					<Breadcrumb.Root class="mb-1">
 						<Breadcrumb.List class="gap-1 text-code-sm font-code text-outline">
 							<Breadcrumb.Item>
-								<button
-									type="button"
-									class="transition-colors group-hover:text-primary"
+								<Button
+									bare
+									class="font-code transition-colors group-hover:text-primary"
 									onclick={(event) => {
 										event.stopPropagation();
 										onselectfolder?.(note.folder);
 									}}
 								>
 									{folderLabels[note.folder] ?? note.folder}
-								</button>
+								</Button>
 							</Breadcrumb.Item>
 						</Breadcrumb.List>
 					</Breadcrumb.Root>
@@ -184,9 +181,10 @@
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
-								<button
+								<Button
 									{...props}
-									class="shrink-0 rounded-md p-0.5 transition-all {note.pinned
+									bare
+									class="shrink-0 p-0.5 transition-all {note.pinned
 										? 'text-primary'
 										: 'text-outline opacity-0 group-hover:opacity-100'}"
 									aria-label="Toggle pin"
@@ -196,7 +194,7 @@
 									}}
 								>
 									<Pin size={15} />
-								</button>
+								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>{note.pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
@@ -209,10 +207,11 @@
 					<span class="text-code-sm font-code text-outline">{note.updated}</span>
 					<div class="flex min-w-0 gap-1">
 						{#each note.tags.slice(0, 2) as tag (tag)}
-							<button
-								class="truncate rounded-md px-1.5 py-px text-code-sm font-code transition-colors {activeTag ===
-								tag
-									? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
+							<Button
+								variant="secondary"
+								size="xs"
+								class="truncate px-1.5 font-code text-code-sm {activeTag === tag
+									? 'text-on-surface ring-1 ring-inset ring-primary/60'
 									: 'bg-surface-container-high/60 text-tertiary hover:text-on-surface'}"
 								onclick={(event) => {
 									event.stopPropagation();
@@ -220,7 +219,7 @@
 								}}
 							>
 								#{tag}
-							</button>
+							</Button>
 						{/each}
 					</div>
 				</div>
@@ -228,16 +227,10 @@
 		{/each}
 
 		{#if filtered.length === 0}
-			<div class="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-				<div
-					class="glass-well flex size-11 items-center justify-center rounded-2xl text-outline"
-				>
-					<FileText size={20} />
-				</div>
-				<p class="text-body-sm font-body text-outline">
-					{query ? 'No notes match that search.' : 'Nothing here yet.'}
-				</p>
-			</div>
+			<EmptyState
+				icon={FileText}
+				title={query ? 'No notes match that search.' : 'Nothing here yet.'}
+			/>
 		{/if}
 	</div>
 </section>

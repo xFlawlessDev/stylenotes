@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CalendarDays, Check, Play, RotateCcw, SquarePen, X } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import {
 		formatTaskDate,
 		isTaskOverdue,
@@ -43,7 +44,7 @@
 </script>
 
 <div
-	class="glass-solid flex w-full flex-col gap-2 rounded-xl p-3 shadow-2xl ring-1 ring-hairline"
+	class="glass-solid flex w-full flex-col gap-2 rounded-xl p-3 ring-1 ring-hairline"
 	role="tooltip"
 	onmouseleave={onclose}
 >
@@ -96,16 +97,16 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-7 items-center justify-center rounded-lg transition-all {doing
-							? 'text-secondary'
-							: 'text-on-surface-variant hover:text-secondary'}"
+						variant="secondary"
+						size="icon-sm"
+						class={doing ? 'text-secondary' : 'text-on-surface-variant hover:text-secondary'}
 						aria-label={doing ? 'Move back to To do' : 'Move to In progress'}
 						onclick={() => onprogress(task)}
 					>
 						<Play size={15} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>{doing ? 'Move back to To do' : 'Move to In progress'}</Tooltip.Content>
@@ -113,9 +114,11 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-primary"
+						variant="secondary"
+						size="icon-sm"
+						class="text-on-surface-variant hover:text-primary"
 						aria-label={done ? 'Reopen task' : 'Complete task'}
 						onclick={() => oncomplete(task)}
 					>
@@ -124,7 +127,7 @@
 						{:else}
 							<Check size={15} />
 						{/if}
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>{done ? 'Reopen task' : 'Complete task'}</Tooltip.Content>
@@ -132,25 +135,31 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
+						variant="secondary"
+						size="icon-sm"
+						class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
 						aria-label="Remove from dock"
 						onclick={() => onremove(task)}
 					>
 						<X size={15} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content>Remove from dock</Tooltip.Content>
 		</Tooltip.Root>
 	</div>
 
-	<button
-		class="emphasis-container flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-headline-sm font-headline text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
+	<Button
+		variant="tonal"
+		size="md"
+		shape="tile"
+		block
+		class="gap-1.5 px-3 py-1.5 font-headline text-headline-sm active:scale-[0.99]"
 		onclick={onopen}
 	>
 		<span class="relative">Edit task</span>
 		<SquarePen size={14} />
-	</button>
+	</Button>
 </div>

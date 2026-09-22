@@ -10,9 +10,7 @@
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
+	import { Field, Input, Select, Textarea } from '$lib/components/base';
 
 	let {
 		title = $bindable(''),
@@ -51,19 +49,13 @@
 
 	// Compact mode is for dialogs inside small windows (e.g. the Kanban board).
 	const stack = $derived(compact ? 'flex flex-col gap-2' : 'flex flex-col gap-3.5');
-	const group = $derived(compact ? 'flex flex-col gap-1' : 'flex flex-col gap-1.5');
-	const label = $derived(
-		compact
-			? 'text-label-sm font-label text-on-surface-variant'
-			: 'text-label-md font-label text-on-surface-variant'
-	);
-	const input = $derived(
-		compact
-			? 'glass-well h-8 border-0 text-body-sm font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50'
-			: 'glass-well h-9 border-0 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50'
-	);
+	const group = $derived(compact ? 'gap-1' : '');
+	const labelClass = $derived(compact ? 'text-label-sm' : '');
+	const inputSize = $derived(compact ? 'md' : 'lg');
+	const inputClass = $derived(compact ? 'text-body-sm' : '');
+	const selectSize = $derived(compact ? 'md' : 'lg');
+	const selectClass = $derived(compact ? 'px-2 font-code text-code-sm' : '');
 	const grid = $derived(compact ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-3');
-	const select = $derived(compact ? 'h-8 px-2 text-code-sm font-code' : '');
 
 	$effect(() => {
 		if (!autofocus || focusedOnce) return;
@@ -79,64 +71,68 @@
 </script>
 
 <div class={stack}>
-	<div class={group}>
-		<Label for="{idPrefix}-title" class={label}>Title</Label>
+	<Field label="Title" for="{idPrefix}-title" class={group} {labelClass}>
 		<Input
 			id="{idPrefix}-title"
 			bind:ref={titleEl}
 			bind:value={title}
+			size={inputSize}
+			class={inputClass}
 			placeholder="What needs doing?"
-			class={input}
 		/>
-	</div>
+	</Field>
 
-	<div class={group}>
-		<Label for="{idPrefix}-notes" class={label}>
-			Details <span class="text-outline">(optional)</span>
-		</Label>
-		<textarea
+	<Field label="Details" hint="optional" for="{idPrefix}-notes" class={group} {labelClass}>
+		<Textarea
 			id="{idPrefix}-notes"
 			bind:value={detail}
 			rows={compact ? 2 : 3}
+			size="sm"
+			class={compact ? 'py-1.5' : 'py-2'}
 			placeholder="Context, links, next steps."
-			class="glass-well w-full resize-none rounded-lg px-3 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none {compact
-				? 'py-1.5'
-				: 'py-2'}"
-		></textarea>
-	</div>
+		/>
+	</Field>
 
 	<div class={grid}>
-		<div class={group}>
-			<Label class={label}>Status</Label>
-			<SelectField
+		<Field label="Status" class={group} {labelClass}>
+			<Select
 				label="Status"
-				size={compact ? 'sm' : 'default'}
+				size={selectSize}
+				class={selectClass}
 				options={TASK_STATUSES.map((value) => ({ value, label: statusMeta[value].label }))}
 				bind:value={status}
-				class={select}
 			/>
-		</div>
+		</Field>
 
-		<div class={group}>
-			<Label class={label}>Priority</Label>
-			<SelectField
+		<Field label="Priority" class={group} {labelClass}>
+			<Select
 				label="Priority"
-				size={compact ? 'sm' : 'default'}
+				size={selectSize}
+				class={selectClass}
 				options={TASK_PRIORITIES.map((value) => ({ value, label: priorityMeta[value].label }))}
 				bind:value={priority}
-				class={select}
 			/>
-		</div>
+		</Field>
 
-		<div class={group}>
-			<Label for="{idPrefix}-start" class={label}>Start</Label>
-			<Input id="{idPrefix}-start" type="date" bind:value={startDate} class={input} />
-		</div>
+		<Field label="Start" for="{idPrefix}-start" class={group} {labelClass}>
+			<Input
+				id="{idPrefix}-start"
+				type="date"
+				size={inputSize}
+				class={inputClass}
+				bind:value={startDate}
+			/>
+		</Field>
 
-		<div class={group}>
-			<Label for="{idPrefix}-due" class={label}>Due</Label>
-			<Input id="{idPrefix}-due" type="date" bind:value={dueDate} class={input} />
-		</div>
+		<Field label="Due" for="{idPrefix}-due" class={group} {labelClass}>
+			<Input
+				id="{idPrefix}-due"
+				type="date"
+				size={inputSize}
+				class={inputClass}
+				bind:value={dueDate}
+			/>
+		</Field>
 	</div>
 
 	{#if dateError}
@@ -144,32 +140,28 @@
 	{/if}
 
 	<div class={grid}>
-		<div class={group}>
-			<Label class={label}>Folder</Label>
-			<SelectField
+		<Field label="Folder" class={group} {labelClass}>
+			<Select
 				label="Folder"
-				size={compact ? 'sm' : 'default'}
+				size={selectSize}
+				class={selectClass}
 				options={folderOptions.map((option) => ({ value: option.id, label: option.label }))}
 				bind:value={folder}
-				class={select}
 			/>
-		</div>
+		</Field>
 
-		<div class={group}>
-			<Label class={label}>
-				Linked note <span class="text-outline">(optional)</span>
-			</Label>
-			<SelectField
+		<Field label="Linked note" hint="optional" class={group} {labelClass}>
+			<Select
 				label="Linked note"
 				placeholder="None"
-				size={compact ? 'sm' : 'default'}
+				size={selectSize}
+				class={selectClass}
 				options={[
 					{ value: '', label: 'None' },
 					...notes.map((note) => ({ value: note.id, label: note.title || 'Untitled note' }))
 				]}
 				bind:value={noteId}
-				class={select}
 			/>
-		</div>
+		</Field>
 	</div>
 </div>

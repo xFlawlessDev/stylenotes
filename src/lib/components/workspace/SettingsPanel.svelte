@@ -15,6 +15,7 @@
 		ShieldCheck,
 		PictureInPicture2,
 	} from '@lucide/svelte';
+	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import {
 		settings,
 		updateSettings,
@@ -81,13 +82,16 @@
 					<span class="text-headline-md font-headline text-on-surface">Settings</span>
 					<span class="text-label-sm font-label text-outline">Personalize StyleNotes</span>
 				</div>
-				<button
-					class="glass-chip flex size-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:text-on-surface"
+				<Button
+					size="icon"
+					shape="pill"
+					variant="secondary"
+					class="text-on-surface-variant"
 					aria-label="Close"
 					onclick={onclose}
 				>
 					<X size={16} />
-				</button>
+				</Button>
 			</div>
 
 			<div class="glass-divider h-px"></div>
@@ -97,19 +101,15 @@
 				<nav class="scrollbar-none flex w-full shrink-0 flex-row gap-1 overflow-x-auto p-2.5 sm:w-40 sm:flex-col sm:overflow-visible">
 					{#each nav as item (item.id)}
 						{@const Icon = item.icon}
-						<button
-							class="flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-body-md font-body transition-all {section ===
-							item.id
-								? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-								: 'text-on-surface-variant hover:bg-surface-container/50'}"
+						<Button
+							variant={section === item.id ? 'tonal' : 'ghost'}
+							size="lg"
+							class="shrink-0 justify-start gap-2.5 px-3 text-left font-body text-body-md"
 							onclick={() => (section = item.id)}
 						>
-							<Icon
-								size={16}
-								class={section === item.id ? 'text-on-primary-container' : 'text-outline'}
-							/>
+							<Icon size={16} class={section === item.id ? 'text-on-primary-container' : 'text-outline'} />
 							{item.label}
-						</button>
+						</Button>
 					{/each}
 				</nav>
 
@@ -128,50 +128,33 @@
 							>
 							<div class="grid grid-cols-3 gap-2">
 								{#each views as item (item.id)}
-									{@const Icon = item.icon}
-									<button
-										class="flex flex-col items-center gap-1.5 rounded-2xl py-3 text-label-sm font-label transition-all {settings.editorView ===
-										item.id
-											? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-											: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
+									<ChoiceTile
+										layout="stack"
+										icon={item.icon}
+										label={item.label}
+										class="py-3"
+										active={settings.editorView === item.id}
 										onclick={() => updateSettings({ editorView: item.id })}
-									>
-										<Icon size={16} />
-										{item.label}
-									</button>
+									/>
 								{/each}
 							</div>
 						</div>
 
 						<div class="flex flex-col gap-2">
 							{#each [{ k: 'spellcheck' as const, t: 'Check spelling', d: 'Underline misspelled words while writing' }, { k: 'showWordCount' as const, t: 'Show word count', d: 'Display live counts in the editor header' }, { k: 'confirmDelete' as const, t: 'Confirm before deleting', d: 'Ask before a note is permanently removed' }] as row (row.k)}
-								<label
-									class="flex cursor-pointer items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
+								<div
+									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 								>
 									<span class="flex flex-col">
 										<span class="text-body-md font-body text-on-surface">{row.t}</span>
 										<span class="text-label-sm font-label text-outline">{row.d}</span>
 									</span>
-									<button
-										class="relative h-5 w-9 shrink-0 rounded-full transition-colors {settings[
-											row.k
-										]
-											? 'emphasis-primary'
-											: 'bg-surface-container-highest'}"
-										role="switch"
-										aria-checked={settings[row.k]}
-										aria-label={row.t}
-										onclick={() => updateSettings({ [row.k]: !settings[row.k] })}
-									>
-										<span
-											class="absolute top-0.5 size-4 rounded-full transition-transform {settings[
-												row.k
-											]
-												? 'right-0.5 bg-on-primary'
-												: 'left-0.5 bg-outline'}"
-										></span>
-									</button>
-								</label>
+									<Switch
+										checked={settings[row.k]}
+										label={row.t}
+										onchange={(checked) => updateSettings({ [row.k]: checked })}
+									/>
+								</div>
 							{/each}
 						</div>
 
@@ -220,12 +203,16 @@
 								</div>
 							</div>
 							<div class="grid grid-cols-2 gap-2">
-								<button
-									class="glass-chip flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label text-on-surface transition-colors hover:text-primary"
+								<Button
+									variant="secondary"
+									size="lg"
+									shape="tile"
+									block
+									class="justify-center text-label-md"
 									onclick={onexport}
 								>
 									<Download size={15} /> Export to folder
-								</button>
+								</Button>
 							</div>
 						</div>
 
@@ -234,8 +221,12 @@
 								>Reset</span
 							>
 							<div class="flex flex-col gap-2">
-								<button
-									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3 text-left transition-colors hover:bg-surface-container/50"
+								<Button
+									variant="soft"
+									size="md"
+									shape="tile"
+									block
+									class="h-auto justify-between gap-3 p-3 text-left"
 									onclick={resetSettings}
 								>
 									<span class="flex flex-col">
@@ -245,9 +236,13 @@
 										>
 									</span>
 									<RotateCcw size={15} class="shrink-0 text-outline" />
-								</button>
-								<button
-									class="flex items-center justify-between rounded-2xl bg-error-container/25 p-3 text-left transition-colors hover:bg-error-container/40"
+								</Button>
+								<Button
+									variant="danger"
+									size="md"
+									shape="tile"
+									block
+									class="h-auto justify-between gap-3 p-3 text-left"
 									onclick={onresetdata}
 								>
 									<span class="flex flex-col">
@@ -257,7 +252,7 @@
 										>
 									</span>
 									<Trash2 size={15} class="shrink-0 text-error" />
-								</button>
+								</Button>
 							</div>
 						</div>
 					{/if}

@@ -2,6 +2,7 @@
 	import { Check, GripVertical, Pencil, Trash2, X } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { folderIcons } from '$lib/content/folder-icons';
+	import { Button, Input } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
@@ -38,7 +39,7 @@
 
 	let editLabel = $state('');
 	let iconOpen = $state(false);
-	let inputEl = $state<HTMLInputElement>();
+	let inputEl = $state<HTMLInputElement | null>(null);
 
 	$effect(() => {
 		if (editing) {
@@ -66,18 +67,19 @@
 	{#if editing}
 		<div class="glass-chip flex flex-col gap-2 rounded-xl px-2 py-2">
 			<div class="flex items-center gap-1.5">
-				<button
-					type="button"
-					class="flex size-7 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-surface-container-high/70"
+				<Button
+					size="icon-sm"
+					class="shrink-0 text-primary"
 					aria-label="Choose icon"
 					onclick={() => (iconOpen = !iconOpen)}
 				>
 					<Icon size={16} />
-				</button>
-				<input
-					bind:this={inputEl}
+				</Button>
+				<Input
+					bind:ref={inputEl}
 					bind:value={editLabel}
-					class="glass-well h-7 min-w-0 flex-1 rounded-lg border-0 px-2 text-body-sm font-body text-on-surface focus:outline-none"
+					size="sm"
+					class="min-w-0 flex-1"
 					onkeydown={(event) => {
 						if (event.key === 'Enter') {
 							event.preventDefault();
@@ -90,15 +92,15 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<button
+							<Button
 								{...props}
-								type="button"
-								class="flex size-7 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-surface-container-high/70"
+								size="icon-sm"
+								class="shrink-0 text-primary"
 								aria-label="Save folder"
 								onclick={commit}
 							>
 								<Check size={15} />
-							</button>
+							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>Save</Tooltip.Content>
@@ -109,15 +111,15 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<button
+							<Button
 								{...props}
-								type="button"
-								class="flex size-7 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:text-on-surface"
+								size="icon-sm"
+								class="shrink-0 text-outline"
 								aria-label="Cancel"
 								onclick={onedit}
 							>
 								<X size={15} />
-							</button>
+							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>Cancel</Tooltip.Content>
@@ -128,12 +130,9 @@
 				<div class="flex flex-wrap gap-1 rounded-lg bg-surface-container-lowest/40 p-1.5">
 					{#each folderIcons as entry (entry.id)}
 						{@const Choice = entry.icon}
-						<button
-							type="button"
-class="flex size-7 items-center justify-center rounded-lg transition-colors {folder.icon ===
-						entry.id
-							? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-							: 'text-on-surface-variant hover:bg-surface-container-high/70 hover:text-on-surface'}"
+						<Button
+							size="icon-sm"
+							variant={folder.icon === entry.id ? 'tonal' : 'ghost'}
 							aria-label={entry.id}
 							aria-pressed={folder.icon === entry.id}
 							onclick={() => {
@@ -142,7 +141,7 @@ class="flex size-7 items-center justify-center rounded-lg transition-colors {fol
 							}}
 						>
 							<Choice size={14} />
-						</button>
+						</Button>
 					{/each}
 				</div>
 			{/if}
@@ -184,10 +183,10 @@ class="flex size-7 items-center justify-center rounded-lg transition-colors {fol
 						<Tooltip.Root>
 							<Tooltip.Trigger>
 								{#snippet child({ props })}
-									<button
+									<Button
 										{...props}
-										type="button"
-										class="flex size-6 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container-high/70 hover:text-on-surface"
+										size="icon-xs"
+										class="text-outline"
 										aria-label="Edit folder"
 										onclick={(event) => {
 											event.stopPropagation();
@@ -195,7 +194,7 @@ class="flex size-7 items-center justify-center rounded-lg transition-colors {fol
 										}}
 									>
 										<Pencil size={13} />
-									</button>
+									</Button>
 								{/snippet}
 							</Tooltip.Trigger>
 							<Tooltip.Content>Edit folder</Tooltip.Content>
@@ -219,15 +218,16 @@ class="flex size-7 items-center justify-center rounded-lg transition-colors {fol
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					type="button"
-					class="flex size-7 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-error-container/40 hover:text-error"
+					variant="danger-ghost"
+					size="icon-sm"
+					class="shrink-0"
 					aria-label="Delete folder"
 					onclick={ondelete}
 				>
 					<Trash2 size={15} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Delete folder</Tooltip.Content>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { FilterX, PictureInPicture2 } from '@lucide/svelte';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, Field, Select } from '$lib/components/base';
 	import { DOCK_EDGES, dockEdgeLabels, type DockEdge } from '$lib/dock';
 	import { QUICK_NOTE_LABEL, QUICK_TASK_LABEL } from '$lib/stores/shortcuts';
 	import { settings, updateSettings } from '$lib/stores/settings.svelte';
@@ -71,45 +71,41 @@
 	</div>
 
 	<div class="flex flex-col gap-3 rounded-2xl bg-surface-container-lowest/30 p-3">
-		<div class="flex flex-col gap-1.5">
-			<span class="text-body-md font-body text-on-surface">Position</span>
-			<SelectField
+		<Field label="Position">
+			<Select
 				label="Dock position"
 				options={positionOptions}
 				value={settings.overlayPosition}
 				onchange={(next) => updateSettings({ overlayPosition: next as DockEdge })}
 			/>
-		</div>
+		</Field>
 
-		<div class="flex flex-col gap-1.5">
-			<span class="text-body-md font-body text-on-surface">Status</span>
-			<SelectField
+		<Field label="Status">
+			<Select
 				label="Dock status filter"
 				options={statusOptions}
 				value={settings.overlayStatus}
 				onchange={(next) => updateSettings({ overlayStatus: next as TaskStatus | 'all' })}
 			/>
-		</div>
+		</Field>
 
-		<div class="flex flex-col gap-1.5">
-			<span class="text-body-md font-body text-on-surface">Priority</span>
-			<SelectField
+		<Field label="Priority">
+			<Select
 				label="Dock priority filter"
 				options={priorityOptions}
 				value={settings.overlayPriority}
 				onchange={(next) => updateSettings({ overlayPriority: next as TaskPriorityFilter })}
 			/>
-		</div>
+		</Field>
 
-		<div class="flex flex-col gap-1.5">
-			<span class="text-body-md font-body text-on-surface">Sort by</span>
-			<SelectField
+		<Field label="Sort by">
+			<Select
 				label="Dock sort order"
 				options={sortOptions}
 				value={settings.overlaySort}
 				onchange={(next) => updateSettings({ overlaySort: next as OverlaySort })}
 			/>
-		</div>
+		</Field>
 
 		<div class="flex flex-col gap-1.5">
 			<span class="text-body-md font-body text-on-surface">Quick capture</span>
@@ -125,13 +121,9 @@
 		</div>
 
 		{#if customized}
-			<button
-				type="button"
-				class="flex items-center justify-center gap-1.5 rounded-xl py-2 text-label-md font-label text-outline transition-colors hover:bg-surface-container/50 hover:text-on-surface"
-				onclick={resetFilters}
-			>
+			<Button variant="ghost" size="md" block class="justify-center text-outline" onclick={resetFilters}>
 				<FilterX size={14} /> Reset dock settings
-			</button>
+			</Button>
 		{/if}
 	</div>
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { FolderClosed, Inbox, Pencil, PictureInPicture2 } from '@lucide/svelte';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, EmptyState, Select } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import {
 		statusMeta,
@@ -83,10 +83,10 @@
 				{/if}
 
 				<div onclick={(event) => event.stopPropagation()} role="presentation">
-					<SelectField
+					<Select
 						size="sm"
 						label="Status"
-						class="h-7 w-[130px] px-2 text-code-sm font-code"
+						class="w-[130px] px-2 font-code text-code-sm"
 						options={columns.map((column) => ({ value: column.id, label: column.label }))}
 						value={status}
 						onchange={(next) => onstatus(task.id, next as TaskStatus)}
@@ -126,10 +126,11 @@
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
-								<button
+								<Button
 									{...props}
-									type="button"
-									class="rounded-md p-1 transition-all {task.overlay
+									size="icon-xs"
+									variant="ghost"
+									class="rounded-md {task.overlay
 										? 'text-primary'
 										: 'text-outline hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100'}"
 									aria-label={task.overlay ? 'Remove from dock' : 'Add to dock'}
@@ -140,7 +141,7 @@
 									}}
 								>
 									<PictureInPicture2 size={14} />
-								</button>
+								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>
@@ -148,9 +149,10 @@
 						</Tooltip.Content>
 					</Tooltip.Root>
 
-					<button
-						type="button"
-						class="rounded-md p-1 text-outline transition-opacity hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+					<Button
+						size="icon-xs"
+						variant="ghost"
+						class="rounded-md text-outline hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
 						aria-label="Edit task"
 						onclick={(event) => {
 							event.stopPropagation();
@@ -158,18 +160,13 @@
 						}}
 					>
 						<Pencil size={14} />
-					</button>
+					</Button>
 				</div>
 			</div>
 		{/each}
 
 		{#if ordered.length === 0}
-			<div class="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
-				<div class="glass-well flex size-11 items-center justify-center rounded-2xl text-outline">
-					<Inbox size={20} />
-				</div>
-				<p class="text-body-sm font-body text-outline">No tasks match this view.</p>
-			</div>
+			<EmptyState icon={Inbox} title="No tasks match this view." class="py-12" />
 		{/if}
 	</div>
 </section>

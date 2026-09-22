@@ -25,7 +25,7 @@
 	import { isTauri, openTasksInWorkspace } from '$lib/windows';
 	import CompactKanban from '$lib/components/tasks/CompactKanban.svelte';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, Select } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let tasks = $state<Task[]>([]);
@@ -164,10 +164,10 @@
 				{openCount} open · {visibleTasks.length} total
 			</span>
 			<div class="hidden shrink-0 @[560px]:block">
-				<SelectField
+				<Select
 					size="sm"
 					label="Filter tasks by folder"
-					class="h-7 w-[124px] px-2 text-code-sm font-code"
+					class="w-[124px] px-2 font-code text-code-sm"
 					options={folderOptions}
 					bind:value={folderFilter}
 				/>
@@ -187,15 +187,14 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<button
+							<Button
 								{...props}
-								type="button"
-								class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container/70 hover:text-on-surface"
+								size="icon-sm"
 								aria-label="Lock Kanban window to desktop"
 								onclick={toggleLock}
 							>
 								<Lock size={14} />
-							</button>
+							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>Lock to desktop ({KANBAN_SHORTCUT_LABEL})</Tooltip.Content>
@@ -204,15 +203,14 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<button
+							<Button
 								{...props}
-								type="button"
-								class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container/70 hover:text-on-surface"
+								size="icon-sm"
 								aria-label="Open StyleNotes on the Kanban view"
 								onclick={() => void openTasksInWorkspace()}
 							>
 								<NotebookPen size={14} />
-							</button>
+							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>Open StyleNotes (Tasks · Kanban)</Tooltip.Content>
@@ -220,22 +218,21 @@
 
 				<span class="mx-0.5 h-4 w-px bg-hairline/70"></span>
 
-				<button
-					type="button"
-					class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container/70 hover:text-on-surface"
+				<Button
+					size="icon-sm"
 					aria-label="Minimize"
 					onclick={() => isTauri && getCurrentWindow().minimize()}
 				>
 					<Minus size={14} />
-				</button>
-				<button
-					type="button"
-					class="flex size-7 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-window-close/20 hover:text-on-surface"
+				</Button>
+				<Button
+					size="icon-sm"
+					class="hover:bg-window-close/20"
 					aria-label="Hide to tray"
 					onclick={hideWindow}
 				>
 					<X size={14} />
-				</button>
+				</Button>
 			</div>
 		{/if}
 	</header>

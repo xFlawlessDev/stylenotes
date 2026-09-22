@@ -1,8 +1,6 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
+	import { Button, Field, Input } from '$lib/components/base';
 	import { FolderPlus } from '@lucide/svelte';
 
 	let {
@@ -66,27 +64,25 @@
 				submit();
 			}}
 		>
-			<div class="flex flex-col gap-2">
-				<Label for="folder-name" class="text-label-md font-label text-on-surface-variant"
-					>Folder name</Label
-				>
+			<Field label="Folder name" for="folder-name">
 				<Input
 					id="folder-name"
 					bind:value
+					size="lg"
 					placeholder="e.g. Research"
-					class="glass-well h-9 border-0 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50"
+					invalid={Boolean(error)}
 					oninput={() => (touched = true)}
 				/>
 				{#if error}
 					<p class="text-label-sm font-label text-error">{error}</p>
 				{/if}
-			</div>
+			</Field>
 
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit">Create folder</Button>
+				<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
+				<Button variant="primary" type="submit">Create folder</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

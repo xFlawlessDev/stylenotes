@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/base';
 	import { Keyboard, Sparkles } from '@lucide/svelte';
 	import { MOD } from '$lib/content/markdown-shortcuts';
 
@@ -101,7 +101,7 @@
 		<Dialog.Footer
 			class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 		>
-			<Button type="button" onclick={() => (open = false)}>Got it</Button>
+			<Button variant="primary" onclick={() => (open = false)}>Got it</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

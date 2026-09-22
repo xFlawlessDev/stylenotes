@@ -29,7 +29,7 @@
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import NoteBodyEditor from '$lib/components/note/NoteBodyEditor.svelte';
 	import NoteViewSwitcher from '$lib/components/note/NoteViewSwitcher.svelte';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, EmptyState, Input, Select } from '$lib/components/base';
 
 	const noteId = currentNoteId();
 
@@ -179,19 +179,20 @@
 
 	{#if note}
 		<div class="flex min-h-0 flex-1 flex-col gap-1.5 p-2.5 pt-2">
-			<input
-				class="w-full shrink-0 bg-transparent px-1.5 text-headline-sm font-headline font-bold tracking-tight text-on-surface placeholder:text-outline/60 focus:outline-none"
-				type="text"
+			<Input
+				variant="bare"
+				size="sm"
+				class="shrink-0 px-1.5 font-headline text-headline-sm font-bold tracking-tight placeholder:text-outline/60"
 				placeholder="Untitled note"
 				aria-label="Note title"
 				bind:value={title}
 				oninput={() => update({ title })}
 			/>
 			<div class="flex shrink-0 items-center gap-2 px-1.5">
-				<SelectField
+				<Select
 					size="sm"
 					label="Note folder"
-					class="h-7 w-[136px] px-2 text-code-sm font-code"
+					class="w-[136px] px-2 font-code text-code-sm"
 					options={folderOptions}
 					bind:value={folder}
 					onchange={(next) => update({ folder: next })}
@@ -213,23 +214,21 @@
 			</footer>
 		</div>
 	{:else}
-		<div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-			<div class="glass-well flex size-12 items-center justify-center rounded-2xl text-outline">
-				<NotebookPen size={22} />
-			</div>
-			<div class="flex flex-col gap-1">
-				<h2 class="text-headline-sm font-headline text-on-surface">Note unavailable</h2>
-				<p class="text-body-sm font-body text-outline">
-					This note was deleted or could not be loaded.
-				</p>
-			</div>
-			<button
-				type="button"
-				class="glass-chip rounded-xl px-3 py-1.5 text-label-md font-label text-on-surface-variant transition-colors hover:text-on-surface"
+		<EmptyState
+			size="md"
+			icon={NotebookPen}
+			heading="Note unavailable"
+			title="This note was deleted or could not be loaded."
+			class="gap-3"
+		>
+			<Button
+				variant="secondary"
+				size="md"
+				class="px-3 text-label-md text-on-surface-variant hover:text-on-surface"
 				onclick={closeWindow}
 			>
 				Close window
-			</button>
-		</div>
+			</Button>
+		</EmptyState>
 	{/if}
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
 	import { kanbanDrag } from '$lib/content/kanban-drag';
 	import {
@@ -77,14 +78,14 @@
 							{column.length}
 						</span>
 					</div>
-					<button
-						type="button"
-						class="flex size-6 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface"
+					<Button
+						bare
+						class="size-6 rounded-md text-outline hover:bg-surface-container/60 hover:text-on-surface"
 						aria-label="Add task to {statusMeta[status].label}"
 						onclick={() => onadd(status)}
 					>
 						<Plus size={15} />
-					</button>
+					</Button>
 				</div>
 
 				<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">

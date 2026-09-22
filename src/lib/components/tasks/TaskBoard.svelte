@@ -21,7 +21,7 @@
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, removeTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 	import { isTauri, openKanban } from '$lib/windows';
-	import SelectField from '$lib/components/fields/SelectField.svelte';
+	import { Button, Select } from '$lib/components/base';
 	import TaskRail from '$lib/components/tasks/TaskRail.svelte';
 	import TaskList from '$lib/components/tasks/TaskList.svelte';
 	import TaskKanban from '$lib/components/tasks/TaskKanban.svelte';
@@ -229,26 +229,30 @@
 	<section class="glass-panel flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
 		<div class="flex flex-col gap-2">
 			<div class="flex items-center gap-2">
-				<button
-					class="glass-chip flex size-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:text-on-surface lg:hidden"
+				<Button
+					variant="secondary"
+					size="icon"
+					class="shrink-0 text-on-surface-variant lg:hidden"
 					aria-label="Open task filters"
 					onclick={() => (railOpen = true)}
 				>
 					<SlidersHorizontal size={16} />
-				</button>
+				</Button>
 
 				<div class="scrollbar-none flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-xl p-0.5 lg:flex-none lg:bg-transparent">
 					{#each views as item (item.id)}
 						{@const Icon = item.icon}
-						<button
-							class="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-label-md font-label transition-all sm:px-3 {view ===
-							item.id
-								? 'glass-chip font-medium text-on-surface'
-								: 'text-outline hover:text-on-surface'}"
+						<Button
+							variant={view === item.id ? 'secondary' : 'ghost'}
+							size="sm"
+							class="shrink-0 gap-1.5 text-label-md {view === item.id
+								? 'font-medium'
+								: 'text-outline'}"
+							aria-pressed={view === item.id}
 							onclick={() => (view = item.id)}
 						>
 							<Icon size={14} /> <span class="hidden sm:inline">{item.label}</span>
-						</button>
+						</Button>
 					{/each}
 				</div>
 
@@ -256,15 +260,17 @@
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
-								<button
+								<Button
 									{...props}
-									type="button"
-									class="glass-chip flex size-7 items-center justify-center rounded-full text-outline transition-colors hover:text-on-surface"
+									variant="secondary"
+									size="icon-sm"
+									shape="pill"
+									class="text-outline"
 									aria-label="Open Kanban window"
 									onclick={() => void openKanban()}
 								>
 									<PictureInPicture2 size={14} />
-								</button>
+								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>Open Kanban window</Tooltip.Content>
@@ -280,23 +286,25 @@
 						>
 							{selectedTask.title}
 						</span>
-						<SelectField
+						<Select
 							size="sm"
 							label="Status of {selectedTask.title}"
-							class="h-7 w-[130px] px-2 text-code-sm font-code"
+							class="w-[130px] px-2 font-code text-code-sm"
 							options={statusOptions}
 							value={taskStatus(selectedTask)}
 							onchange={(next) => changeStatus(selectedTask.id, next as TaskStatus)}
 						/>
-						<button
-							type="button"
-							class="glass-chip flex size-7 items-center justify-center rounded-full text-outline transition-colors hover:text-error"
+						<Button
+							variant="secondary"
+							size="icon-sm"
+							shape="pill"
+							class="text-outline hover:text-error"
 							aria-label="Delete {selectedTask.title}"
 							title="Delete {selectedTask.title}"
 							onclick={() => remove(selectedTask.id)}
 						>
 							<Trash2 size={14} />
-						</button>
+						</Button>
 					{/if}
 				</div>
 			</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Check, RotateCcw } from '@lucide/svelte';
+	import { Button, ColorField, Field, Input, Select, Slider, Textarea } from '$lib/components/base';
 	import { normalizeColor, type UiPluginColorKey } from '$lib/content/ui-plugin-css';
 	import {
 		previewUiPlugin,
@@ -36,12 +37,6 @@
 		{ value: "Georgia, 'Times New Roman', serif", label: 'Serif' },
 		{ value: "ui-monospace, 'Cascadia Mono', 'Courier New', monospace", label: 'Monospace' },
 	];
-
-	const field =
-		'glass-well w-full min-w-0 border-0 px-3 py-2 text-body-md font-body text-on-surface placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50';
-	const legend = 'text-label-sm font-label tracking-wider text-outline uppercase';
-	const iconButton =
-		'flex size-7 shrink-0 items-center justify-center rounded-full text-outline transition-colors hover:text-on-surface disabled:opacity-30';
 
 	/** Reads a theme variable as pixels so sliders can show the current default. */
 	function readPx(name: string, fallback: number): number {
@@ -109,54 +104,32 @@
 		<span class="shrink-0 text-label-sm font-label text-outline">Applies live</span>
 	</div>
 
-	<label class="flex flex-col gap-1.5">
-		<span class={legend}>Name</span>
-		<input
-			class={field}
+	<Field label="Name">
+		<Input
+			size="lg"
 			value={plugin.name}
-			maxlength="80"
+			maxlength={80}
 			placeholder="Untitled plugin"
 			oninput={(event) => previewUiPlugin(plugin.id, { name: event.currentTarget.value })}
 		/>
-	</label>
+	</Field>
 
-	<div class="flex flex-col gap-2">
-		<span class={legend}>Colors</span>
+	<Field label="Colors" legend class="gap-2">
 		<div class="flex flex-col gap-1.5">
 			{#each colors as color (color.key)}
-				<div class="flex items-center gap-2">
-					<input
-						type="color"
-						class="size-8 shrink-0 cursor-pointer rounded-lg border border-outline-variant bg-transparent"
-						aria-label="{color.label} color"
-						value={colorValue(color.key, color.vars)}
-						oninput={(event) => setColor(color.key, event.currentTarget.value)}
-					/>
-					<span class="w-20 shrink-0 truncate text-body-md font-body text-on-surface"
-						>{color.label}</span
-					>
-					<input
-						class="w-0 min-w-0 flex-1 glass-well border-0 px-2 py-1.5 text-code-sm font-code text-on-surface-variant placeholder:text-outline focus-visible:ring-1 focus-visible:ring-primary/50"
-						value={plugin.tokens[color.key] ?? ''}
-						placeholder="theme default"
-						aria-label="{color.label} hex"
-						onchange={(event) => setColor(color.key, event.currentTarget.value)}
-					/>
-					<button
-						class={iconButton}
-						disabled={!plugin.tokens[color.key]}
-						aria-label="Reset {color.label}"
-						onclick={() => clearToken(color.key)}
-					>
-						<RotateCcw size={13} />
-					</button>
-				</div>
+				<ColorField
+					label={color.label}
+					value={colorValue(color.key, color.vars)}
+					hex={plugin.tokens[color.key] ?? ''}
+					dirty={Boolean(plugin.tokens[color.key])}
+					onchange={(value) => setColor(color.key, value)}
+					onreset={() => clearToken(color.key)}
+				/>
 			{/each}
 		</div>
-	</div>
+	</Field>
 
-	<div class="flex flex-col gap-2">
-		<span class={legend}>Shape &amp; glass</span>
+	<Field label={'Shape & glass'} legend class="gap-2">
 		<div class="flex flex-col gap-3">
 			{#each sizes as size (size.key)}
 				{@const current = sizeValue(size.key, size.vars, size.fallback)}
@@ -166,56 +139,52 @@
 							>{size.label}</span
 						>
 						<span class="shrink-0 text-label-sm font-label text-outline">{current}px</span>
-						<button
-							class={iconButton}
+						<Button
+							size="icon-sm"
+							shape="pill"
 							disabled={plugin.tokens[size.key] === undefined}
 							aria-label="Reset {size.label}"
 							onclick={() => clearToken(size.key)}
 						>
 							<RotateCcw size={13} />
-						</button>
+						</Button>
 					</div>
-					<input
-						type="range"
-						class="w-full min-w-0 accent-[var(--color-primary)]"
-						min="0"
+					<Slider
+						label={size.label}
+						min={0}
 						max={size.max}
 						value={current}
-						aria-label={size.label}
-						oninput={(event) => setSize(size.key, Number(event.currentTarget.value))}
+						oninput={(value) => setSize(size.key, value)}
 					/>
 				</div>
 			{/each}
 		</div>
-	</div>
+	</Field>
 
-	<label class="flex flex-col gap-1.5">
-		<span class={legend}>Typeface</span>
-		<select class={field} value={plugin.tokens.fontFamily ?? ''} onchange={(event) => setFont(event.currentTarget.value)}>
-			{#each fonts as font (font.value)}
-				<option value={font.value}>{font.label}</option>
-			{/each}
-		</select>
-	</label>
+	<Field label="Typeface">
+		<Select
+			label="Typeface"
+			size="lg"
+			options={fonts}
+			value={plugin.tokens.fontFamily ?? ''}
+			onchange={setFont}
+		/>
+	</Field>
 
-	<label class="flex flex-col gap-1.5">
-		<span class={legend}>Custom CSS</span>
-		<textarea
-			class="{field} h-32 resize-y font-code text-code-sm leading-relaxed"
+	<Field
+		label="Custom CSS"
+		description="Applied as-is, after the tokens above. Remote @import is stripped."
+	>
+		<Textarea
+			class="h-32 resize-y font-code text-code-sm leading-relaxed"
 			spellcheck="false"
 			placeholder="/* your CSS */"
 			value={plugin.css}
 			oninput={(event) => previewUiPlugin(plugin.id, { css: event.currentTarget.value })}
-		></textarea>
-		<span class="text-label-sm font-label leading-relaxed text-outline">
-			Applied as-is, after the tokens above. Remote @import is stripped.
-		</span>
-	</label>
+		/>
+	</Field>
 
-	<button
-		class="emphasis-primary flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label text-on-primary"
-		onclick={ondone}
-	>
+	<Button variant="primary" size="lg" shape="tile" block onclick={ondone}>
 		<Check size={15} /> Done
-	</button>
+	</Button>
 </div>

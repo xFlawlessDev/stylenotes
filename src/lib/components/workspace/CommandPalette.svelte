@@ -11,6 +11,7 @@
 	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder as FolderType } from '$lib/stores/notes';
+	import { Button, Input } from '$lib/components/base';
 	import { statusMeta, taskStatus, matchesTaskQuery, type Task } from '$lib/stores/tasks';
 
 	type Action = {
@@ -54,7 +55,7 @@
 
 	let query = $state('');
 	let activeIndex = $state(0);
-	let inputEl = $state<HTMLInputElement>();
+	let inputEl = $state<HTMLInputElement | null>(null);
 	let listEl = $state<HTMLDivElement>();
 
 	const items = $derived.by<Item[]>(() => {
@@ -203,13 +204,14 @@
 		>
 			<div class="flex items-center gap-3 px-4 py-3">
 				<Search size={17} class="shrink-0 text-outline" />
-				<input
-					bind:this={inputEl}
+				<Input
+					variant="bare"
+					size="sm"
+					bind:ref={inputEl}
 					bind:value={query}
 					onkeydown={onkeydown}
-					class="h-6 w-full bg-transparent text-body-lg font-body text-on-surface placeholder:text-outline focus:outline-none"
+					class="h-6 px-0 text-body-lg"
 					placeholder="Search notes, tasks, folders, and actions"
-					type="text"
 					spellcheck="false"
 				/>
 				<kbd class="glass-chip shrink-0 rounded-md px-1.5 py-0.5 text-code-sm font-code text-outline"
@@ -234,10 +236,10 @@
 						{#each section.items as item (item.id)}
 							{@const index = items.indexOf(item)}
 							{@const Icon = item.icon}
-							<button
+							<Button
+								bare
 								data-index={index}
-								class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors {index ===
-								activeIndex
+								class="w-full gap-3 rounded-xl px-3 py-2 text-left {index === activeIndex
 									? 'glass-chip text-on-surface'
 									: 'text-on-surface-variant hover:bg-surface-container/50'}"
 								onmouseenter={() => (activeIndex = index)}
@@ -248,7 +250,7 @@
 								{#if item.hint}
 									<span class="shrink-0 text-code-sm font-code capitalize text-outline">{item.hint}</span>
 								{/if}
-							</button>
+							</Button>
 						{/each}
 					</div>
 				{/each}

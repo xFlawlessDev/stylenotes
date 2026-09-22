@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CalendarRange } from '@lucide/svelte';
+	import { Button, EmptyState } from '$lib/components/base';
 	import {
 		addDays,
 		diffDays,
@@ -61,14 +62,10 @@
 
 <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
 	{#if rows.length === 0}
-		<div class="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-			<div class="glass-well flex size-11 items-center justify-center rounded-2xl text-outline">
-				<CalendarRange size={20} />
-			</div>
-			<p class="text-body-sm font-body text-outline">
-				Add start or due dates to see tasks on the timeline.
-			</p>
-		</div>
+		<EmptyState
+			icon={CalendarRange}
+			title="Add start or due dates to see tasks on the timeline."
+		/>
 	{:else}
 		<div class="glass-panel min-h-0 flex-1 overflow-hidden rounded-2xl">
 			<div class="scrollbar-none h-full overflow-auto">
@@ -107,6 +104,7 @@
 						{@const status = taskStatus(task)}
 						{@const overdue = isTaskOverdue(task)}
 						<div class="flex border-b border-hairline/60 last:border-b-0">
+							<!-- Native button: this is a table-style cell with stacked block content. -->
 							<button
 								type="button"
 								class="sticky left-0 z-10 w-[160px] shrink-0 cursor-pointer border-r border-hairline bg-surface/90 px-3 py-2 text-left backdrop-blur transition-colors hover:bg-surface-container/50 sm:w-[220px] {selectedId ===
@@ -144,9 +142,9 @@
 								{/if}
 
 								{#if bar}
-									<button
-										type="button"
-										class="{BAR_BASE} {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
+									<Button
+										bare
+										class="{BAR_BASE} justify-start {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
 										style="left: {bar.offset * DAY_WIDTH + 1}px; width: {bar.span * DAY_WIDTH - 2}px"
 										title="{task.title} · {statusMeta[status].label} · {priorityMeta[taskPriority(task)]
 											.label}{overdue ? ' · Overdue' : ''} (double-click to open)"
@@ -157,7 +155,7 @@
 										ondblclick={() => onedit(task)}
 									>
 										<span class="truncate {status === 'done' ? 'line-through' : ''}">{task.title}</span>
-									</button>
+									</Button>
 								{/if}
 							</div>
 						</div>

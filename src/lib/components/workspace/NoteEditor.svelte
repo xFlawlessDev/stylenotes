@@ -16,6 +16,7 @@
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { openNoteWindow } from '$lib/windows';
+	import { Button, EmptyState, Input, Textarea } from '$lib/components/base';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
@@ -57,7 +58,7 @@
 	let title = $state('');
 	let draft = $state('');
 	let html = $state('');
-	let textareaEl = $state<HTMLTextAreaElement>();
+	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
 	let tagDialogOpen = $state(false);
 	let guideOpen = $state(false);
@@ -242,24 +243,30 @@
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 						>Full preview</span
 					>
-					<button
-						class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
+					<Button
+						variant="secondary"
+						size="xs"
+						shape="pill"
+						class="gap-1.5"
 						onclick={() => ontogglefullpreview?.()}
 					>
 						<Minimize2 size={13} /> Exit
-					</button>
+					</Button>
 				</div>
 			{:else if settings.focusMode}
 				<div class="flex h-11 shrink-0 items-center justify-between px-4">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 						>Focus mode</span
 					>
-					<button
-						class="glass-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm font-label text-on-surface-variant transition-colors hover:text-on-surface"
+					<Button
+						variant="secondary"
+						size="xs"
+						shape="pill"
+						class="gap-1.5"
 						onclick={() => updateSettings({ focusMode: false })}
 					>
 						<X size={13} /> Exit
-					</button>
+					</Button>
 				</div>
 			{:else}
 				<div class="flex h-10 shrink-0 items-center justify-end px-4">
@@ -284,16 +291,17 @@
 
 			{#if !fullPreview}
 				<div class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
-					<button
-						type="button"
-						class="w-fit max-w-full truncate text-label-sm font-label tracking-wide text-primary capitalize transition-colors hover:brightness-110"
+					<Button
+						bare
+						class="w-fit max-w-full truncate text-label-sm tracking-wide text-primary capitalize hover:brightness-110"
 						onclick={() => onselectfolder?.(note.folder)}
 					>
 						{folderLabel}
-					</button>
-					<input
-						class="w-full bg-transparent text-headline-xl font-headline font-bold tracking-tight text-on-surface placeholder:text-outline/60 focus:outline-none"
-						type="text"
+					</Button>
+					<Input
+						variant="bare"
+						size="none"
+						class="w-full font-headline text-headline-xl font-bold tracking-tight placeholder:text-outline/60"
 						placeholder="Untitled note"
 						bind:value={title}
 						oninput={() => onupdate(note.id, { title })}
@@ -305,21 +313,24 @@
 							>
 								<Tag size={11} />
 								{tag}
-								<button
-									class="ml-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+								<Button
+									bare
+									class="ml-0.5 opacity-0 group-hover:opacity-100"
 									aria-label="Remove tag"
 									onclick={() => removeTag(tag)}
 								>
 									<X size={10} />
-								</button>
+								</Button>
 							</span>
 						{/each}
-						<button
-							class="glass-well flex items-center gap-1 rounded-full px-2 py-1 text-code-sm font-code text-outline transition-colors hover:text-on-surface"
+						<Button
+							size="xs"
+							shape="pill"
+							class="glass-well gap-1 px-2 font-code text-code-sm text-outline hover:bg-transparent"
 							onclick={addTag}
 						>
 							+ Tag
-						</button>
+						</Button>
 						<span class="text-code-sm font-code text-outline">{note.updated}</span>
 						<span class="ml-auto">
 							<EditorStatus {note} />
@@ -334,26 +345,30 @@
 
 			<div class="grid min-h-0 flex-1 overflow-hidden">
 				{#if view === 'write'}
-					<textarea
-						bind:this={textareaEl}
+					<Textarea
+						bind:ref={textareaEl}
 						value={draft}
 						oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
 						onkeydown={onEditorKeydown}
 						spellcheck={settings.spellcheck}
+						variant="bare"
+						size="lg"
 						placeholder="Start writing. Use the toolbar or shortcuts to format..."
-						class="scrollbar-none h-full w-full resize-none bg-transparent px-6 py-4 text-body-lg font-body leading-relaxed text-on-surface-variant placeholder:text-outline focus:outline-none"
-					></textarea>
+						class="scrollbar-none h-full w-full px-6 py-4 text-on-surface-variant"
+					></Textarea>
 				{:else if view === 'split'}
 					<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
-						<textarea
-							bind:this={textareaEl}
+						<Textarea
+							bind:ref={textareaEl}
 							value={draft}
 							oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
 							onkeydown={onEditorKeydown}
 							spellcheck={settings.spellcheck}
+							variant="bare"
+							size="md"
 							placeholder="Write here..."
-							class="scrollbar-none h-full w-full resize-none bg-transparent px-4 py-4 text-body-md font-body leading-relaxed text-on-surface-variant placeholder:text-outline focus:outline-none"
-						></textarea>
+							class="scrollbar-none h-full w-full px-4 py-4 text-on-surface-variant"
+						></Textarea>
 						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 						<div
 							bind:this={previewEl}
@@ -385,17 +400,12 @@
 				{/if}
 			</div>
 		{:else}
-			<div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-				<div class="glass-well flex size-14 items-center justify-center rounded-2xl text-outline">
-					<PenLine size={26} />
-				</div>
-				<div class="flex flex-col gap-1">
-					<h2 class="text-headline-md font-headline text-on-surface">No note selected</h2>
-					<p class="text-body-sm font-body text-outline">
-						Create a new note or pick one from the list to begin.
-					</p>
-				</div>
-			</div>
+			<EmptyState
+				size="lg"
+				icon={PenLine}
+				heading="No note selected"
+				title="Create a new note or pick one from the list to begin."
+			/>
 		{/if}
 			</div>
 		{/snippet}

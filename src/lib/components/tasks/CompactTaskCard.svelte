@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CalendarClock, Link2, Pencil } from '@lucide/svelte';
+	import { Button } from '$lib/components/base';
 	import {
 		formatTaskDate,
 		isTaskOverdue,
@@ -53,9 +54,9 @@
 		<h3 class="line-clamp-2 min-w-0 flex-1 text-body-sm font-body leading-snug text-on-surface">
 			{task.title}
 		</h3>
-		<button
-			type="button"
-			class="shrink-0 rounded p-0.5 text-outline opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-primary"
+		<Button
+			bare
+			class="shrink-0 rounded p-0.5 text-outline opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-primary"
 			aria-label="Edit task"
 			onclick={(event) => {
 				event.stopPropagation();
@@ -63,7 +64,7 @@
 			}}
 		>
 			<Pencil size={12} />
-		</button>
+		</Button>
 	</div>
 
 	{#if task.notes}

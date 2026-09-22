@@ -16,6 +16,7 @@
 		Copy,
 	} from '@lucide/svelte';
 	import type { EditorView } from '$lib/stores/settings.svelte';
+	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 
@@ -65,17 +66,15 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger>
 					{#snippet child({ props })}
-						<button
+						<Button
 							{...props}
-							class="flex size-7 items-center justify-center rounded-md transition-colors {view ===
-							item.id
-								? 'bg-surface-container-high/80 text-primary'
-								: 'text-outline hover:text-on-surface'}"
+							variant={view === item.id ? 'secondary' : 'ghost'}
+							size="icon-sm"
 							aria-label={item.title}
 							onclick={() => onview(item.id)}
 						>
 							<Icon size={15} />
-						</button>
+						</Button>
 					{/snippet}
 				</Tooltip.Trigger>
 				<Tooltip.Content>{item.title}</Tooltip.Content>
@@ -85,14 +84,16 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+					variant="secondary"
+					size="icon"
+					class="text-on-surface-variant"
 					aria-label="Full preview"
 					onclick={onfullpreview}
 				>
 					<Maximize2 size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Full preview</Tooltip.Content>
@@ -100,16 +101,16 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {pinned
-						? 'text-primary'
-						: 'text-on-surface-variant hover:text-on-surface'}"
+					variant="secondary"
+					size="icon"
+					class={pinned ? 'text-primary' : 'text-on-surface-variant'}
 					aria-label="Pin note"
 					onclick={ontogglepin}
 				>
 					<Pin size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>{pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
@@ -117,14 +118,16 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+					variant="secondary"
+					size="icon"
+					class="text-on-surface-variant"
 					aria-label="Open in note window"
 					onclick={onopenwindow}
 				>
 					<AppWindow size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Open in note window</Tooltip.Content>
@@ -132,16 +135,16 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {docked
-						? 'text-tertiary'
-						: 'text-on-surface-variant hover:text-on-surface'}"
+					variant="secondary"
+					size="icon"
+					class={docked ? 'text-tertiary' : 'text-on-surface-variant'}
 					aria-label={docked ? 'Remove from dock' : 'Add to dock'}
 					onclick={ontoggledock}
 				>
 					<PictureInPicture2 size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>{docked ? 'Remove from dock' : 'Add to dock'}</Tooltip.Content>
@@ -149,11 +152,11 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg transition-all {archived
-						? 'text-tertiary'
-						: 'text-on-surface-variant hover:text-on-surface'}"
+					variant="secondary"
+					size="icon"
+					class={archived ? 'text-tertiary' : 'text-on-surface-variant'}
 					aria-label={archived ? 'Unarchive note' : 'Archive note'}
 					onclick={ontogglearchive}
 				>
@@ -162,7 +165,7 @@
 					{:else}
 						<Archive size={16} />
 					{/if}
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>{archived ? 'Unarchive note' : 'Archive note'}</Tooltip.Content>
@@ -170,13 +173,15 @@
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:text-on-surface"
+					variant="secondary"
+					size="icon"
+					class="text-on-surface-variant"
 					aria-label="Share note"
 				>
 					<Share2 size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</DropdownMenu.Trigger>
 		<DropdownMenu.Content align="end" class="min-w-40">
@@ -197,14 +202,16 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
-					class="glass-chip flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-all hover:bg-error-container/40 hover:text-error"
+					variant="secondary"
+					size="icon"
+					class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
 					aria-label="Delete note"
 					onclick={ondelete}
 				>
 					<Trash2 size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Delete note</Tooltip.Content>

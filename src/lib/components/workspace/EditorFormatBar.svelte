@@ -21,6 +21,7 @@
 		Table,
 	} from '@lucide/svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Button } from '$lib/components/base';
 	import type { EditorCommand } from '$lib/content/markdown-editor';
 	import { MOD } from '$lib/content/markdown-shortcuts';
 
@@ -55,8 +56,7 @@
 		],
 	];
 
-	const buttonClass =
-		'flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-high/70 hover:text-on-surface';
+	const buttonClass = 'shrink-0 rounded-lg';
 
 	let {
 		oncommand,
@@ -78,14 +78,9 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger>
 					{#snippet child({ props })}
-						<button
-							{...props}
-							class={buttonClass}
-							aria-label={tool.label}
-							onclick={() => oncommand(tool.id)}
-						>
+						<Button {...props} size="icon-sm" class={buttonClass} aria-label={tool.label} onclick={() => oncommand(tool.id)}>
 							<tool.icon size={16} />
-						</button>
+						</Button>
 					{/snippet}
 				</Tooltip.Trigger>
 				<Tooltip.Content>
@@ -102,14 +97,15 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<button
+				<Button
 					{...props}
+					size="icon-sm"
 					class={buttonClass}
 					aria-label="Formatting guide"
 					onclick={() => onguide?.()}
 				>
 					<CircleHelp size={16} />
-				</button>
+				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content>Formatting guide</Tooltip.Content>

@@ -43,6 +43,7 @@
 
 	const Icon = $derived((collapsed ? openIcons : closeIcons)[edge]);
 	const label = $derived(collapsed ? 'Expand dock' : 'Click to minimize · drag to move');
+	// Stays a native button: the drag action cannot attach to a component.
 	const classes = $derived(
 		collapsed
 			? `flex h-full w-full cursor-grab touch-none items-center justify-center bg-surface-container-lowest/90 text-on-surface-variant shadow-2xl backdrop-blur-2xl transition-colors hover:text-primary active:cursor-grabbing ${tabRadius[edge]}`

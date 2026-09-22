@@ -33,6 +33,7 @@
 	} from '$lib/windows';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
+	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	const taskId = currentTaskId();
@@ -228,15 +229,15 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<button
+							<Button
 								{...props}
-								type="button"
-								class="flex size-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:text-on-surface"
+								bare
+								class="size-6 rounded-md text-on-surface-variant"
 								aria-label="Open linked note"
 								onclick={() => task?.noteId && void openNoteWindow(task.noteId)}
 							>
 								<NotebookPen size={13} />
-							</button>
+							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content>Open linked note</Tooltip.Content>
@@ -263,23 +264,21 @@
 			/>
 		</div>
 	{:else}
-		<div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-			<div class="glass-well flex size-12 items-center justify-center rounded-2xl text-outline">
-				<ListTodo size={22} />
-			</div>
-			<div class="flex flex-col gap-1">
-				<h2 class="text-headline-sm font-headline text-on-surface">Task unavailable</h2>
-				<p class="text-body-sm font-body text-outline">
-					This task was deleted or could not be loaded.
-				</p>
-			</div>
-			<button
-				type="button"
-				class="glass-chip rounded-xl px-3 py-1.5 text-label-md font-label text-on-surface-variant transition-colors hover:text-on-surface"
+		<EmptyState
+			size="md"
+			icon={ListTodo}
+			heading="Task unavailable"
+			title="This task was deleted or could not be loaded."
+			class="gap-3"
+		>
+			<Button
+				variant="secondary"
+				size="md"
+				class="px-3 text-label-md text-on-surface-variant hover:text-on-surface"
 				onclick={closeWindow}
 			>
 				Close window
-			</button>
-		</div>
+			</Button>
+		</EmptyState>
 	{/if}
 </div>

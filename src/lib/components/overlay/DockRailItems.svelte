@@ -4,6 +4,7 @@
 	import type { Task } from '$lib/stores/tasks';
 	import { type DockEdge, type DockHover } from '$lib/dock';
 	import { openWorkspace } from '$lib/windows';
+	import { Button } from '$lib/components/base';
 	import DockNoteButton from '$lib/components/overlay/DockNoteButton.svelte';
 	import DockTaskButton from '$lib/components/overlay/DockTaskButton.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -73,14 +74,16 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
-					<button
+					<Button
 						{...props}
-						class="glass-chip flex size-9 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-all hover:text-on-surface"
+						variant="secondary"
+						size="icon-lg"
+						class="shrink-0 text-on-surface-variant"
 						aria-label={docked > 0 ? 'No docked items match the dock filters' : 'Dock is empty'}
 						onclick={openWorkspace}
 					>
 						<ListTodo size={18} />
-					</button>
+					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content side={tooltipSide}>
@@ -95,12 +98,15 @@
 ></div>
 
 <!-- Hover opens the quick-capture menu (note or task). -->
-<button
-	bind:this={plusEl}
-	class="emphasis-container flex size-9 shrink-0 items-center justify-center rounded-2xl text-on-primary-container shadow-md ring-1 ring-inset ring-emphasis-container-ring transition-all hover:scale-105"
+<Button
+	bind:ref={plusEl}
+	variant="tonal"
+	size="icon-lg"
+	shape="tile"
+	class="shrink-0 shadow-md hover:scale-105"
 	aria-label="Quick capture: new note or task"
 	onclick={onplus}
 	onmouseenter={onplusenter}
 >
 	<Plus size={19} class="relative" />
-</button>
+</Button>

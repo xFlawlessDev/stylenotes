@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Button, type ButtonVariant } from '$lib/components/base';
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -8,7 +9,7 @@
 		description,
 		confirmLabel = 'Confirm',
 		cancelLabel = 'Cancel',
-		confirmVariant = 'destructive',
+		confirmVariant = 'danger',
 		icon,
 		onconfirm,
 		oncancel,
@@ -18,11 +19,21 @@
 		description: string;
 		confirmLabel?: string;
 		cancelLabel?: string;
-		confirmVariant?: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link';
+		confirmVariant?: ButtonVariant;
 		icon?: Snippet;
 		onconfirm?: () => void;
 		oncancel?: () => void;
 	} = $props();
+
+	function cancel() {
+		open = false;
+		oncancel?.();
+	}
+
+	function confirm() {
+		open = false;
+		onconfirm?.();
+	}
 </script>
 
 <AlertDialog.Root bind:open>
@@ -44,16 +55,8 @@
 		<AlertDialog.Footer
 			class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 		>
-			<AlertDialog.Cancel variant="outline" onclick={oncancel}>{cancelLabel}</AlertDialog.Cancel>
-			<AlertDialog.Action
-				variant={confirmVariant}
-				onclick={() => {
-					open = false;
-					onconfirm?.();
-				}}
-			>
-				{confirmLabel}
-			</AlertDialog.Action>
+			<Button variant="outline" onclick={cancel}>{cancelLabel}</Button>
+			<Button variant={confirmVariant} onclick={confirm}>{confirmLabel}</Button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

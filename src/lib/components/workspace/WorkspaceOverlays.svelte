@@ -152,7 +152,7 @@
 	title="Delete this note?"
 	description="This permanently removes the note and its content. This action cannot be undone."
 	confirmLabel="Delete note"
-	confirmVariant="destructive"
+	confirmVariant="danger"
 	onconfirm={onconfirmdelete}
 	oncancel={oncanceldelete}
 >
@@ -166,7 +166,7 @@
 	title="Delete this folder?"
 	description={folderDeleteDescription}
 	confirmLabel="Delete folder"
-	confirmVariant="destructive"
+	confirmVariant="danger"
 	onconfirm={onconfirmfolderdelete}
 	oncancel={oncancelfolderdelete}
 >
@@ -180,7 +180,7 @@
 	title="Reset all data?"
 	description="Restores the sample notes and clears your local changes and preferences."
 	confirmLabel="Reset everything"
-	confirmVariant="destructive"
+	confirmVariant="danger"
 	onconfirm={onreset}
 >
 	{#snippet icon()}

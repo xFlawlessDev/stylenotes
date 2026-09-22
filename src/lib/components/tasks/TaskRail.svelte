@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus, Search, X } from '@lucide/svelte';
+	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus, X } from '@lucide/svelte';
+	import { Button, SearchInput } from '$lib/components/base';
 	import type { Folder } from '$lib/stores/notes';
 	import { TASK_STATUSES, statusMeta, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
 
@@ -99,17 +100,22 @@
 			<span class="text-headline-sm font-headline leading-tight text-on-surface">Tasks</span>
 			<span class="text-label-sm font-label truncate text-outline">{tasks.length} in view</span>
 		</div>
-		<button
-			class="ml-auto flex size-7 items-center justify-center rounded-lg text-outline transition-colors hover:bg-surface-container/60 hover:text-on-surface lg:hidden"
+		<Button
+			size="icon-sm"
+			class="ml-auto text-outline lg:hidden"
 			aria-label="Close task filters"
 			onclick={onclose}
 		>
 			<X size={16} />
-		</button>
+		</Button>
 	</div>
 
-	<button
-		class="emphasis-container flex h-10 w-full items-center justify-between rounded-2xl px-3 text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring transition-all active:scale-[0.99]"
+	<Button
+		variant="tonal"
+		size="lg"
+		shape="tile"
+		block
+		class="h-10 justify-between px-3 active:scale-[0.99]"
 		onclick={() => {
 			oncreate();
 			onclose?.();
@@ -119,28 +125,14 @@
 			<Plus size={16} />
 			<span class="text-label-md font-label font-semibold">New Task</span>
 		</span>
-	</button>
+	</Button>
 
-	<div class="relative w-full">
-		<Search size={15} class="pointer-events-none absolute top-2.5 left-3 z-10 text-on-surface-variant" />
-		<input
-			value={query}
-			oninput={(event) => onquery(event.currentTarget.value)}
-			class="glass-well h-9 w-full rounded-xl pr-8 pl-9 text-body-sm font-body text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none"
-			placeholder="Search tasks"
-			type="text"
-		/>
-		{#if query}
-			<button
-				type="button"
-				class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-outline transition-colors hover:text-on-surface"
-				aria-label="Clear search"
-				onclick={() => onquery('')}
-			>
-				<X size={13} />
-			</button>
-		{/if}
-	</div>
+	<SearchInput
+		value={query}
+		placeholder="Search tasks"
+		ariaLabel="Search tasks"
+		onquery={onquery}
+	/>
 
 	<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto scrollbar-none">
 		<div class="flex flex-col gap-0.5">
@@ -155,11 +147,10 @@
 			</div>
 			{#each [{ id: 'all' as const, label: 'All tasks' }, ...TASK_STATUSES.map((status) => ({ id: status, label: statusMeta[status].label }))] as item (item.id)}
 				{@const Icon = statusIcons[item.id]}
-				<button
-					class="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-label-md font-label transition-colors {activeStatus ===
-					item.id
-						? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-						: 'text-on-surface-variant hover:bg-surface-container/50'}"
+				<Button
+					variant={activeStatus === item.id ? 'tonal' : 'ghost'}
+					size="md"
+					class="justify-between rounded-xl px-2.5 text-left text-label-md"
 					aria-pressed={activeStatus === item.id}
 					onclick={() => pickStatus(item.id)}
 				>
@@ -168,11 +159,11 @@
 						<span>{item.label}</span>
 					</span>
 					<span
-						class="rounded-md px-1.5 py-px text-code-sm font-code {activeStatus === item.id
+						class="rounded-md px-1.5 py-px font-code text-code-sm {activeStatus === item.id
 							? 'text-on-primary-container/80'
 							: 'text-outline'}">{counts.byStatus.get(item.id) ?? 0}</span
 					>
-				</button>
+				</Button>
 			{/each}
 		</div>
 
@@ -187,23 +178,22 @@
 				{/if}
 			</div>
 			{#each folderOptions as option (option.id)}
-				<button
-					class="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-label-md font-label transition-colors {activeFolder ===
-					option.id
-						? 'bg-primary-container/20 text-primary ring-1 ring-inset ring-primary/30'
-						: 'text-on-surface-variant hover:bg-surface-container/50'}"
+				<Button
+					variant={activeFolder === option.id ? 'tonal' : 'ghost'}
+					size="md"
+					class="justify-between rounded-xl px-2.5 text-left text-label-md"
 					aria-pressed={activeFolder === option.id}
 					onclick={() => pickFolder(option.id)}
 				>
 					<span class="truncate">{option.label}</span>
 					{#if option.id !== 'all'}
 						<span
-							class="rounded-md px-1.5 py-px text-code-sm font-code {activeFolder === option.id
+							class="rounded-md px-1.5 py-px font-code text-code-sm {activeFolder === option.id
 								? 'text-primary/80'
 								: 'text-outline'}">{counts.byFolder.get(option.id) ?? 0}</span
 						>
 					{/if}
-				</button>
+				</Button>
 			{/each}
 		</div>
 	</div>
