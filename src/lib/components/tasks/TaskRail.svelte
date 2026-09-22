@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { ListTodo, Plus, Search, X } from '@lucide/svelte';
+	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus, Search, X } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { TASK_STATUSES, statusMeta, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
 
 	let {
 		folders,
 		tasks,
+		countBase,
 		activeFolder,
 		activeStatus,
 		query,
@@ -18,6 +19,8 @@
 	}: {
 		folders: Folder[];
 		tasks: Task[];
+		/** Tasks after query/priority/due but before folder/status — facet counts are derived from this. */
+		countBase: Task[];
 		activeFolder: string;
 		activeStatus: TaskStatus | 'all';
 		query: string;
@@ -39,14 +42,22 @@
 		onclose?.();
 	}
 
+	// Each facet is scoped only by the *other* active filters: status counts
+	// respect the selected folder, folder counts respect the selected status,
+	// so picking one option never zeroes out the rest of its own list.
 	const counts = $derived.by(() => {
 		const byFolder = new Map<string, number>();
-		const byStatus = new Map<TaskStatus | 'all', number>([['all', tasks.length]]);
+		const byStatus = new Map<TaskStatus | 'all', number>([['all', 0]]);
 		for (const status of TASK_STATUSES) byStatus.set(status, 0);
-		for (const task of tasks) {
-			byFolder.set(task.folder, (byFolder.get(task.folder) ?? 0) + 1);
+		for (const task of countBase) {
 			const status = taskStatus(task);
-			byStatus.set(status, (byStatus.get(status) ?? 0) + 1);
+			if (activeFolder === 'all' || task.folder === activeFolder) {
+				byStatus.set('all', (byStatus.get('all') ?? 0) + 1);
+				byStatus.set(status, (byStatus.get(status) ?? 0) + 1);
+			}
+			if (activeStatus === 'all' || status === activeStatus) {
+				byFolder.set(task.folder, (byFolder.get(task.folder) ?? 0) + 1);
+			}
 		}
 		return { byFolder, byStatus };
 	});
@@ -56,12 +67,20 @@
 		...folders.filter((folder) => folder.id !== 'all')
 	]);
 
-	const statusDot: Record<TaskStatus | 'all', string> = {
-		all: 'bg-primary',
-		todo: 'bg-outline',
-		doing: 'bg-secondary',
-		review: 'bg-tertiary',
-		done: 'bg-primary'
+	const statusIcons: Record<TaskStatus | 'all', typeof Circle> = {
+		all: ListTodo,
+		todo: Circle,
+		doing: CircleDashed,
+		review: Eye,
+		done: CircleCheck
+	};
+
+	const statusTone: Record<TaskStatus | 'all', string> = {
+		all: 'text-primary',
+		todo: 'text-outline',
+		doing: 'text-secondary',
+		review: 'text-tertiary',
+		done: 'text-primary'
 	};
 </script>
 
@@ -135,6 +154,7 @@
 				{/if}
 			</div>
 			{#each [{ id: 'all' as const, label: 'All tasks' }, ...TASK_STATUSES.map((status) => ({ id: status, label: statusMeta[status].label }))] as item (item.id)}
+				{@const Icon = statusIcons[item.id]}
 				<button
 					class="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-label-md font-label transition-colors {activeStatus ===
 					item.id
@@ -144,7 +164,7 @@
 					onclick={() => pickStatus(item.id)}
 				>
 					<span class="flex items-center gap-2">
-						<span class="size-1.5 rounded-full {statusDot[item.id]}"></span>
+						<Icon size={15} class={statusTone[item.id]} />
 						<span>{item.label}</span>
 					</span>
 					<span
