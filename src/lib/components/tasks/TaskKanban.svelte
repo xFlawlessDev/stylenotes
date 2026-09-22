@@ -111,14 +111,6 @@
 						</p>
 					{/if}
 				</div>
-
-				<button
-					type="button"
-					class="flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-label-md font-label text-outline transition-colors hover:bg-surface-container/50 hover:text-on-surface"
-					onclick={() => onadd(status)}
-				>
-					<Plus size={14} /> Add task
-				</button>
 			</div>
 		{/each}
 	</div>
