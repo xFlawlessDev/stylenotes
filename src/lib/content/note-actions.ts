@@ -4,6 +4,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { noteMarkdown, type Note } from '$lib/content/content';
 import { preserveBlankLines } from '$lib/content/markdown-preview';
 import { repairLocalImageLinks, resolveLocalImages } from '$lib/content/attachments';
+import { slugifyFolder } from '$lib/stores/notes';
 import { isTauri } from '$lib/windows';
 
 /** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset protocol. */
@@ -92,30 +93,37 @@ export async function copyNoteToClipboard(note: Note): Promise<boolean> {
 	}
 }
 
-export function noteFileName(note: Note): string {
-	const base =
-		(note.title || 'note').trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ') || 'note';
-	return `${base}.md`;
+/** Turns a note title into a file name base that is safe on every platform. */
+export function markdownBaseName(title: string): string {
+	const base = (title || 'note')
+		.trim()
+		.replace(/[\\/:*?"<>|]+/g, '-')
+		.replace(/\s+/g, ' ')
+		.replace(/^\.+/, '')
+		.trim();
+	return base || 'note';
 }
 
-export async function exportNoteMarkdown(note: Note): Promise<string | null> {
-	const content = noteMarkdown(note);
-	const fileName = noteFileName(note);
+export function noteFileName(note: Note): string {
+	return `${markdownBaseName(note.title)}.md`;
+}
 
-	if (isTauri) {
-		const [{ save }, { writeTextFile }] = await Promise.all([
-			import('@tauri-apps/plugin-dialog'),
-			import('@tauri-apps/plugin-fs'),
-		]);
-		const path = await save({
-			defaultPath: fileName,
-			filters: [{ name: 'Markdown', extensions: ['md'] }],
-		});
-		if (!path) return null;
-		await writeTextFile(path, content);
-		return fileName;
-	}
+/** Asks the user where to save via the native dialog, then writes the file. Null when cancelled. */
+async function saveMarkdownDialog(fileName: string, content: string): Promise<string | null> {
+	const [{ save }, { writeTextFile }] = await Promise.all([
+		import('@tauri-apps/plugin-dialog'),
+		import('@tauri-apps/plugin-fs'),
+	]);
+	const path = await save({
+		defaultPath: fileName,
+		filters: [{ name: 'Markdown', extensions: ['md'] }],
+	});
+	if (!path) return null;
+	await writeTextFile(path, content);
+	return fileName;
+}
 
+function downloadMarkdown(fileName: string, content: string): string {
 	const blob = new Blob([content], { type: 'text/markdown' });
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
@@ -126,17 +134,86 @@ export async function exportNoteMarkdown(note: Note): Promise<string | null> {
 	return fileName;
 }
 
-export function exportAllNotes(notes: Note[]): string {
-	const blob = new Blob([notes.map((note) => noteMarkdown(note)).join('\n')], {
-		type: 'text/markdown',
+export async function exportNoteMarkdown(note: Note): Promise<string | null> {
+	const content = noteMarkdown(note);
+	const fileName = noteFileName(note);
+	if (isTauri) return saveMarkdownDialog(fileName, content);
+	return downloadMarkdown(fileName, content);
+}
+
+export type FolderRef = { id: string; label: string };
+
+export type FolderExport = { dir: string; written: number; failed: string[] };
+
+function joinPath(dir: string, name: string): string {
+	const sep = dir.includes('\\') ? '\\' : '/';
+	return `${dir.replace(/[\\/]+$/, '')}${sep}${name}`;
+}
+
+/** File name no other note in this export claimed yet (lower-cased, since Windows is case-insensitive). */
+function uniqueFileName(dirPath: string, base: string, used: Set<string>): string {
+	const key = (file: string) => joinPath(dirPath, file).toLowerCase();
+	let file = `${base}.md`;
+	for (let n = 2; used.has(key(file)); n += 1) file = `${base}-${n}.md`;
+	used.add(key(file));
+	return file;
+}
+
+/** Last path segment, for toasts (the path plugin has no permission here). */
+function lastSegment(dir: string): string {
+	return dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+}
+
+/**
+ * Writes every note as its own .md file into a folder the user picks,
+ * grouped into a subfolder per note folder. Null when the user cancels.
+ */
+export async function exportNotesToFolder(
+	notes: Note[],
+	folders: FolderRef[],
+): Promise<FolderExport | null> {
+	if (!isTauri) {
+		// Browser/dev fallback: no folder picker on the web, download one file per note.
+		for (const note of notes) downloadMarkdown(noteFileName(note), noteMarkdown(note));
+		return { dir: 'Downloads', written: notes.length, failed: [] };
+	}
+
+	const [{ open }, { mkdir, writeTextFile }] = await Promise.all([
+		import('@tauri-apps/plugin-dialog'),
+		import('@tauri-apps/plugin-fs'),
+	]);
+	// recursive: true extends the fs scope to the subfolders created inside the picked folder.
+	const picked = await open({
+		directory: true,
+		multiple: false,
+		recursive: true,
+		title: 'Choose a folder to export into',
 	});
-	const url = URL.createObjectURL(blob);
-	const link = document.createElement('a');
-	link.href = url;
-	link.download = 'stylenotes.md';
-	link.click();
-	URL.revokeObjectURL(url);
-	return link.download;
+	const dir = typeof picked === 'string' ? picked : null;
+	if (!dir) return null;
+
+	const madeDirs = new Set<string>();
+	const used = new Set<string>();
+	const failed: string[] = [];
+	let written = 0;
+
+	for (const note of notes) {
+		const label = folders.find((folder) => folder.id === note.folder)?.label ?? note.folder;
+		const dirPath = joinPath(dir, slugifyFolder(label));
+		try {
+			if (!madeDirs.has(dirPath.toLowerCase())) {
+				await mkdir(dirPath, { recursive: true });
+				madeDirs.add(dirPath.toLowerCase());
+			}
+			const file = uniqueFileName(dirPath, markdownBaseName(note.title), used);
+			await writeTextFile(joinPath(dirPath, file), noteMarkdown(note));
+			written += 1;
+		} catch {
+			failed.push(note.title || 'Untitled note');
+		}
+	}
+
+	return { dir, written, failed };
 }
 
 /** Note file actions wired to a toast callback. */
@@ -159,9 +236,19 @@ export function createNoteActions(notify: (message: string) => void) {
 				notify('Could not export note');
 			}
 		},
-		exportAll(notes: Note[]) {
-			const name = exportAllNotes(notes);
-			notify(`Exported ${name}`);
+		async exportAll(notes: Note[], folders: FolderRef[]) {
+			try {
+				const result = await exportNotesToFolder(notes, folders);
+				if (!result) return;
+				if (result.failed.length > 0) {
+					const total = result.written + result.failed.length;
+					notify(`Exported ${result.written} of ${total} notes, ${result.failed.length} failed`);
+				} else {
+					notify(`Exported ${result.written} notes to ${lastSegment(result.dir)}`);
+				}
+			} catch {
+				notify('Could not export notes');
+			}
 		},
 	};
 }

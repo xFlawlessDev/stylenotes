@@ -329,7 +329,7 @@
 									class="glass-chip flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label text-on-surface transition-colors hover:text-primary"
 									onclick={onexport}
 								>
-									<Download size={15} /> Export
+									<Download size={15} /> Export to folder
 								</button>
 							</div>
 						</div>

@@ -510,7 +510,7 @@
 		onselectfolder={selectFolder}
 		{settingsOpen}
 		onsettingsclose={() => (settingsOpen = false)}
-		onexport={() => noteActions.exportAll(items)}
+		onexport={() => noteActions.exportAll(items, folders)}
 		onresetdata={() => (resetOpen = true)}
 		notecount={items.length}
 		onnewnote={createNote}

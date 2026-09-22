@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	escapeHtml,
+	markdownBaseName,
 	noteFileName,
 	notePrintDocument,
 	renderNoteHtml,
@@ -57,5 +58,20 @@ describe('noteFileName', () => {
 	it('falls back to note when the title is blank', () => {
 		const blank = { ...createNote({}), title: '' };
 		expect(noteFileName(blank)).toBe('note.md');
+	});
+});
+
+describe('markdownBaseName', () => {
+	it('keeps ordinary titles readable', () => {
+		expect(markdownBaseName('Weekly review')).toBe('Weekly review');
+	});
+
+	it('strips leading dots so a title cannot create a hidden file', () => {
+		expect(markdownBaseName('.draft')).toBe('draft');
+		expect(markdownBaseName('..')).toBe('note');
+	});
+
+	it('trims surrounding whitespace', () => {
+		expect(markdownBaseName('  meeting notes  ')).toBe('meeting notes');
 	});
 });

@@ -9,6 +9,7 @@
 		ListTodo,
 		FolderTree,
 		Rows3,
+		Settings as SettingsIcon,
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri } from '$lib/windows';
@@ -205,7 +206,7 @@
 						aria-label="Open settings"
 						onclick={onsettings}
 					>
-						<span class="relative">AR</span>
+						<SettingsIcon size={16} />
 					</button>
 				{/snippet}
 			</Tooltip.Trigger>
