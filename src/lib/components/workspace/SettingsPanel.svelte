@@ -27,6 +27,7 @@
 		type Density,
 		type EditorView,
 	} from '$lib/stores/settings.svelte';
+	import { appInfo } from '$lib/app-info';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 
 	let {
@@ -369,18 +370,17 @@
 
 					{#if section === 'about'}
 						<div class="flex flex-col items-center gap-3 py-6 text-center">
-							<div
-								class="emphasis-container flex size-14 items-center justify-center rounded-2xl text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring"
-							>
-								<Sparkles size={24} />
-							</div>
+							<img
+								src="/icon-128.png"
+								alt={appInfo.name}
+								class="size-14 rounded-2xl object-cover"
+							/>
 							<div class="flex flex-col gap-1">
-								<span class="text-headline-md font-headline text-on-surface">StyleNotes</span>
-								<span class="text-label-sm font-label text-outline">Version 0.1.0</span>
+								<span class="text-headline-md font-headline text-on-surface">{appInfo.name}</span>
+								<span class="text-label-sm font-label text-outline">Version {appInfo.version}</span>
 							</div>
 							<p class="max-w-[300px] text-body-sm font-body leading-relaxed text-on-surface-variant">
-								A calm, local-first notebook built with Tauri, Svelte, and a liquid glass
-								interface inspired by Material Design.
+								{appInfo.description}
 							</p>
 							<div
 								class="glass-chip flex items-center gap-2 rounded-full px-3 py-1.5 text-label-sm font-label text-on-surface-variant"
