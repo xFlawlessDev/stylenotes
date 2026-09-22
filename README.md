@@ -42,6 +42,35 @@ bun run tauri dev   # full desktop app (DB, windows, plugins)
 | `bun run fmt` / `bun run fmt:check` | `cargo fmt` on `src-tauri` |
 | `bun run clippy` | `cargo clippy` with `-D warnings` |
 | `bun run check:all` | `check` + `fmt:check` + `clippy` |
+| `bun run release` | Cut a release: bump versions, update `CHANGELOG.md`, commit, tag `vX.Y.Z` |
+| `bun run release:dry` | Preview the version bump and changelog without changing anything |
+
+## Versioning & releases
+
+Versions follow [Semantic Versioning](https://semver.org/) and are derived automatically from [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` → minor, `fix:` → patch, `!` / `BREAKING CHANGE` → major) via [`commit-and-tag-version`](https://github.com/absolute-version/commit-and-tag-version) — the maintained successor of the deprecated `standard-version`.
+
+One command keeps **every** version file in lockstep:
+
+| File | Why it matters |
+| --- | --- |
+| `package.json` | source of truth for the current version |
+| `src-tauri/tauri.conf.json` | bundle version + About panel (`appInfo.version`) |
+| `src-tauri/Cargo.toml` | Rust crate version |
+| `src-tauri/Cargo.lock` | keeps binary builds from a release tag reproducible |
+
+```bash
+bun run check:all          # sanity-check before cutting a release
+bun run release:dry        # preview bump + changelog, changes nothing
+bun run release            # bump all files, update CHANGELOG.md, commit, tag vX.Y.Z
+git push --follow-tags      # publish the commit and tag when ready
+```
+
+Things worth knowing:
+
+- **First release:** `bun run release -- --first-release` tags the current version as-is without bumping.
+- **Force a bump:** `bun run release -- --release-as minor`. Below 1.0.0 the tool follows the npm/cargo convention — only breaking changes raise the minor, everything else bumps the patch, so plain `feat:` commits go `0.1.0 → 0.1.1`; pass `--release-as minor` if you want `0.2.0`.
+- **Never edit versions by hand.** `src/lib/version-sync.test.ts` fails the test suite if the four files drift apart, and custom updaters in `scripts/` rewrite only the version line of each file (formatting, inline arrays, and CRLF line endings are preserved).
+- A `postbump` hook runs `cargo update --offline -p stylenotes` so `Cargo.lock` always matches `Cargo.toml`, and the release commit includes it.
 
 ## Project layout
 

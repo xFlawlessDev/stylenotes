@@ -16,7 +16,9 @@
     "fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
     "clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
-    "check:all": "bun run check && bun run fmt:check && bun run clippy"
+    "check:all": "bun run check && bun run fmt:check && bun run clippy",
+    "release": "commit-and-tag-version",
+    "release:dry": "commit-and-tag-version --dry-run"
   },
   "license": "MIT",
   "dependencies": {
@@ -45,6 +47,7 @@
     "@vitest/coverage-v8": "^5.0.1",
     "bits-ui": "^2.18.0",
     "cn": "^0.3.0",
+    "commit-and-tag-version": "^13.2.1",
     "jsdom": "^30.1.0",
     "shadcn-svelte": "^1.7.0",
     "svelte": "^5.56.3",

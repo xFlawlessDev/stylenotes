@@ -1,0 +1,14 @@
+{
+  "packageFiles": [{ "filename": "package.json", "type": "json" }],
+  "bumpFiles": [
+    { "filename": "package.json", "type": "json" },
+    { "filename": "src-tauri/tauri.conf.json", "updater": "./scripts/json-conf-updater.cjs" },
+    { "filename": "src-tauri/Cargo.toml", "updater": "./scripts/cargo-toml-updater.cjs" },
+    { "filename": "src-tauri/Cargo.lock", "updater": "./scripts/cargo-lock-updater.cjs" }
+  ],
+  "scripts": {
+    "postbump": "cargo update --offline -p stylenotes --manifest-path src-tauri/Cargo.toml"
+  },
+  "header": "# Changelog\n\nAll notable changes to StyleNotes are documented in this file. Versions follow Semantic Versioning and are derived from [Conventional Commits](https://www.conventionalcommits.org/).\n",
+  "tagPrefix": "v"
+}

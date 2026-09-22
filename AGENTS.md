@@ -11,6 +11,8 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - `bun run check` — svelte-check + sync (typecheck frontend)
 - `bun run test` — Vitest unit tests (`src/**/*.test.ts`); `bun run test:watch` for watch mode
 - `bun run check:all` — runs `check`, `fmt:check`, then `clippy`; use before finishing work
+- `bun run release` — cut a release: bumps `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock` in lockstep, updates `CHANGELOG.md`, commits, and tags `vX.Y.Z` (creates a commit/tag — run only when explicitly asked)
+- `bun run release:dry` — preview the version bump and changelog without changing anything
 - `bun run fmt` / `bun run fmt:check` — cargo fmt on `src-tauri`
 - `bun run clippy` — cargo clippy, `-D warnings` (warnings fail)
 
@@ -23,6 +25,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - Never add server-only code (`load` functions, `+server.ts`, Node APIs); SSR is off.
 - Never use `localStorage` for app data — SQLite is the source of truth (the single exception is the pre-paint theme mirror in `app.html`/`applySettings`).
 - Never commit or push unless explicitly asked.
+- Never bump versions by hand — run `bun run release` so `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock` stay in lockstep (enforced by `src/lib/version-sync.test.ts`). Release tooling lives in `.versionrc.json` + `scripts/*-updater.cjs`.
 
 ## Architecture
 
