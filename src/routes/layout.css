@@ -83,6 +83,7 @@
 	--glass-highlight: rgba(255, 255, 255, 0.1);
 	--glass-glow: rgba(168, 199, 232, 0.05);
 	--glass-shadow: rgba(4, 7, 12, 0.5);
+	--glass-blur: 32px;
 	--aurora-1: rgba(168, 199, 232, 0.07);
 	--aurora-2: rgba(143, 166, 189, 0.055);
 	--aurora-3: rgba(158, 201, 196, 0.04);
@@ -530,8 +531,8 @@ html[data-motion='reduced'] *::after {
 
 	.glass-panel {
 		background-color: color-mix(in oklab, var(--color-surface-container) 78%, transparent);
-		backdrop-filter: blur(32px) saturate(160%);
-		-webkit-backdrop-filter: blur(32px) saturate(160%);
+		backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+		-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
 		border: 1px solid var(--glass-stroke);
 		box-shadow:
 			inset 0 1px 0 var(--glass-highlight),
@@ -543,8 +544,8 @@ html[data-motion='reduced'] *::after {
 	/* Opaque floating surface for menus, popovers, and dialogs */
 	.glass-solid {
 		background-color: color-mix(in oklab, var(--color-surface-container-high) 94%, transparent);
-		backdrop-filter: blur(28px) saturate(150%);
-		-webkit-backdrop-filter: blur(28px) saturate(150%);
+		backdrop-filter: blur(calc(var(--glass-blur) * 0.875)) saturate(150%);
+		-webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.875)) saturate(150%);
 		border: 1px solid color-mix(in oklab, var(--glass-highlight) 60%, transparent);
 		box-shadow:
 			inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -553,16 +554,16 @@ html[data-motion='reduced'] *::after {
 
 	.glass-well {
 		background-color: color-mix(in oklab, var(--color-surface-container-lowest) 70%, transparent);
-		backdrop-filter: blur(20px) saturate(140%);
-		-webkit-backdrop-filter: blur(20px) saturate(140%);
+		backdrop-filter: blur(calc(var(--glass-blur) * 0.625)) saturate(140%);
+		-webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.625)) saturate(140%);
 		border: 1px solid color-mix(in oklab, var(--glass-stroke) 70%, transparent);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 	}
 
 	.glass-chip {
 		background-color: color-mix(in oklab, var(--color-surface-container-high) 70%, transparent);
-		backdrop-filter: blur(16px) saturate(150%);
-		-webkit-backdrop-filter: blur(16px) saturate(150%);
+		backdrop-filter: blur(calc(var(--glass-blur) * 0.5)) saturate(150%);
+		-webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.5)) saturate(150%);
 		border: 1px solid var(--glass-stroke);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 	}
@@ -614,8 +615,8 @@ html[data-motion='reduced'] *::after {
 	.glass-dialog {
 		background-color: color-mix(in oklab, var(--color-surface-container-high) 94%, transparent) !important;
 		border: 1px solid color-mix(in oklab, var(--glass-highlight) 50%, transparent);
-		backdrop-filter: blur(32px) saturate(150%);
-		-webkit-backdrop-filter: blur(32px) saturate(150%);
+		backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+		-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
 		box-shadow:
 			inset 0 1px 0 rgba(255, 255, 255, 0.08),
 			0 24px 60px -24px var(--glass-shadow);

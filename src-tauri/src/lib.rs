@@ -180,6 +180,25 @@ fn migrations() -> Vec<Migration> {
             sql: "ALTER TABLE notes ADD COLUMN overlay INTEGER NOT NULL DEFAULT 0;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "create_ui_plugins",
+            sql: "
+                CREATE TABLE IF NOT EXISTS ui_plugins (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL DEFAULT 'Untitled plugin',
+                    tokens TEXT NOT NULL DEFAULT '{}',
+                    css TEXT NOT NULL DEFAULT '',
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    position INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_ui_plugins_position ON ui_plugins (position);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

@@ -19,6 +19,17 @@
       } catch (error) {
         /* keep defaults */
       }
+      try {
+        const plugins = localStorage.getItem('stylenotes.plugins.v1');
+        if (plugins) {
+          const style = document.createElement('style');
+          style.id = 'stylenotes-ui-plugins';
+          style.textContent = plugins;
+          document.head.appendChild(style);
+        }
+      } catch (error) {
+        /* keep defaults */
+      }
     </script>
     %sveltekit.head%
   </head>

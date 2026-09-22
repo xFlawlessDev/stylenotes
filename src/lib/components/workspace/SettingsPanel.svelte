@@ -2,15 +2,11 @@
 	import {
 		X,
 		Sun,
-		Moon,
-		Check,
 		Download,
 		RotateCcw,
 		Sparkles,
 		Keyboard,
 		Type,
-		Rows3,
-		Rows2,
 		Eye,
 		PenLine,
 		Columns2,
@@ -23,11 +19,10 @@
 		settings,
 		updateSettings,
 		resetSettings,
-		accents,
-		type Density,
 		type EditorView,
 	} from '$lib/stores/settings.svelte';
 	import { appInfo } from '$lib/app-info';
+	import AppearanceSettings from '$lib/components/workspace/AppearanceSettings.svelte';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 
 	let {
@@ -53,11 +48,6 @@
 		{ id: 'dock', label: 'Overlay', icon: PictureInPicture2 },
 		{ id: 'data', label: 'Data', icon: HardDrive },
 		{ id: 'about', label: 'About', icon: Sparkles },
-	];
-
-	const densities: { id: Density; label: string; icon: typeof Rows3 }[] = [
-		{ id: 'comfortable', label: 'Comfortable', icon: Rows3 },
-		{ id: 'compact', label: 'Compact', icon: Rows2 },
 	];
 
 	const views: { id: EditorView; label: string; icon: typeof Eye }[] = [
@@ -102,8 +92,8 @@
 
 			<div class="glass-divider h-px"></div>
 
-			<div class="flex min-h-0 flex-1">
-				<div class="flex min-h-0 flex-1 flex-col sm:flex-row">
+			<div class="flex min-h-0 min-w-0 flex-1">
+				<div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
 				<nav class="scrollbar-none flex w-full shrink-0 flex-row gap-1 overflow-x-auto p-2.5 sm:w-40 sm:flex-col sm:overflow-visible">
 					{#each nav as item (item.id)}
 						{@const Icon = item.icon}
@@ -126,105 +116,9 @@
 				<div class="glass-divider hidden w-px shrink-0 sm:block"></div>
 				<div class="glass-divider h-px w-full shrink-0 sm:hidden"></div>
 
-				<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
+				<div class="scrollbar-none flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
 					{#if section === 'appearance'}
-						<div class="flex flex-col gap-2.5">
-							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Theme</span
-							>
-							<div class="grid grid-cols-2 gap-2">
-								<button
-									class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.mode ===
-									'dark'
-										? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-										: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
-									onclick={() => updateSettings({ mode: 'dark' })}
-								>
-									<Moon size={15} /> Dark
-								</button>
-								<button
-									class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.mode ===
-									'light'
-										? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-										: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
-									onclick={() => updateSettings({ mode: 'light' })}
-								>
-									<Sun size={15} /> Light
-								</button>
-							</div>
-						</div>
-
-						<div class="flex flex-col gap-2.5">
-							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Accent color</span
-							>
-							<div class="grid grid-cols-4 gap-2">
-								{#each accents as accent (accent.id)}
-									<button
-										class="flex flex-col items-center gap-1.5 rounded-2xl py-2.5 transition-all {settings.accent ===
-										accent.id
-											? 'emphasis-container ring-1 ring-inset ring-emphasis-container-ring'
-											: 'bg-surface-container-lowest/30 hover:bg-surface-container/50'}"
-										onclick={() => updateSettings({ accent: accent.id })}
-									>
-										<span
-											class="{accent.swatchClass} flex size-6 items-center justify-center rounded-full ring-1 ring-inset ring-outline-variant"
-										>
-											{#if settings.accent === accent.id}
-												<Check size={13} class="text-on-swatch" />
-											{/if}
-										</span>
-										<span class="text-label-sm font-label text-on-surface-variant">{accent.label}</span>
-									</button>
-								{/each}
-							</div>
-						</div>
-
-						<div class="flex flex-col gap-2.5">
-							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Density</span
-							>
-							<div class="grid grid-cols-2 gap-2">
-								{#each densities as item (item.id)}
-									{@const Icon = item.icon}
-									<button
-										class="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-label-md font-label transition-all {settings.density ===
-										item.id
-											? 'emphasis-container text-on-primary-container ring-1 ring-inset ring-emphasis-container-ring'
-											: 'bg-surface-container-lowest/30 text-on-surface-variant hover:bg-surface-container/50'}"
-										onclick={() => updateSettings({ density: item.id })}
-									>
-										<Icon size={15} /> {item.label}
-									</button>
-								{/each}
-							</div>
-						</div>
-
-						<label
-							class="flex cursor-pointer items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
-						>
-							<span class="flex flex-col">
-								<span class="text-body-md font-body text-on-surface">Reduce motion</span>
-								<span class="text-label-sm font-label text-outline"
-									>Minimize animations across the app</span
-								>
-							</span>
-							<button
-								class="relative h-5 w-9 shrink-0 rounded-full transition-colors {settings.reduceMotion
-									? 'emphasis-primary'
-									: 'bg-surface-container-highest'}"
-								role="switch"
-								aria-checked={settings.reduceMotion}
-								aria-label="Reduce motion"
-								onclick={() => updateSettings({ reduceMotion: !settings.reduceMotion })}
-							>
-								<span
-									class="absolute top-0.5 size-4 rounded-full transition-transform {settings.reduceMotion
-										? 'right-0.5 bg-on-primary'
-										: 'left-0.5 bg-outline'}"
-								></span>
-							</button>
-						</label>
+						<AppearanceSettings />
 					{/if}
 
 					{#if section === 'editor'}
