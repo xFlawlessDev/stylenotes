@@ -52,8 +52,11 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 ## Frontend conventions
 
 - Svelte 5 runes (`$state`, `$props`, `$derived`); rune-based stores use the `.svelte.ts` suffix (e.g. `settings.svelte.ts`). Plain logic modules use `.ts`.
-- shadcn-svelte components live in `src/lib/components/ui/`; aliases from `components.json` (`$lib/components`, `$lib/utils`, `$lib/components/ui`). Add via `bunx shadcn-svelte add`.
+- Two component layers, never duplicated:
+  - `src/lib/components/base/` — the app's own primitives (`Button`, `Input`, `Textarea`, `Select`, `Switch`, `Slider`, `ColorField`, `SearchInput`, `SegmentedControl`, `ChoiceTile`, `Field`, `EmptyState`). Single source of truth for buttons and form controls: never hand-roll a native `<button>`/`<input>`/`<select>`/`<textarea>` in app code, and never style one from scratch.
+  - `src/lib/components/ui/` — vendored shadcn-svelte primitives kept for behaviour (`dialog`, `alert-dialog`, `tooltip`, `dropdown-menu`, `breadcrumb`, `select`). They may import from `base/`; `base/` must not import them. Do not re-add shadcn's `button`, `input`, `label`, `card` or `separator` — use `base/` instead.
 - Styling is Tailwind v4 + custom CSS in `src/routes/layout.css`, using both shadcn tokens and Material 3 `--color-*` tokens. Theme is applied via `html` classes (`light`/`dark`) and `data-*` attributes, bootstrapped pre-hydration in `src/app.html`.
+- `cn` comes from `src/lib/cn.ts`, which registers the `layout.css` type scale (`text-body-md`, `text-label-sm`, …) as font sizes. Without that, the class merger treats them as text colours and drops them. Build variants with `tv` from `src/lib/components/base/variants.ts`.
 - Markdown rendering uses `marked` + `dompurify`; sanitize any HTML output.
 
 ## Svelte best practices
@@ -89,7 +92,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - Extract before extracting is painful: pull repeated JSX/markup into a child component, and repeated non-UI logic into a helper function with a test.
 - `src/lib/components/ui/**` (shadcn-svelte) and generated files (`src-tauri/gen/**`, `build/**`, `Cargo.lock`, `bun.lock`) are exempt from the cap — do not edit or split them by hand.
 - Tests may exceed 300 LOC when they cover one module; split by `describe` block only past the 500 cap.
-- Current known offenders to shrink when touched: `overlay/DockRail.svelte` (511), `workspace/NoteEditor.svelte` (470), `workspace/Workspace.svelte` (454), `workspace/SettingsPanel.svelte` (394).
+- Current known offender: `workspace/Workspace.svelte` (~540 lines). The former offenders (`DockRail.svelte`, `NoteEditor.svelte`, `SettingsPanel.svelte`) are back under the cap after the component-base refactor.
 
 ## Skills
 
