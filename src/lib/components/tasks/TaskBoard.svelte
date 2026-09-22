@@ -59,6 +59,10 @@
 	let defaultStatus = $state<TaskStatus>('todo');
 	let railOpen = $state(false);
 
+	// Everything except the folder/status filters: the rail counts facets from
+	// this so selecting a folder or status never zeroes out the other options.
+	const countBase = $derived(filterTasks(tasks, { query, priority, due }));
+
 	const filtered = $derived(
 		filterTasks(
 			activeStatus === 'all'
@@ -210,6 +214,7 @@
 	<TaskRail
 		{folders}
 		tasks={filtered}
+		{countBase}
 		{activeFolder}
 		{activeStatus}
 		{query}
