@@ -132,7 +132,7 @@ html.light {
 	--popover-foreground: #1a222d;
 	--primary: #3f6386;
 	--primary-foreground: #ffffff;
-	--secondary: #5f7085;
+	--secondary: #56647a;
 	--secondary-foreground: #ffffff;
 	--muted: #e4e9f0;
 	--muted-foreground: #57637a;
@@ -142,14 +142,14 @@ html.light {
 	--destructive-foreground: #ffffff;
 	--border: #ccd5e0;
 	--input: #ccd5e0;
-	--ring: #8c9cb0;
+	--ring: #7a8a9e;
 	--sidebar: #e7ecf3;
 
 	--color-primary: #3f6386;
 	--color-on-primary: #ffffff;
 	--color-primary-container: #d3e4f7;
 	--color-on-primary-container: #1d3a56;
-	--color-secondary: #5f7085;
+	--color-secondary: #56647a;
 	--color-on-secondary: #ffffff;
 	--color-secondary-container: #dbe3ec;
 	--color-on-secondary-container: #29374a;
@@ -172,7 +172,7 @@ html.light {
 	--color-surface-container: #eef1f6;
 	--color-surface-container-high: #e2e8f1;
 	--color-surface-container-highest: #d6dee9;
-	--color-outline: #8c9cb0;
+	--color-outline: #586577;
 	--color-outline-variant: #ccd5e0;
 	--color-inverse-surface: #1a222d;
 	--color-inverse-on-surface: #e9edf4;
@@ -239,7 +239,7 @@ html[data-accent='sage'].light {
 	--color-on-primary: #ffffff;
 	--color-primary-container: #cfe7d4;
 	--color-on-primary-container: #17331d;
-	--color-secondary: #5e705f;
+	--color-secondary: #556657;
 	--color-secondary-container: #d9e6da;
 	--color-on-secondary-container: #263327;
 	--color-tertiary: #5f6b3f;
