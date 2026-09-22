@@ -1,4 +1,4 @@
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { flushSync, mount, unmount } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import AddFolderDialog from './AddFolderDialog.svelte';
 import AddTagDialog from './AddTagDialog.svelte';
@@ -35,8 +35,10 @@ describe('dialogs', () => {
 			const buttons = document.querySelectorAll('[data-slot="base-button"]');
 			expect(buttons.length, name).toBeGreaterThan(0);
 
-			await tick();
+			// Let portals and transitions settle before tearing the dialog down.
+			await new Promise((resolve) => setTimeout(resolve, 20));
 			unmount(app);
+			await new Promise((resolve) => setTimeout(resolve, 20));
 			target.remove();
 		}
 	});
