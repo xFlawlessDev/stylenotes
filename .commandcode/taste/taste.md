@@ -1,8 +1,9 @@
 - In the task UI, prefers the Dashboard as the default view when opening Tasks and the “Today” control in the mini calendar rather than Events. Confidence: 0.95
 - Expects UI components to be responsive and work well at narrow/mobile widths. Confidence: 0.82
 - Prefers task cards in the dashboard to display task status as a visible badge. Confidence: 0.9
-- Values evidence-based explanations of dependency choices, including concrete, project-relevant examples plus compatibility, ecosystem, and migration tradeoffs when alternatives exist. Confidence: 0.78
+- Values evidence-based comparisons of technical alternatives, grounded in the project and specific use cases, with practical tradeoffs such as compatibility, ecosystem, and migration costs. Confidence: 0.82
 - For document-editor tooling, prioritizes a user-friendly writing and preview experience when choosing formats and libraries. Confidence: 0.9
 - When extending Markdown-it, prefers using an available plugin over building equivalent functionality from scratch. Confidence: 0.95
 - Wants Markdown previews in document editors to support Shiki syntax highlighting with per-block code copying, KaTeX math rendering, and Mermaid diagram downloads as SVG/PNG. Confidence: 0.95
+- Prefers expensive preview/rendering resources to be prewarmed during idle time to reduce first-use delay without blocking startup; is not concerned about rerender performance absent observed lag. Confidence: 0.9
 - Expects the note editor and note preview panes to scroll together when displayed in split mode. Confidence: 0.9

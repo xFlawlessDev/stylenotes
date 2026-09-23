@@ -887,21 +887,14 @@ html[data-motion='reduced'] *::after {
 	padding: 1rem 1.1rem;
 }
 
-.markdown-body pre.shiki,
-.markdown-body .mermaid-diagram {
-	position: relative;
-	padding-top: 2.75rem;
-}
-
 .markdown-body .preview-action-bar {
-	position: absolute;
-	top: 0.5rem;
-	right: 0.5rem;
+	position: relative;
 	z-index: 1;
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: flex-end;
 	gap: 0.25rem;
+	margin: 0 0 0.5rem;
 }
 
 .markdown-body .preview-action {
