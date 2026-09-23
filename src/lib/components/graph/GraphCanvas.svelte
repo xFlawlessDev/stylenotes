@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
-	import { settings } from '$lib/stores/settings.svelte';
 	import { createGraphEngine, type GraphEngine } from '$lib/components/graph/graph-engine';
 
 	let {
@@ -9,15 +8,19 @@
 		edges,
 		kinds,
 		highlight = null,
+		selectedId = null,
 		fitToken = 0,
-		onopen,
+		onselect,
+		onfocus,
 	}: {
 		nodes: GraphNode[];
 		edges: GraphEdge[];
 		kinds: Record<GraphEdgeKind, boolean>;
 		highlight?: Set<string> | null;
+		selectedId?: string | null;
 		fitToken?: number;
-		onopen: (node: GraphNode) => void;
+		onselect: (node: GraphNode | null) => void;
+		onfocus?: (node: GraphNode | null) => void;
 	} = $props();
 
 	let host = $state<HTMLDivElement | null>(null);
@@ -28,7 +31,7 @@
 	onMount(() => {
 		let disposed = false;
 		let created: GraphEngine | null = null;
-		void createGraphEngine({ host: host!, onopen })
+		void createGraphEngine({ host: host!, onselect, onfocus })
 			.then((next) => {
 				if (disposed) {
 					next.destroy();
@@ -65,10 +68,7 @@
 	});
 
 	$effect(() => {
-		// Re-read the CSS tokens whenever the app theme changes.
-		void settings.mode;
-		void settings.accent;
-		engine?.setTheme();
+		engine?.setSelected(selectedId);
 	});
 
 	$effect(() => {
@@ -79,7 +79,7 @@
 
 <div bind:this={host} class="absolute inset-0" aria-label="Force-directed graph canvas"></div>
 {#if !ready}
-	<p class="absolute inset-0 grid place-items-center text-body-sm font-body text-outline">
+	<p class="absolute inset-0 grid place-items-center text-[12px] text-[#9ca7b6]">
 		{failed ? 'Could not render the graph on this device.' : 'Laying out the graph…'}
 	</p>
 {/if}
