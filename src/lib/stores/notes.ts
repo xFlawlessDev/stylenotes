@@ -139,10 +139,19 @@ export function reassignNotesFolder(notes: Note[], id: string, to = 'personal'):
 const SEED_FLAG = 'notes_seeded_v1';
 
 /** Reads every note, falling back to the bundled samples outside Tauri. */
-export async function listNotes(): Promise<Note[]> {
+export async function listNotes(workspaceId = workspaceStore.activeId): Promise<Note[]> {
+	if (!browser) return seedNotes.filter((note) => (note.workspaceId ?? 'workspace-default') === workspaceId);
+	try {
+		return await notesRepo.list(workspaceId);
+	} catch {
+		return seedNotes.filter((note) => (note.workspaceId ?? 'workspace-default') === workspaceId);
+	}
+}
+
+export async function listAllNotes(): Promise<Note[]> {
 	if (!browser) return [...seedNotes];
 	try {
-		return await notesRepo.list(workspaceStore.activeId);
+		return await notesRepo.list();
 	} catch {
 		return [...seedNotes];
 	}
@@ -162,10 +171,10 @@ export async function hydrateNotes(): Promise<Note[]> {
 	return listNotes();
 }
 
-export async function loadFolders(): Promise<CustomFolder[]> {
+export async function loadFolders(workspaceId = workspaceStore.activeId): Promise<CustomFolder[]> {
 	if (!browser) return [];
 	try {
-		return await foldersRepo.list(workspaceStore.activeId);
+		return await foldersRepo.list(workspaceId);
 	} catch {
 		return [];
 	}
