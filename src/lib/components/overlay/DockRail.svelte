@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import {
 		getCurrentWindow,
-		cursorPosition,
 		currentMonitor,
 		LogicalSize,
 		PhysicalPosition
@@ -21,6 +20,7 @@
 		type DockPoint,
 		type DockSize
 	} from '$lib/dock';
+	import { createDockCursorTracker, type DockCursorTracker } from '$lib/dock-tracker';
 	import {
 		applySettingsSnapshot,
 		settings,
@@ -77,6 +77,7 @@
 	let plusEl: HTMLElement | undefined = $state();
 	let ignoring = false;
 	let dragging = false;
+	let tracker: DockCursorTracker | undefined;
 	let captureCloseTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function syncHovered() {
@@ -142,17 +143,26 @@
 		]);
 		const size = dockWindowSize(settings.overlayPosition, collapsed);
 		await win.setSize(new LogicalSize(size.width, size.height));
-		if (!monitor) return;
-		const next = snapToDockEdge({
-			edge: settings.overlayPosition,
-			monitor,
-			size: {
-				width: Math.round(size.width * factor),
-				height: Math.round(size.height * factor)
-			},
-			current: pos
-		});
-		await win.setPosition(new PhysicalPosition(next.x, next.y));
+		if (monitor) {
+			const next = snapToDockEdge({
+				edge: settings.overlayPosition,
+				monitor,
+				size: {
+					width: Math.round(size.width * factor),
+					height: Math.round(size.height * factor)
+				},
+				current: pos
+			});
+			await win.setPosition(new PhysicalPosition(next.x, next.y));
+		}
+		// The cursor tracker caches the window position; this just changed it.
+		await tracker?.refresh().catch(() => undefined);
+	}
+
+	function onDraggingChange(value: boolean) {
+		dragging = value;
+		// A drag moves the window, so the cached position is stale afterwards.
+		if (!value) void tracker?.refresh().catch(() => undefined);
 	}
 
 	async function toggleCollapsed() {
@@ -196,6 +206,49 @@
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Translates one polled cursor position into the dock's click-through state
+	 * and hover targets. Runs once per tick while the dock window is visible.
+	 */
+	async function handleCursor({ x, y }: DockPoint) {
+		const overRail = inRect(railEl, x, y);
+		const overPlus = inRect(plusEl, x, y);
+		const overCard = inRect(cardEl, x, y);
+		const overCapture = captureOpen && inRect(captureEl, x, y);
+
+		if (collapsed) {
+			await setIgnore(!overRail);
+		} else if (overPlus) {
+			await setIgnore(false);
+			openCaptureMenu();
+		} else if (overCapture) {
+			await setIgnore(false);
+			cancelCaptureClose();
+		} else if (overRail) {
+			await setIgnore(false);
+			const hit = itemAtPoint(x, y);
+			if (hit) {
+				closeCaptureMenu();
+				hovered = hit.hover;
+				cardOffset = dockCardOffset({
+					edge: settings.overlayPosition,
+					pointer: hit.anchor,
+					window: dockWindowSize(settings.overlayPosition, false),
+					card: CARD
+				});
+			} else {
+				scheduleCaptureClose();
+			}
+		} else if (overCard) {
+			await setIgnore(false);
+			scheduleCaptureClose();
+		} else {
+			hovered = null;
+			scheduleCaptureClose();
+			await setIgnore(true);
+		}
 	}
 
 	function openCaptureMenu() {
@@ -286,70 +339,18 @@
 			return cleanupListeners;
 		}
 
+		tracker = createDockCursorTracker({
+			interval: POLL_MS,
+			suspended: () => dragging,
+			onCursor: handleCursor
+		});
+
 		void applyDockGeometry();
 		void setIgnore(true);
 
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const tick = async () => {
-			try {
-				if (dragging) {
-					await setIgnore(false);
-					timer = setTimeout(tick, POLL_MS);
-					return;
-				}
-				const [cursor, pos, scale] = await Promise.all([
-					cursorPosition(),
-					getCurrentWindow().outerPosition(),
-					getCurrentWindow().scaleFactor()
-				]);
-				const x = (cursor.x - pos.x) / scale;
-				const y = (cursor.y - pos.y) / scale;
-
-				const overRail = inRect(railEl, x, y);
-				const overPlus = inRect(plusEl, x, y);
-				const overCard = inRect(cardEl, x, y);
-				const overCapture = captureOpen && inRect(captureEl, x, y);
-
-				if (collapsed) {
-					await setIgnore(!overRail);
-				} else if (overPlus) {
-					await setIgnore(false);
-					openCaptureMenu();
-				} else if (overCapture) {
-					await setIgnore(false);
-					cancelCaptureClose();
-				} else if (overRail) {
-					await setIgnore(false);
-					const hit = itemAtPoint(x, y);
-					if (hit) {
-						closeCaptureMenu();
-						hovered = hit.hover;
-						cardOffset = dockCardOffset({
-							edge: settings.overlayPosition,
-							pointer: hit.anchor,
-							window: dockWindowSize(settings.overlayPosition, false),
-							card: CARD
-						});
-					} else {
-						scheduleCaptureClose();
-					}
-				} else if (overCard) {
-					await setIgnore(false);
-					scheduleCaptureClose();
-				} else {
-					hovered = null;
-					scheduleCaptureClose();
-					await setIgnore(true);
-				}
-			} catch {
-				/* ignore */
-			}
-			timer = setTimeout(tick, POLL_MS);
-		};
-		timer = setTimeout(tick, POLL_MS);
-
 		return () => {
-			clearTimeout(timer);
+			tracker?.dispose();
+			tracker = undefined;
 			cancelCaptureClose();
 			cleanupListeners();
 		};
@@ -384,7 +385,7 @@
 				{edge}
 				{collapsed}
 				ontoggle={toggleCollapsed}
-				ondraggingchange={(value) => (dragging = value)}
+				ondraggingchange={onDraggingChange}
 			/>
 			<DockRailItems
 				notes={dockStore.notes}
@@ -407,7 +408,7 @@
 				{edge}
 				{collapsed}
 				ontoggle={toggleCollapsed}
-				ondraggingchange={(value) => (dragging = value)}
+				ondraggingchange={onDraggingChange}
 			/>
 		</div>
 	{/if}

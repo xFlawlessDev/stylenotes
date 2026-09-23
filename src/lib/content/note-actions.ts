@@ -2,8 +2,8 @@ import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import type MarkdownItType = require('markdown-it');
 import taskLists from 'markdown-it-task-lists';
-import markdownItShiki from '@shikijs/markdown-it';
 import { katex } from '@mdit/plugin-katex';
+import { fencedLanguages, installShiki, loadLanguages } from '$lib/content/code-highlight';
 import wrapperlessFenceRule from '@olets/markdown-it-wrapperless-fence-rule';
 import { addCodeCopyButtons } from '$lib/content/preview-actions';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -54,6 +54,23 @@ function renderMermaidFence(tokens: MarkdownItType.Token[], index: number) {
 	return `<pre><code class="language-mermaid">${code}</code></pre>\n`;
 }
 
+/**
+ * Shiki only knows the grammars loaded so far, so a fence in a language it does
+ * not bundle would throw and cost the whole note its highlighting. Keep just
+ * that block readable instead.
+ */
+function installPlainFenceFallback(parser: MarkdownItType.MarkdownIt) {
+	const highlight = parser.options.highlight;
+	if (!highlight) return;
+	parser.options.highlight = (code, lang, attrs) => {
+		try {
+			return highlight(code, lang, attrs);
+		} catch {
+			return `<pre><code class="language-${escapeHtml(lang)}">${escapeHtml(code)}</code></pre>\n`;
+		}
+	};
+}
+
 const fallbackMarkdown = createMarkdownParser();
 let markdownSetup: Promise<MarkdownItType.MarkdownIt> | undefined;
 
@@ -70,10 +87,8 @@ async function getMarkdownParser(): Promise<MarkdownItType.MarkdownIt> {
 				if (language === 'mermaid') return renderMermaidFence(tokens, index);
 				return wrapperlessFenceRule(tokens, index, options, env, renderer);
 			};
-			const shikiPlugin = await markdownItShiki({
-				themes: { light: 'vitesse-light', dark: 'vitesse-dark' },
-			});
-			parser.use(shikiPlugin);
+			await installShiki(parser);
+			installPlainFenceFallback(parser);
 			return parser;
 		})();
 		markdownSetup = markdownSetup.catch((error) => {
@@ -96,16 +111,15 @@ function assetUrl(path: string): string | null {
 export async function renderNoteHtml(body: string, wiki?: WikiRenderContext): Promise<string> {
 	const source = repairLocalImageLinks(body);
 	const markdownSource = preserveBlankLines(source);
+	const codeLangs = fencedLanguages(markdownSource).filter((lang) => lang !== 'mermaid');
 	let rendered: string;
-	const needsHighlighting = markdownSource.split('\n').some((line) => {
-		const info = /^ {0,3}(?:`{3,}|~{3,})(.*)$/.exec(line)?.[1].trim();
-		return Boolean(info) && info?.split(/\s+/, 1)[0].toLowerCase() !== 'mermaid';
-	});
-	if (!needsHighlighting) {
+	if (codeLangs.length === 0) {
 		rendered = fallbackMarkdown.render(markdownSource, { wiki });
 	} else {
 		try {
-			rendered = (await getMarkdownParser()).render(markdownSource, { wiki });
+			const parser = await getMarkdownParser();
+			await loadLanguages(codeLangs);
+			rendered = parser.render(markdownSource, { wiki });
 		} catch {
 			rendered = fallbackMarkdown.render(markdownSource, { wiki });
 		}

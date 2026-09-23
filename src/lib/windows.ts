@@ -10,6 +10,9 @@ export const KANBAN_LABEL = "kanban";
 export const NAVIGATE_EVENT = "stylenotes:navigate";
 export const NOTE_HEADING_EVENT = "stylenotes:note-heading";
 
+/** Event telling the dock window it was shown (`true`) or hidden (`false`). */
+export const OVERLAY_VISIBILITY_EVENT = "stylenotes:overlay-visibility";
+
 export type WorkspaceView = "dashboard" | "list" | "kanban" | "gantt";
 
 export type WorkspaceSection = "notes" | "tasks" | "graph";
@@ -177,6 +180,7 @@ export async function toggleOverlay() {
   const overlay = await WebviewWindow.getByLabel(OVERLAY_LABEL);
   if (!overlay) {
     await openOverlay();
+    await emit(OVERLAY_VISIBILITY_EVENT, true).catch(() => undefined);
     return;
   }
   const visible = await overlay.isVisible();
@@ -190,6 +194,7 @@ export async function toggleOverlay() {
       /* overlay is not focusable; showing is enough */
     }
   }
+  await emit(OVERLAY_VISIBILITY_EVENT, !visible).catch(() => undefined);
 }
 
 export async function revealCurrentWindow() {

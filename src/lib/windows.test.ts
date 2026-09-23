@@ -60,3 +60,26 @@ describe('openTasksInWorkspace', () => {
 		});
 	});
 });
+
+describe('toggleOverlay', () => {
+	it('tells the dock window when it was shown or hidden', async () => {
+		mocks.emit.mockClear();
+		const hide = vi.fn().mockResolvedValue(undefined);
+		const isVisible = vi.fn().mockResolvedValue(false);
+		mocks.getByLabel.mockResolvedValue({
+			show: mocks.show,
+			hide,
+			isVisible,
+			setFocus: mocks.setFocus
+		});
+
+		await windows.toggleOverlay();
+		expect(mocks.emit).toHaveBeenCalledWith(windows.OVERLAY_VISIBILITY_EVENT, true);
+		expect(hide).not.toHaveBeenCalled();
+
+		isVisible.mockResolvedValue(true);
+		await windows.toggleOverlay();
+		expect(mocks.emit).toHaveBeenCalledWith(windows.OVERLAY_VISIBILITY_EVENT, false);
+		expect(hide).toHaveBeenCalled();
+	});
+});
