@@ -36,7 +36,8 @@ const SHIFT_COMMANDS: Record<string, EditorCommand> = {
 	'8': 'bullet',
 	'9': 'checklist',
 	'.': 'quote',
-	c: 'codeblock'
+	c: 'codeblock',
+	k: 'wikilink'
 };
 
 const PLAIN_COMMANDS: Record<string, EditorCommand> = {

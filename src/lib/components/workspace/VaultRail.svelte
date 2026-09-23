@@ -86,7 +86,7 @@
 		? 'max-lg:translate-x-0'
 		: 'max-lg:-translate-x-[120%]'}"
 >
-	<div class="flex min-h-0 flex-col gap-3">
+	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain">
 		<div class="flex items-center gap-2.5 px-1 py-1">
 			<div
 				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-hairline"
@@ -128,7 +128,7 @@
 			>
 		</Button>
 
-		<div class="flex min-h-0 flex-col gap-1 overflow-y-auto scrollbar-none">
+		<div class="flex min-h-0 flex-col gap-1">
 			<div class="mb-1 flex items-center justify-between px-1">
 				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</span>
 				<div class="flex items-center gap-0.5">
@@ -150,7 +150,11 @@
 					</Tooltip.Root>
 				</div>
 			</div>
-			<nav class="flex flex-col gap-0.5" aria-label="Folders" use:reorder>
+			<nav
+				class="scrollbar-none flex max-h-64 min-h-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
+				aria-label="Folders"
+				use:reorder
+			>
 				{#each folders as folder (folder.id)}
 					<FolderRow
 						{folder}
@@ -195,7 +199,9 @@
 						</Button>
 					{/if}
 				</div>
-				<div class="flex flex-wrap gap-1.5">
+				<div
+					class="scrollbar-none flex max-h-40 flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
+				>
 					{#each tags as tag, i}
 						<Button
 							variant="secondary"

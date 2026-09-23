@@ -134,7 +134,7 @@
 		onquery={onquery}
 	/>
 
-	<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto scrollbar-none">
+	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
 		<div class="flex flex-col gap-0.5">
 			<div class="mb-1 flex items-center justify-between px-1">
 				<p class="text-label-sm font-label tracking-wider text-outline uppercase">Status</p>
@@ -177,24 +177,28 @@
 					>
 				{/if}
 			</div>
-			{#each folderOptions as option (option.id)}
-				<Button
-					variant={activeFolder === option.id ? 'tonal' : 'ghost'}
-					size="md"
-					class="justify-between rounded-xl px-2.5 text-left text-label-md"
-					aria-pressed={activeFolder === option.id}
-					onclick={() => pickFolder(option.id)}
-				>
-					<span class="truncate">{option.label}</span>
-					{#if option.id !== 'all'}
-						<span
-							class="rounded-md px-1.5 py-px font-code text-code-sm {activeFolder === option.id
-								? 'text-primary/80'
-								: 'text-outline'}">{counts.byFolder.get(option.id) ?? 0}</span
-						>
-					{/if}
-				</Button>
-			{/each}
+			<div
+				class="scrollbar-none flex max-h-64 min-h-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
+			>
+				{#each folderOptions as option (option.id)}
+					<Button
+						variant={activeFolder === option.id ? 'tonal' : 'ghost'}
+						size="md"
+						class="justify-between rounded-xl px-2.5 text-left text-label-md"
+						aria-pressed={activeFolder === option.id}
+						onclick={() => pickFolder(option.id)}
+					>
+						<span class="truncate">{option.label}</span>
+						{#if option.id !== 'all'}
+							<span
+								class="rounded-md px-1.5 py-px font-code text-code-sm {activeFolder === option.id
+									? 'text-primary/80'
+									: 'text-outline'}">{counts.byFolder.get(option.id) ?? 0}</span
+							>
+						{/if}
+					</Button>
+				{/each}
+			</div>
 		</div>
 	</div>
 </aside>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { Minimize2, PenLine, Tag, X } from '@lucide/svelte';
+	import { Minimize2, PenLine, X } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { type EditState, type EditorCommand } from '$lib/content/markdown-editor';
 	import { continueList, indentLines } from '$lib/content/markdown-lines';
@@ -21,7 +21,7 @@
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { openNoteWindow } from '$lib/windows';
 	import { Button, EmptyState, Input, Select, Textarea } from '$lib/components/base';
-	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
+	import NoteTags from '$lib/components/note/NoteTags.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
 	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
@@ -72,7 +72,6 @@
 	let html = $state('');
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
-	let tagDialogOpen = $state(false);
 	let guideOpen = $state(false);
 	let moveFolder = $state('');
 	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
@@ -212,21 +211,6 @@
 	function toggleArchive() {
 		if (!note) return;
 		onupdate(note.id, { folder: archived ? RESTORE_FOLDER : ARCHIVE_FOLDER });
-	}
-
-	function addTag() {
-		if (!note) return;
-		tagDialogOpen = true;
-	}
-
-	function commitTag(tag: string) {
-		if (!note) return;
-		onupdate(note.id, { tags: [...note.tags, tag] });
-	}
-
-	function removeTag(tag: string) {
-		if (!note) return;
-		onupdate(note.id, { tags: note.tags.filter((item) => item !== tag) });
 	}
 
 	function syncSplitScroll(source: HTMLElement, target: HTMLElement) {
@@ -375,30 +359,7 @@
 						oninput={() => onupdate(note.id, { title })}
 					/>
 					<div class="flex flex-wrap items-center gap-1.5">
-						{#each note.tags as tag (tag)}
-							<span
-								class="glass-chip group flex items-center gap-1 rounded-full px-2.5 py-1 text-code-sm font-code text-secondary"
-							>
-								<Tag size={11} />
-								{tag}
-								<Button
-									bare
-									class="ml-0.5 opacity-0 group-hover:opacity-100"
-									aria-label="Remove tag"
-									onclick={() => removeTag(tag)}
-								>
-									<X size={10} />
-								</Button>
-							</span>
-						{/each}
-						<Button
-							size="xs"
-							shape="pill"
-							class="glass-well gap-1 px-2 font-code text-code-sm text-outline hover:bg-transparent"
-							onclick={addTag}
-						>
-							+ Tag
-						</Button>
+						<NoteTags tags={note.tags} onchange={(tags) => onupdate(note.id, { tags })} />
 						<span class="text-code-sm font-code text-outline">{note.updated}</span>
 						<span class="ml-auto">
 							<EditorStatus {note} />
@@ -481,6 +442,5 @@
 		{/snippet}
 	</FileDropZone>
 
-	<AddTagDialog bind:open={tagDialogOpen} existing={note?.tags ?? []} onsubmit={commitTag} />
 	<MarkdownGuideDialog bind:open={guideOpen} />
 </main>

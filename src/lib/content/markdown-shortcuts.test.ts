@@ -21,6 +21,7 @@ describe('shortcutCommand', () => {
 		expect(key('9', { shiftKey: true })).toBe('checklist');
 		expect(key('.', { shiftKey: true })).toBe('quote');
 		expect(key('c', { shiftKey: true })).toBe('codeblock');
+		expect(key('k', { shiftKey: true })).toBe('wikilink');
 	});
 
 	it('maps alt shortcuts for headings', () => {

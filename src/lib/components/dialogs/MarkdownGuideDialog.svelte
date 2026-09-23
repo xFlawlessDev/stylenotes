@@ -33,6 +33,7 @@
 		{ keys: `${MOD}+Shift+X`, note: 'Strikethrough' },
 		{ keys: `${MOD}+E`, note: 'Inline code' },
 		{ keys: `${MOD}+K`, note: 'Link' },
+		{ keys: `${MOD}+Shift+K`, note: 'Wiki link' },
 		{ keys: `${MOD}+Alt+1…6`, note: 'Heading levels' },
 		{ keys: `${MOD}+Alt+0`, note: 'Normal text' },
 		{ keys: `${MOD}+Shift+8`, note: 'Bulleted list' },

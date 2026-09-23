@@ -60,9 +60,16 @@
 	}
 </script>
 
-<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden scrollbar-none pr-0.5">
-	<div class="grid min-w-0 shrink-0 gap-3 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]">
-		<section class="glass-panel flex min-w-0 flex-col gap-3 rounded-2xl p-2.5 sm:p-3" aria-labelledby="mini-calendar-heading">
+<div
+	class="scrollbar-none flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5"
+>
+	<div
+		class="grid min-w-0 shrink-0 gap-3 xl:min-h-[12rem] xl:grid-rows-[minmax(0,1fr)] xl:shrink xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]"
+	>
+		<section
+			class="glass-panel scrollbar-none flex max-h-[min(56vh,36rem)] min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-2xl p-2.5 sm:p-3"
+			aria-labelledby="mini-calendar-heading"
+		>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<h2 id="mini-calendar-heading" class="text-title-sm font-title text-on-surface">Mini Calendar</h2>
 				<div class="flex min-w-0 flex-wrap items-center gap-1">
@@ -121,7 +128,10 @@
 			</section>
 		</section>
 
-		<section class="glass-panel flex min-h-[220px] min-w-0 flex-col gap-3 rounded-2xl p-2.5 sm:min-h-[250px] sm:p-3" aria-labelledby="events-heading">
+		<section
+			class="glass-panel flex max-h-[min(56vh,36rem)] min-h-[200px] min-w-0 flex-col gap-3 overflow-hidden overscroll-contain rounded-2xl p-2.5 sm:min-h-[220px] sm:p-3 xl:min-h-0"
+			aria-labelledby="events-heading"
+		>
 			<div class="flex items-center justify-between gap-2">
 				<div class="flex items-center gap-2">
 					<CalendarDays size={16} class="text-primary" />
@@ -131,7 +141,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="flex min-h-0 flex-col gap-2 overflow-y-auto">
+			<div class="scrollbar-none flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
 				{#each selectedDayTasks as task (task.id)}
 					<TaskCard
 						{task}
@@ -151,7 +161,10 @@
 		</section>
 	</div>
 
-	<section class="glass-panel flex min-h-[320px] min-w-0 flex-col gap-3 rounded-2xl p-2.5 sm:p-3 xl:min-h-0 xl:flex-1" aria-labelledby="incomplete-heading">
+	<section
+		class="glass-panel flex min-h-[240px] min-w-0 flex-col gap-3 overflow-hidden rounded-2xl p-2.5 sm:p-3 xl:min-h-64 xl:flex-1"
+		aria-labelledby="incomplete-heading"
+	>
 		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
 			<div class="min-w-0">
 				<h2 id="incomplete-heading" class="text-title-sm font-title text-on-surface">Incomplete Tasks</h2>
@@ -170,7 +183,9 @@
 				{/each}
 			</nav>
 		</div>
-		<div class="grid min-w-0 gap-2 xl:min-h-0 xl:overflow-y-auto sm:grid-cols-2 2xl:grid-cols-3">
+		<div
+			class="scrollbar-none grid max-h-[min(52vh,32rem)] min-w-0 gap-2 overflow-y-auto overscroll-contain sm:grid-cols-2 xl:max-h-none xl:min-h-0 2xl:grid-cols-3"
+		>
 			{#each incompleteTasks as task (task.id)}
 				<TaskCard
 					{task}

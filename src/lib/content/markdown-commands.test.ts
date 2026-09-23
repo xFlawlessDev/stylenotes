@@ -12,6 +12,7 @@ describe('transform', () => {
 	it('dispatches inline commands', () => {
 		expect(transform(at('x', 0, 1), 'bold')?.value).toBe('**x**');
 		expect(transform(at('x', 0, 1), 'code')?.value).toBe('`x`');
+		expect(transform(at('x', 0, 1), 'wikilink')?.value).toBe('[[x]]');
 		expect(transform(at('x', 0, 1), 'image')?.value).toBe('![x](https://)');
 	});
 

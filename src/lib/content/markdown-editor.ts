@@ -10,6 +10,7 @@ export type EditorCommand =
 	| 'strikethrough'
 	| 'code'
 	| 'link'
+	| 'wikilink'
 	| 'image'
 	| 'heading1'
 	| 'heading2'

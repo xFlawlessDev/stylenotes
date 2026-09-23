@@ -28,6 +28,8 @@ export function transform(state: EditState, command: EditorCommand): EditState |
 			return wrapInline(state, '`', '`', 'code');
 		case 'link':
 			return wrapInline(state, '[', '](https://)', 'title');
+		case 'wikilink':
+			return wrapInline(state, '[[', ']]', 'Note title');
 		case 'image':
 			return wrapInline(state, '![', '](https://)', 'alt text');
 		case 'heading1':

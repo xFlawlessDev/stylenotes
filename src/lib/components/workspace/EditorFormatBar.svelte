@@ -17,6 +17,7 @@
 		Quote,
 		SquareCheck,
 		SquareCode,
+		SquareLibrary,
 		Strikethrough,
 		Table,
 	} from '@lucide/svelte';
@@ -39,6 +40,7 @@
 			{ id: 'strikethrough', label: 'Strikethrough', shortcut: `${MOD}+Shift+X`, icon: Strikethrough },
 			{ id: 'code', label: 'Inline code', shortcut: `${MOD}+E`, icon: Code2 },
 			{ id: 'link', label: 'Link', shortcut: `${MOD}+K`, icon: Link },
+			{ id: 'wikilink', label: 'Wiki link', shortcut: `${MOD}+Shift+K`, icon: SquareLibrary },
 			{ id: 'image', label: 'Image', icon: Image },
 		],
 		[

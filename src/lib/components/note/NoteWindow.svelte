@@ -38,6 +38,7 @@
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import NoteBodyEditor from '$lib/components/note/NoteBodyEditor.svelte';
+	import NoteTags from '$lib/components/note/NoteTags.svelte';
 	import NoteViewSwitcher from '$lib/components/note/NoteViewSwitcher.svelte';
 	import { Button, EmptyState, Input, Select } from '$lib/components/base';
 
@@ -278,11 +279,9 @@
 					bind:value={folder}
 					onchange={(next) => update({ folder: next })}
 				/>
-				{#if note.tags.length}
-					<span class="min-w-0 truncate text-code-sm font-code text-outline">
-						{note.tags.map((tag) => `#${tag}`).join(' ')}
-					</span>
-				{/if}
+			</div>
+			<div class="shrink-0 px-1.5">
+				<NoteTags tags={note.tags} onchange={(tags) => update({ tags })} />
 			</div>
 			<NoteBodyEditor
 				body={note.body}
