@@ -35,6 +35,7 @@
     "opener:default",
     "dialog:default",
     "fs:allow-write-text-file",
+    "fs:allow-write-file",
     "fs:allow-mkdir",
     "sql:default",
     "sql:allow-execute"

@@ -1,7 +1,26 @@
 import DOMPurify from 'dompurify';
+import { addMermaidDownloadButtons } from '$lib/content/preview-actions';
 
 let mermaidModule: Promise<typeof import('mermaid').default> | undefined;
 let diagramId = 0;
+
+export async function prewarmMermaid(): Promise<void> {
+	await getMermaid();
+}
+
+function getMermaid(): Promise<typeof import('mermaid').default> {
+	if (!mermaidModule) {
+		mermaidModule = import('mermaid').then(({ default: mermaid }) => {
+			mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+			return mermaid;
+		});
+		mermaidModule = mermaidModule.catch((error) => {
+			mermaidModule = undefined;
+			throw error;
+		});
+	}
+	return mermaidModule;
+}
 
 export async function renderMermaidBlocks(
 	html: string,
@@ -21,6 +40,7 @@ export async function renderMermaidBlocks(
 			const diagram = document.createElement('div');
 			diagram.className = 'mermaid-diagram';
 			diagram.innerHTML = safeSvg;
+			if (diagram.querySelector('svg')) addMermaidDownloadButtons(diagram);
 			code.parentElement?.replaceWith(diagram);
 		} catch {
 			continue;
@@ -37,11 +57,7 @@ export async function renderNotePreviewHtml(
 	if (!html.includes('language-mermaid')) return html;
 
 	if (!renderDiagram) {
-		mermaidModule ??= import('mermaid').then(({ default: mermaid }) => {
-			mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
-			return mermaid;
-		});
-		const mermaid = await mermaidModule;
+		const mermaid = await getMermaid();
 		renderDiagram = async (source, id) => (await mermaid.render(id, source)).svg;
 	}
 

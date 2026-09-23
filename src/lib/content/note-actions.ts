@@ -1,5 +1,11 @@
 import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import MarkdownIt from 'markdown-it';
+import type MarkdownItType = require('markdown-it');
+import taskLists from 'markdown-it-task-lists';
+import markdownItShiki from '@shikijs/markdown-it';
+import { katex } from '@mdit/plugin-katex';
+import wrapperlessFenceRule from '@olets/markdown-it-wrapperless-fence-rule';
+import { addCodeCopyButtons } from '$lib/content/preview-actions';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { noteMarkdown, type Note } from '$lib/content/content';
 import { preserveBlankLines } from '$lib/content/markdown-preview';
@@ -12,6 +18,56 @@ import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 const ALLOWED_URI =
 	/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|asset):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
+function createMarkdownParser() {
+	const parser = new MarkdownIt({ breaks: true, html: true, linkify: true });
+	parser.use(taskLists, { enabled: true, label: false });
+	parser.use(katex, { delimiters: 'dollars', throwOnError: false, trust: false });
+	const defaultFence = parser.renderer.rules.fence;
+	parser.renderer.rules.fence = (tokens, index, options, env, renderer) => {
+		const language = tokens[index].info.trim().split(/\s+/, 1)[0].toLowerCase();
+		if (language === 'mermaid') return renderMermaidFence(tokens, index);
+		return defaultFence
+			? defaultFence(tokens, index, options, env, renderer)
+			: renderer.renderToken(tokens, index, options);
+	};
+	return parser;
+}
+
+function renderMermaidFence(tokens: MarkdownItType.Token[], index: number) {
+	const code = escapeHtml(tokens[index].content);
+	return `<pre><code class="language-mermaid">${code}</code></pre>\n`;
+}
+
+const fallbackMarkdown = createMarkdownParser();
+let markdownSetup: Promise<MarkdownItType.MarkdownIt> | undefined;
+
+export async function prewarmNoteRenderer(): Promise<void> {
+	await getMarkdownParser();
+}
+
+async function getMarkdownParser(): Promise<MarkdownItType.MarkdownIt> {
+	if (!markdownSetup) {
+		markdownSetup = (async () => {
+			const parser = createMarkdownParser();
+			parser.renderer.rules.fence = (tokens, index, options, env, renderer) => {
+				const language = tokens[index].info.trim().split(/\s+/, 1)[0].toLowerCase();
+				if (language === 'mermaid') return renderMermaidFence(tokens, index);
+				return wrapperlessFenceRule(tokens, index, options, env, renderer);
+			};
+			const shikiPlugin = await markdownItShiki({
+				themes: { light: 'vitesse-light', dark: 'vitesse-dark' },
+			});
+			parser.use(shikiPlugin);
+			return parser;
+		})();
+		markdownSetup = markdownSetup.catch((error) => {
+			markdownSetup = undefined;
+			throw error;
+		});
+	}
+	return markdownSetup;
+}
+
 function assetUrl(path: string): string | null {
 	if (!isTauri) return null;
 	try {
@@ -21,11 +77,26 @@ function assetUrl(path: string): string | null {
 	}
 }
 
-export function renderNoteHtml(body: string): string {
+export async function renderNoteHtml(body: string): Promise<string> {
 	const source = repairLocalImageLinks(body);
-	const rendered = marked.parse(preserveBlankLines(source), { breaks: true }) as string;
+	const markdownSource = preserveBlankLines(source);
+	let rendered: string;
+	const needsHighlighting = markdownSource.split('\n').some((line) => {
+		const info = /^ {0,3}(?:`{3,}|~{3,})(.*)$/.exec(line)?.[1].trim();
+		return Boolean(info) && info?.split(/\s+/, 1)[0].toLowerCase() !== 'mermaid';
+	});
+	if (!needsHighlighting) {
+		rendered = fallbackMarkdown.render(markdownSource);
+	} else {
+		try {
+			rendered = (await getMarkdownParser()).render(markdownSource);
+		} catch {
+			rendered = fallbackMarkdown.render(markdownSource);
+		}
+	}
 	const resolved = resolveLocalImages(rendered, assetUrl);
-	return DOMPurify.sanitize(resolved, { ALLOWED_URI_REGEXP: ALLOWED_URI });
+	const sanitized = DOMPurify.sanitize(resolved, { ALLOWED_URI_REGEXP: ALLOWED_URI });
+	return addCodeCopyButtons(sanitized);
 }
 
 export function escapeHtml(value: string): string {
@@ -45,15 +116,22 @@ export function escapeHtml(value: string): string {
 	});
 }
 
-export function notePrintDocument(note: Note, rendered: string): string {
+export function notePrintDocument(note: Note, rendered: string, stylesheets: string[] = []): string {
 	const title = escapeHtml(note.title || 'Untitled note');
+	const links = stylesheets.map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}">`).join('');
 	return (
-		`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
+		`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${links}` +
 		'<style>body{font-family:system-ui,sans-serif;line-height:1.7;max-width:720px;margin:40px auto;padding:0 24px;color:#111}' +
 		'h1{font-size:1.8rem;margin-bottom:1rem}img,svg{max-width:100%;height:auto}.mermaid-diagram{margin:1.5rem 0;overflow-x:auto}.mermaid-diagram svg{display:block;margin:auto}</style></head><body>' +
 		`<h1>${title}</h1>${rendered}` +
 		'</body></html>'
 	);
+}
+
+function printStylesheets(): string[] {
+	return Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+		.map((link) => link.href)
+		.filter(Boolean);
 }
 
 export function printNoteDocument(note: Note, rendered: string | Promise<string>): boolean {
@@ -62,10 +140,12 @@ export function printNoteDocument(note: Note, rendered: string | Promise<string>
 	const popup = window.open('', '_blank', 'width=800,height=900');
 	if (popup) {
 		void Promise.resolve(rendered).then((html) => {
-			popup.document.write(notePrintDocument(note, html));
+			popup.document.write(notePrintDocument(note, html, printStylesheets()));
 			popup.document.close();
 			popup.focus();
-			popup.print();
+			popup.onload = () => {
+				void popup.document.fonts.ready.then(() => popup.print());
+			};
 		});
 		return true;
 	}
@@ -75,14 +155,18 @@ export function printNoteDocument(note: Note, rendered: string | Promise<string>
 	iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
 	void Promise.resolve(rendered).then((html) => {
 		iframe.onload = () => {
-			try {
-				iframe.contentWindow?.focus();
-				iframe.contentWindow?.print();
-			} finally {
-				setTimeout(() => iframe.remove(), 1000);
-			}
+			const printWindow = iframe.contentWindow;
+			if (!printWindow) return;
+			void printWindow.document.fonts.ready.then(() => {
+				try {
+					printWindow.focus();
+					printWindow.print();
+				} finally {
+					setTimeout(() => iframe.remove(), 1000);
+				}
+			});
 		};
-		iframe.srcdoc = notePrintDocument(note, html);
+		iframe.srcdoc = notePrintDocument(note, html, printStylesheets());
 		document.body.appendChild(iframe);
 	});
 	return true;
@@ -228,9 +312,9 @@ export function createNoteActions(notify: (message: string) => void) {
 			notify(ok ? 'Note copied to clipboard' : 'Could not copy note');
 		},
 		print(note: Note) {
-			const rendered = renderNotePreviewHtml(renderNoteHtml(note.body)).catch(() =>
-				renderNoteHtml(note.body),
-			);
+			const rendered = renderNoteHtml(note.body)
+				.then(renderNotePreviewHtml)
+				.catch(() => renderNoteHtml(note.body));
 			if (!printNoteDocument(note, rendered)) {
 				notify('Could not open print view');
 			}

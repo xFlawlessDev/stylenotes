@@ -9,20 +9,69 @@ import {
 import { createNote } from '$lib/content/content';
 
 describe('renderNoteHtml', () => {
-	it('keeps asset protocol image sources after sanitizing', () => {
-		const html = renderNoteHtml('![cat](asset://localhost/C%3A%2Fpics%2Fcat.png)');
+	it('keeps asset protocol image sources after sanitizing', async () => {
+		const html = await renderNoteHtml('![cat](asset://localhost/C%3A%2Fpics%2Fcat.png)');
 		expect(html).toContain('src="asset://localhost/C%3A%2Fpics%2Fcat.png"');
 	});
 
-	it('strips scripts from the rendered markdown', () => {
-		const html = renderNoteHtml('<script>alert(1)</script>\n\nHello');
+	it('strips scripts from the rendered markdown', async () => {
+		const html = await renderNoteHtml('<script>alert(1)</script>\n\nHello');
 		expect(html).not.toContain('<script>');
 	});
 
-	it('keeps Mermaid fences as code in the synchronous print renderer', () => {
-		const html = renderNoteHtml('```mermaid\nflowchart LR\nA --> B\n```');
-		expect(html).toContain('class="language-mermaid"');
+	it('keeps Mermaid fences as code for the preview renderer', async () => {
+		const html = await renderNoteHtml('```mermaid\nflowchart LR\nA --> B\n```');
+		expect(html).toContain('<pre><code class="language-mermaid">');
 		expect(html).toContain('A --&gt; B');
+	});
+
+	it('renders editor-friendly Markdown syntax', async () => {
+		const html = await renderNoteHtml(
+			'first line\nsecond line\n\n~~removed~~\n\nhttps://example.com\n\n| Name | Value |\n| --- | --- |\n| note | text |',
+		);
+
+		expect(html).toContain('first line<br>\nsecond line');
+		expect(html).toContain('<s>removed</s>');
+		expect(html).toContain('<a href="https://example.com">https://example.com</a>');
+		expect(html).toContain('<table>');
+		expect(html).toContain('<td>note</td>');
+	});
+
+	it('renders interactive task checkboxes in Markdown order', async () => {
+		const html = await renderNoteHtml('- [ ] first task\n  - [x] nested task\n- [ ] third task');
+		const checkboxes = [...html.matchAll(/<input[^>]*type="checkbox"[^>]*>/g)].map(
+			([tag]) => tag,
+		);
+
+		expect(checkboxes).toHaveLength(3);
+		expect(checkboxes[0]).not.toContain('checked');
+		expect(checkboxes[1]).toContain('checked');
+		expect(checkboxes[2]).not.toContain('checked');
+		expect(html).not.toContain('disabled');
+	});
+
+	it('highlights code fences including less common languages', async () => {
+		const typescript = await renderNoteHtml('```ts\nconst answer: number = 42;\n```');
+		const haskell = await renderNoteHtml('```haskell\nmain = putStrLn "hello"\n```');
+
+		expect(typescript).toContain('class="shiki');
+		expect(typescript).toContain('class="language-ts"');
+		expect(typescript).toContain('--shiki-dark:');
+		expect(typescript).toContain('answer');
+		expect(typescript).toContain('data-preview-action="copy-code"');
+		expect(haskell).toContain('class="shiki');
+		expect(haskell).toContain('class="language-haskell"');
+		expect(haskell).toContain('putStrLn');
+	}, 15000);
+
+	it('renders inline and display math and keeps invalid expressions readable', async () => {
+		const html = await renderNoteHtml(
+			'Energy $E=mc^2$\n\n$$\n\\frac{1}{2}\n$$\n\nInvalid $\\notacommand$',
+		);
+
+		expect(html).toContain('class="katex"');
+		expect(html).toContain('class="katex-display"');
+		expect(html).toContain('notacommand');
 	});
 });
 
@@ -51,10 +100,12 @@ describe('notePrintDocument', () => {
 		expect(notePrintDocument(note, '')).toContain('<h1>Untitled note</h1>');
 	});
 
-	it('includes inline Mermaid SVG in the print document', () => {
+	it('includes inline Mermaid SVG and stylesheets in the print document', () => {
 		const note = createNote({ title: 'Diagram' });
 		const svg = '<div class="mermaid-diagram"><svg><path d="M0 0" /></svg></div>';
-		expect(notePrintDocument(note, svg)).toContain(svg);
+		const doc = notePrintDocument(note, svg, ['https://app.test/katex.css']);
+		expect(doc).toContain(svg);
+		expect(doc).toContain('<link rel="stylesheet" href="https://app.test/katex.css">');
 	});
 });
 

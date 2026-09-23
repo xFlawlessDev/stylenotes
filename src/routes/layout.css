@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn-svelte/tailwind.css";
+@import "katex/dist/katex.min.css";
 @import "@fontsource-variable/inter";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -880,6 +881,65 @@ html[data-motion='reduced'] *::after {
 	color: var(--color-on-surface-variant);
 	font-size: 0.82rem;
 	line-height: 1.65;
+}
+
+.markdown-body pre.shiki {
+	padding: 1rem 1.1rem;
+}
+
+.markdown-body pre.shiki,
+.markdown-body .mermaid-diagram {
+	position: relative;
+	padding-top: 2.75rem;
+}
+
+.markdown-body .preview-action-bar {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	z-index: 1;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.25rem;
+}
+
+.markdown-body .preview-action {
+	min-height: 1.5rem;
+	padding-inline: 0.5rem;
+	border-radius: 0.4rem;
+	background: color-mix(in oklab, var(--color-surface-container-high) 88%, transparent);
+	font-size: 0.7rem;
+	line-height: 1;
+}
+
+.markdown-body .preview-action:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
+html.light .markdown-body .shiki,
+html.light .markdown-body .shiki span {
+	color: var(--shiki-light) !important;
+	background-color: var(--shiki-light-bg) !important;
+	font-style: var(--shiki-light-font-style) !important;
+	font-weight: var(--shiki-light-font-weight) !important;
+	text-decoration: var(--shiki-light-text-decoration) !important;
+}
+
+html.dark .markdown-body .shiki,
+html.dark .markdown-body .shiki span {
+	color: var(--shiki-dark) !important;
+	background-color: var(--shiki-dark-bg) !important;
+	font-style: var(--shiki-dark-font-style) !important;
+	font-weight: var(--shiki-dark-font-weight) !important;
+	text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+.markdown-body .katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.25rem 0;
 }
 
 .markdown-body .mermaid-diagram {

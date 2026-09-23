@@ -15,6 +15,7 @@
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { openNoteWindow } from '$lib/windows';
 	import { Button, EmptyState, Input, Select, Textarea } from '$lib/components/base';
@@ -119,7 +120,7 @@
 			return;
 		}
 
-		void renderNotePreviewHtml(renderNoteHtml(source))
+		void renderNoteHtml(source).then(renderNotePreviewHtml)
 			.then((rendered) => {
 				if (!cancelled) html = enableTaskCheckboxes(rendered);
 			})
@@ -217,8 +218,24 @@
 		onupdate(note.id, { tags: note.tags.filter((item) => item !== tag) });
 	}
 
-	function togglePreviewCheckbox(event: MouseEvent) {
-		if (!note || !previewEl) return;
+	function syncSplitScroll(source: HTMLElement, target: HTMLElement) {
+		const sourceRange = source.scrollHeight - source.clientHeight;
+		const targetRange = target.scrollHeight - target.clientHeight;
+		target.scrollTop = sourceRange > 0 ? (source.scrollTop / sourceRange) * targetRange : 0;
+	}
+
+	function onEditorScroll() {
+		if (view === 'split' && textareaEl && previewEl) syncSplitScroll(textareaEl, previewEl);
+	}
+
+	function onPreviewScroll() {
+		if (view === 'split' && textareaEl && previewEl) syncSplitScroll(previewEl, textareaEl);
+	}
+
+	async function togglePreviewCheckbox(event: MouseEvent) {
+		if (!previewEl) return;
+		if (await handlePreviewAction(event, previewEl)) return;
+		if (!note) return;
 		const index = clickedCheckboxIndex(previewEl, event.target);
 		if (index < 0) return;
 		event.preventDefault();
@@ -401,12 +418,14 @@
 							variant="bare"
 							size="md"
 							placeholder="Write here..."
-							class="scrollbar-none h-full w-full px-4 py-4 text-on-surface-variant"
+							class="scrollbar-none h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
+							onscroll={onEditorScroll}
 						></Textarea>
 						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 						<div
 							bind:this={previewEl}
 							class="scrollbar-none h-full overflow-y-auto px-5 py-4"
+							onscroll={onPreviewScroll}
 							onclick={togglePreviewCheckbox}
 						>
 							{#if html}
