@@ -16,7 +16,7 @@
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { openNoteWindow } from '$lib/windows';
-	import { Button, EmptyState, Input, Textarea } from '$lib/components/base';
+	import { Button, EmptyState, Input, Select, Textarea } from '$lib/components/base';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
@@ -62,6 +62,7 @@
 	let previewEl = $state<HTMLDivElement>();
 	let tagDialogOpen = $state(false);
 	let guideOpen = $state(false);
+	let moveFolder = $state('');
 	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
 
 	const view = $derived(
@@ -74,6 +75,17 @@
 	const folderLabel = $derived(
 		folders.find((folder) => folder.id === note?.folder)?.label ?? note?.folder ?? ''
 	);
+	const folderOptions = $derived(
+		folders
+			.filter((folder) => folder.id !== 'all' && folder.id !== note?.folder)
+			.map((folder) => ({ value: folder.id, label: folder.label }))
+	);
+
+	function moveToFolder(folder: string) {
+		if (!note || folder === note.folder) return;
+		onupdate(note.id, { folder });
+		moveFolder = '';
+	}
 
 	$effect(() => {
 		title = note?.title ?? '';
@@ -291,13 +303,27 @@
 
 			{#if !fullPreview}
 				<div class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
-					<Button
-						bare
-						class="w-fit max-w-full truncate text-label-sm tracking-wide text-primary capitalize hover:brightness-110"
-						onclick={() => onselectfolder?.(note.folder)}
-					>
-						{folderLabel}
-					</Button>
+					<div class="flex flex-wrap items-center gap-2">
+						<Button
+							bare
+							class="w-fit max-w-full truncate text-label-sm tracking-wide text-primary capitalize hover:brightness-110"
+							onclick={() => onselectfolder?.(note.folder)}
+						>
+							{folderLabel}
+						</Button>
+						{#if folderOptions.length}
+							<Select
+								bind:value={moveFolder}
+								placeholder="Move to…"
+								label="Move note to folder"
+								size="sm"
+								variant="chip"
+								class="max-w-full"
+								options={folderOptions}
+								onchange={moveToFolder}
+							/>
+						{/if}
+					</div>
 					<Input
 						variant="bare"
 						size="none"
