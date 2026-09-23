@@ -7,6 +7,7 @@
 	import { clickedCheckboxIndex, enableTaskCheckboxes } from '$lib/content/markdown-preview';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { settings, type EditorView } from '$lib/stores/settings.svelte';
 	import { Textarea } from '$lib/components/base';
@@ -42,13 +43,26 @@
 		focusEnd();
 	});
 
-	const html = $derived.by(() => {
-		if (!body) return '';
-		try {
-			return enableTaskCheckboxes(renderNoteHtml(body));
-		} catch {
-			return '';
+	let html = $state('');
+
+	$effect(() => {
+		let cancelled = false;
+		if (!body) {
+			html = '';
+			return;
 		}
+
+		void renderNotePreviewHtml(renderNoteHtml(body))
+			.then((rendered) => {
+				if (!cancelled) html = enableTaskCheckboxes(rendered);
+			})
+			.catch(() => {
+				if (!cancelled) html = '';
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	function focusEnd() {

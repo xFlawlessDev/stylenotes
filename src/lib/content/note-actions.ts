@@ -6,6 +6,7 @@ import { preserveBlankLines } from '$lib/content/markdown-preview';
 import { repairLocalImageLinks, resolveLocalImages } from '$lib/content/attachments';
 import { slugifyFolder } from '$lib/stores/notes';
 import { isTauri } from '$lib/windows';
+import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 
 /** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset protocol. */
 const ALLOWED_URI =
@@ -49,38 +50,41 @@ export function notePrintDocument(note: Note, rendered: string): string {
 	return (
 		`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
 		'<style>body{font-family:system-ui,sans-serif;line-height:1.7;max-width:720px;margin:40px auto;padding:0 24px;color:#111}' +
-		'h1{font-size:1.8rem;margin-bottom:1rem}img{max-width:100%}</style></head><body>' +
+		'h1{font-size:1.8rem;margin-bottom:1rem}img,svg{max-width:100%;height:auto}.mermaid-diagram{margin:1.5rem 0;overflow-x:auto}.mermaid-diagram svg{display:block;margin:auto}</style></head><body>' +
 		`<h1>${title}</h1>${rendered}` +
 		'</body></html>'
 	);
 }
 
-export function printNoteDocument(note: Note, rendered: string): boolean {
+export function printNoteDocument(note: Note, rendered: string | Promise<string>): boolean {
 	if (typeof document === 'undefined') return false;
-	const html = notePrintDocument(note, rendered);
 
 	const popup = window.open('', '_blank', 'width=800,height=900');
 	if (popup) {
-		popup.document.write(html);
-		popup.document.close();
-		popup.focus();
-		popup.print();
+		void Promise.resolve(rendered).then((html) => {
+			popup.document.write(notePrintDocument(note, html));
+			popup.document.close();
+			popup.focus();
+			popup.print();
+		});
 		return true;
 	}
 
 	const iframe = document.createElement('iframe');
 	iframe.setAttribute('aria-hidden', 'true');
 	iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-	iframe.srcdoc = html;
-	iframe.onload = () => {
-		try {
-			iframe.contentWindow?.focus();
-			iframe.contentWindow?.print();
-		} finally {
-			setTimeout(() => iframe.remove(), 1000);
-		}
-	};
-	document.body.appendChild(iframe);
+	void Promise.resolve(rendered).then((html) => {
+		iframe.onload = () => {
+			try {
+				iframe.contentWindow?.focus();
+				iframe.contentWindow?.print();
+			} finally {
+				setTimeout(() => iframe.remove(), 1000);
+			}
+		};
+		iframe.srcdoc = notePrintDocument(note, html);
+		document.body.appendChild(iframe);
+	});
 	return true;
 }
 
@@ -224,7 +228,10 @@ export function createNoteActions(notify: (message: string) => void) {
 			notify(ok ? 'Note copied to clipboard' : 'Could not copy note');
 		},
 		print(note: Note) {
-			if (!printNoteDocument(note, renderNoteHtml(note.body))) {
+			const rendered = renderNotePreviewHtml(renderNoteHtml(note.body)).catch(() =>
+				renderNoteHtml(note.body),
+			);
+			if (!printNoteDocument(note, rendered)) {
 				notify('Could not open print view');
 			}
 		},

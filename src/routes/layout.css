@@ -882,6 +882,22 @@ html[data-motion='reduced'] *::after {
 	line-height: 1.65;
 }
 
+.markdown-body .mermaid-diagram {
+	max-width: 100%;
+	margin: 1.1rem 0;
+	overflow-x: auto;
+	border: 1px solid var(--glass-stroke);
+	border-radius: 0.9rem;
+	background-color: color-mix(in oklab, var(--color-surface-container-lowest) 55%, transparent);
+}
+
+.markdown-body .mermaid-diagram svg {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: 0 auto;
+}
+
 .markdown-body hr {
 	margin: 1.75rem 0;
 	border: none;

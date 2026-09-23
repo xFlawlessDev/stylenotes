@@ -15,6 +15,7 @@
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { openNoteWindow } from '$lib/windows';
 	import { Button, EmptyState, Input, Select, Textarea } from '$lib/components/base';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
@@ -111,17 +112,24 @@
 
 	$effect(() => {
 		const source = note?.body ?? '';
+		let cancelled = false;
 
 		if (!source) {
 			html = '';
 			return;
 		}
 
-		try {
-			html = enableTaskCheckboxes(renderNoteHtml(source));
-		} catch {
-			html = '';
-		}
+		void renderNotePreviewHtml(renderNoteHtml(source))
+			.then((rendered) => {
+				if (!cancelled) html = enableTaskCheckboxes(rendered);
+			})
+			.catch(() => {
+				if (!cancelled) html = '';
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	function commitBody(value: string) {

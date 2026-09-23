@@ -18,6 +18,12 @@ describe('renderNoteHtml', () => {
 		const html = renderNoteHtml('<script>alert(1)</script>\n\nHello');
 		expect(html).not.toContain('<script>');
 	});
+
+	it('keeps Mermaid fences as code in the synchronous print renderer', () => {
+		const html = renderNoteHtml('```mermaid\nflowchart LR\nA --> B\n```');
+		expect(html).toContain('class="language-mermaid"');
+		expect(html).toContain('A --&gt; B');
+	});
 });
 
 describe('escapeHtml', () => {
@@ -43,6 +49,12 @@ describe('notePrintDocument', () => {
 	it('falls back to a default title when empty', () => {
 		const note = createNote({ title: '' });
 		expect(notePrintDocument(note, '')).toContain('<h1>Untitled note</h1>');
+	});
+
+	it('includes inline Mermaid SVG in the print document', () => {
+		const note = createNote({ title: 'Diagram' });
+		const svg = '<div class="mermaid-diagram"><svg><path d="M0 0" /></svg></div>';
+		expect(notePrintDocument(note, svg)).toContain(svg);
 	});
 });
 
