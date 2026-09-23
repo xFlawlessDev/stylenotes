@@ -9,7 +9,7 @@ export const KANBAN_LABEL = "kanban";
 /** Event that asks the workspace window to switch section/view. */
 export const NAVIGATE_EVENT = "stylenotes:navigate";
 
-export type WorkspaceView = "list" | "kanban" | "gantt";
+export type WorkspaceView = "dashboard" | "list" | "kanban" | "gantt";
 
 export type WorkspaceNavigate = {
   section: "notes" | "tasks";
@@ -112,10 +112,10 @@ export async function openKanban() {
   });
 }
 
-/** Opens the workspace on the Kanban view of the tasks section. */
+/** Opens the workspace on the Dashboard view of the tasks section. */
 export async function openTasksInWorkspace() {
   if (isTauri) {
-    const payload: WorkspaceNavigate = { section: "tasks", view: "kanban" };
+    const payload: WorkspaceNavigate = { section: "tasks", view: "dashboard" };
     await emit(NAVIGATE_EVENT, payload).catch(() => undefined);
   }
   return openWorkspace();

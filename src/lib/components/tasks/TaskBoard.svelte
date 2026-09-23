@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
-	import { LayoutList, Kanban, GanttChart, SlidersHorizontal, Trash2, PictureInPicture2 } from '@lucide/svelte';
+	import {
+		LayoutList,
+		Kanban,
+		GanttChart,
+		LayoutDashboard,
+		SlidersHorizontal,
+		Trash2,
+		PictureInPicture2
+	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder } from '$lib/stores/notes';
 	import {
@@ -26,6 +34,7 @@
 	import TaskList from '$lib/components/tasks/TaskList.svelte';
 	import TaskKanban from '$lib/components/tasks/TaskKanban.svelte';
 	import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
+	import TaskDashboard from '$lib/components/tasks/TaskDashboard.svelte';
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
 	import { dependencyStore } from '$lib/stores/dependencies.svelte';
@@ -33,12 +42,12 @@
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	export type TaskView = 'list' | 'kanban' | 'gantt';
+	export type TaskView = 'dashboard' | 'list' | 'kanban' | 'gantt';
 
 	let {
 		tasks = $bindable(),
 		selectedId = $bindable(''),
-		view = $bindable<TaskView>('kanban'),
+		view = $bindable<TaskView>('dashboard'),
 		focusToken = 0,
 		workspaceId,
 		folders,
@@ -110,6 +119,7 @@
 	);
 
 	const views: { id: TaskView; label: string; icon: typeof LayoutList }[] = [
+		{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
 		{ id: 'list', label: 'List', icon: LayoutList },
 		{ id: 'kanban', label: 'Kanban', icon: Kanban },
 		{ id: 'gantt', label: 'Calendar', icon: GanttChart }
@@ -330,7 +340,14 @@
 			</div>
 		</div>
 
-		{#if view === 'list'}
+		{#if view === 'dashboard'}
+			<TaskDashboard
+				tasks={filtered}
+				{selectedId}
+				onselect={(id) => (selectedId = id)}
+				onedit={openEdit}
+			/>
+		{:else if view === 'list'}
 			<TaskList
 				tasks={filtered}
 				{selectedId}

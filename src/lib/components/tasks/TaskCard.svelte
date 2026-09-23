@@ -5,6 +5,8 @@
 		isTaskOverdue,
 		priorityMeta,
 		taskPriority,
+		taskStatus,
+		statusMeta,
 		formatTaskDate,
 		type Task
 	} from '$lib/stores/tasks';
@@ -14,6 +16,7 @@
 		selected = false,
 		noteTitle = null,
 		dragging = false,
+		showStatus = false,
 		onselect,
 		onedit
 	}: {
@@ -21,12 +24,14 @@
 		selected?: boolean;
 		noteTitle?: string | null;
 		dragging?: boolean;
+		showStatus?: boolean;
 		onselect: () => void;
 		onedit: () => void;
 	} = $props();
 
 	const overdue = $derived(isTaskOverdue(task));
 	const priority = $derived(priorityMeta[taskPriority(task)]);
+	const status = $derived(statusMeta[taskStatus(task)]);
 </script>
 
 <div
@@ -70,6 +75,11 @@
 	{/if}
 
 	<div class="flex flex-wrap items-center gap-1.5">
+		{#if showStatus}
+			<span class="rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code {status.tone}">
+				{status.label}
+			</span>
+		{/if}
 		<span
 			class="rounded-md px-1.5 py-px text-code-sm font-code {priority.tone}"
 			title="Priority"

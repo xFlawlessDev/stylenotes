@@ -89,7 +89,7 @@
 	let section = $state<'notes' | 'tasks'>('notes');
 	let tasks = $state<Task[]>([]);
 	let selectedTaskId = $state('');
-	let taskView = $state<TaskView>('kanban');
+	let taskView = $state<TaskView>('dashboard');
 	let taskFocusToken = $state(0);
 	let railOpen = $state(false);
 	let feedOpen = $state(false);
