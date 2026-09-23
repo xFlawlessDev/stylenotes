@@ -27,6 +27,9 @@
 	import TaskKanban from '$lib/components/tasks/TaskKanban.svelte';
 	import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
+	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
+	import { dependencyStore } from '$lib/stores/dependencies.svelte';
+	import { isTaskBlocked } from '$lib/stores/tasks';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -37,6 +40,7 @@
 		selectedId = $bindable(''),
 		view = $bindable<TaskView>('kanban'),
 		focusToken = 0,
+		workspaceId,
 		folders,
 		notes,
 		onnotify
@@ -45,6 +49,7 @@
 		selectedId?: string;
 		view?: TaskView;
 		focusToken?: number;
+		workspaceId: string;
 		folders: Folder[];
 		notes: Note[];
 		onnotify: (message: string) => void;
@@ -134,7 +139,7 @@
 			void persistOrToast(next);
 			onnotify('Task updated');
 		} else {
-			const task = createTask({ ...data, position: nextPosition(tasks, data.status) });
+			const task = createTask({ ...data, workspaceId, position: nextPosition(tasks, data.status) });
 			tasks = [task, ...tasks];
 			selectedId = task.id;
 			void persistOrToast(task);
@@ -286,6 +291,9 @@
 						>
 							{selectedTask.title}
 						</span>
+						<BlockedIndicator
+							blocked={isTaskBlocked(selectedTask, tasks, dependencyStore.items)}
+						/>
 						<Select
 							size="sm"
 							label="Status of {selectedTask.title}"

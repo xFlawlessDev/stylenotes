@@ -10,6 +10,7 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
 export type Task = {
 	id: string;
+	workspaceId?: string;
 	title: string;
 	notes: string;
 	status: TaskStatus;
@@ -22,6 +23,43 @@ export type Task = {
 	completed: boolean;
 	overlay: boolean;
 };
+
+export type TaskDependency = {
+	taskId: string;
+	dependsOnTaskId: string;
+	createdAt?: string;
+};
+
+export function canAddDependency(
+	taskId: string,
+	dependsOnTaskId: string,
+	tasks: Task[],
+	dependencies: TaskDependency[]
+): boolean {
+	if (taskId === dependsOnTaskId) return false;
+	const task = tasks.find((item) => item.id === taskId);
+	const dependency = tasks.find((item) => item.id === dependsOnTaskId);
+	if (!task || !dependency || task.workspaceId !== dependency.workspaceId) return false;
+	if (dependencies.some((item) => item.taskId === taskId && item.dependsOnTaskId === dependsOnTaskId)) return false;
+
+	// Adding A -> B is invalid when B already reaches A.
+	const visiting = new Set<string>();
+	const reaches = (current: string): boolean => {
+		if (current === taskId) return true;
+		if (visiting.has(current)) return false;
+		visiting.add(current);
+		return dependencies
+			.filter((item) => item.taskId === current)
+			.some((item) => reaches(item.dependsOnTaskId));
+	};
+	return !reaches(dependsOnTaskId);
+}
+
+export function isTaskBlocked(task: Task, tasks: Task[], dependencies: TaskDependency[]): boolean {
+	return dependencies
+		.filter((item) => item.taskId === task.id)
+		.some((item) => !tasks.find((candidate) => candidate.id === item.dependsOnTaskId)?.completed);
+}
 
 export type TaskFormData = {
 	title: string;
@@ -61,6 +99,7 @@ export function isTaskPriority(value: string): value is TaskPriority {
 export function createTask(seed: Partial<Task> = {}): Task {
 	return {
 		id: seed.id ?? crypto.randomUUID(),
+		workspaceId: seed.workspaceId ?? 'workspace-default',
 		title: seed.title?.trim() || 'Untitled task',
 		notes: seed.notes ?? '',
 		status: seed.status && isTaskStatus(seed.status) ? seed.status : 'todo',

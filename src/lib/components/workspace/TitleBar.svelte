@@ -16,6 +16,7 @@
 	import { Button, SegmentedControl } from '$lib/components/base';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import WorkspaceSwitcher from '$lib/components/workspace/WorkspaceSwitcher.svelte';
 
 	let {
 		title = 'StyleNotes',
@@ -30,6 +31,12 @@
 		onopenfolders,
 		onopennotes,
 		notifications,
+		workspaceId,
+		workspaces = [],
+		onworkspacechange,
+		onworkspacecreate,
+		onworkspacerename,
+		onworkspacedelete,
 	}: {
 		title?: string;
 		mode?: ThemeMode;
@@ -43,6 +50,13 @@
 		onopenfolders?: () => void;
 		onopennotes?: () => void;
 		notifications?: Snippet;
+		workspaceId?: string;
+		workspaces?: { id: string; name: string; color: string }[];
+		onworkspacechange?: (id: string) => void;
+		/** Resolve to `false` when the write failed so the dialog can show it. */
+		onworkspacecreate?: (name: string) => boolean | Promise<boolean>;
+		onworkspacerename?: (id: string, name: string) => boolean | Promise<boolean>;
+		onworkspacedelete?: (id: string) => boolean | Promise<boolean>;
 	} = $props();
 
 	const sections = [
@@ -105,6 +119,16 @@
 			/>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
 		</div>
+		{#if workspaceId && workspaces.length}
+			<WorkspaceSwitcher
+				activeId={workspaceId}
+				{workspaces}
+				onchange={onworkspacechange}
+				oncreate={onworkspacecreate}
+				onrename={onworkspacerename}
+				ondelete={onworkspacedelete}
+			/>
+		{/if}
 
 		<SegmentedControl
 			value={section}

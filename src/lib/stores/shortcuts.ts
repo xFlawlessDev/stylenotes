@@ -4,6 +4,7 @@ import { persistNote } from '$lib/stores/notes';
 import { createTask, nextPosition } from '$lib/stores/tasks';
 import { persistTask, refreshTasks } from '$lib/stores/tasks.svelte';
 import { isTauri, openNoteWindow, openTaskWindow } from '$lib/windows';
+import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
 /** Shortcut label shown in the UI; the keys are registered in Rust (`lib.rs`). */
 export const QUICK_NOTE_LABEL = 'Ctrl+Shift+N';
@@ -20,7 +21,7 @@ export type QuickCaptureKind = 'note' | 'task';
  * or null when the database is unavailable.
  */
 export async function createQuickNote(): Promise<string | null> {
-	const note = createNote({ title: 'Quick note', overlay: true });
+	const note = createNote({ title: 'Quick note', overlay: true, workspaceId: workspaceStore.activeId });
 	if (!(await persistNote(note))) return null;
 	await openNoteWindow(note.id);
 	return note.id;
@@ -35,6 +36,7 @@ export async function createQuickTask(): Promise<string | null> {
 	const task = createTask({
 		title: 'Quick task',
 		overlay: true,
+		workspaceId: workspaceStore.activeId,
 		position: nextPosition(tasks, 'todo')
 	});
 	if (!(await persistTask(task))) return null;

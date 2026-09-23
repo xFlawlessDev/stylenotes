@@ -199,6 +199,40 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "add_workspaces_and_scope_records",
+            sql: "
+                CREATE TABLE IF NOT EXISTS workspaces (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    color TEXT NOT NULL DEFAULT 'primary',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                INSERT OR IGNORE INTO workspaces (id, name, color)
+                VALUES ('workspace-default', 'Personal', 'primary');
+
+                ALTER TABLE notes ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'workspace-default' REFERENCES workspaces(id) ON DELETE CASCADE;
+                ALTER TABLE tasks ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'workspace-default' REFERENCES workspaces(id) ON DELETE CASCADE;
+                ALTER TABLE folders ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'workspace-default' REFERENCES workspaces(id) ON DELETE CASCADE;
+                CREATE INDEX IF NOT EXISTS idx_notes_workspace_id ON notes (workspace_id);
+                CREATE INDEX IF NOT EXISTS idx_tasks_workspace_id ON tasks (workspace_id);
+                CREATE INDEX IF NOT EXISTS idx_folders_workspace_id ON folders (workspace_id);
+
+                CREATE TABLE IF NOT EXISTS task_dependencies (
+                    task_id TEXT NOT NULL,
+                    depends_on_task_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (task_id, depends_on_task_id),
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    CHECK (task_id != depends_on_task_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies (depends_on_task_id);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

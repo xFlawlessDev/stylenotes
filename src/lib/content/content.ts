@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 
 export type Note = {
-  id: string;
+	id: string;
+	workspaceId?: string;
   title: string;
   folder: string;
   tags: string[];
@@ -27,7 +28,8 @@ export function buildExcerpt(body: string, limit = 150): string {
 export function createNote(seed: Partial<Note> = {}): Note {
   const body = seed.body ?? '';
   return {
-    id: seed.id ?? crypto.randomUUID(),
+		id: seed.id ?? crypto.randomUUID(),
+		workspaceId: seed.workspaceId ?? 'workspace-default',
     title: seed.title?.trim() || 'Untitled note',
     folder: seed.folder ?? 'personal',
     tags: seed.tags ?? [],
@@ -114,8 +116,9 @@ function buildNote(path: string, raw: string): Note {
   const fileName = path.split('/').pop() ?? path;
   const id = fileName.replace(/\.md$/, '');
 
-  return {
-    id,
+	return {
+		id,
+		workspaceId: 'workspace-default',
     title: asString(data.title, id),
     folder: asString(data.folder, 'personal'),
     tags: asList(data.tags),

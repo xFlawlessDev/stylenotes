@@ -3,6 +3,7 @@ import { emit } from '@tauri-apps/api/event';
 import { tasksRepo } from '$lib/db';
 import type { Task } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
+import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
 export const TASKS_CHANGED = 'tasks:changed';
 
@@ -27,7 +28,7 @@ export async function hydrateTasks(): Promise<Task[]> {
 export async function refreshTasks(): Promise<Task[]> {
 	if (!browser) return taskStore.items;
 	try {
-		taskStore.items = await tasksRepo.list();
+		taskStore.items = await tasksRepo.list(workspaceStore.activeId);
 	} catch {
 		/* keep the last known tasks */
 	}
@@ -38,7 +39,7 @@ export async function refreshTasks(): Promise<Task[]> {
 export async function persistTask(task: Task): Promise<boolean> {
 	if (!browser) return false;
 	try {
-		await tasksRepo.upsert(task);
+		await tasksRepo.upsert({ ...task, workspaceId: task.workspaceId || workspaceStore.activeId });
 		notifyTasksChanged();
 		return true;
 	} catch {
@@ -49,7 +50,7 @@ export async function persistTask(task: Task): Promise<boolean> {
 export async function persistTaskList(tasks: Task[]): Promise<boolean> {
 	if (!browser) return false;
 	try {
-		await tasksRepo.replaceAll(tasks);
+		await tasksRepo.replaceAll(tasks.map((task) => ({ ...task, workspaceId: task.workspaceId || workspaceStore.activeId })));
 		notifyTasksChanged();
 		return true;
 	} catch {

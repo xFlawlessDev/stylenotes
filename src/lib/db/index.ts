@@ -3,7 +3,7 @@ import type { Note } from '$lib/content/content';
 import type { CustomFolder } from '$lib/stores/notes';
 import type { AppNotification } from '$lib/stores/notifications';
 import type { Settings } from '$lib/stores/settings.svelte';
-import type { Task } from '$lib/stores/tasks';
+import type { Task, TaskDependency } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 
 export const DB_URL = 'sqlite:stylenotes.db';
@@ -22,6 +22,7 @@ export function getDb(): Promise<Database> {
 
 type NoteRow = {
 	id: string;
+	workspace_id: string;
 	title: string;
 	folder: string;
 	body: string;
@@ -36,7 +37,7 @@ type NoteRow = {
 type TagRow = { note_id: string; tag: string };
 
 function toNote(row: NoteRow, tags: string[]): Note {
-	return {
+	const note: Note = {
 		id: row.id,
 		title: row.title,
 		folder: row.folder,
@@ -49,6 +50,8 @@ function toNote(row: NoteRow, tags: string[]): Note {
 		words: Number(row.words) || 0,
 		chars: Number(row.chars) || 0,
 	};
+	if (row.workspace_id) note.workspaceId = row.workspace_id;
+	return note;
 }
 
 async function tagsByNote(): Promise<Map<string, string[]>> {
@@ -72,27 +75,44 @@ async function writeTags(noteId: string, tags: string[]) {
 }
 
 export const notesRepo = {
-	async list(): Promise<Note[]> {
+	async list(workspaceId?: string): Promise<Note[]> {
 		const db = await getDb();
 		const rows = await db.select<NoteRow[]>(
-			'SELECT * FROM notes ORDER BY pinned DESC, created_at DESC'
+			workspaceId ? 'SELECT * FROM notes WHERE workspace_id = $1 ORDER BY pinned DESC, created_at DESC' : 'SELECT * FROM notes ORDER BY pinned DESC, created_at DESC',
+			workspaceId ? [workspaceId] : []
 		);
 		const tags = await tagsByNote();
 		return rows.map((row) => toNote(row, tags.get(row.id) ?? []));
 	},
 
-	async count(): Promise<number> {
+	async count(workspaceId?: string): Promise<number> {
 		const db = await getDb();
-		const rows = await db.select<{ total: number }[]>('SELECT COUNT(*) AS total FROM notes');
+		const rows = await db.select<{ total: number }[]>(
+			workspaceId ? 'SELECT COUNT(*) AS total FROM notes WHERE workspace_id = $1' : 'SELECT COUNT(*) AS total FROM notes',
+			workspaceId ? [workspaceId] : []
+		);
 		return Number(rows[0]?.total ?? 0);
 	},
 
 	async upsert(note: Note): Promise<void> {
 		const db = await getDb();
+		if (!note.workspaceId) {
+			await db.execute(
+				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+				 ON CONFLICT(id) DO UPDATE SET title = excluded.title, folder = excluded.folder, body = excluded.body,
+				 excerpt = excluded.excerpt, words = excluded.words, chars = excluded.chars, pinned = excluded.pinned,
+				 overlay = excluded.overlay, updated = excluded.updated`,
+				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated]
+			);
+			await writeTags(note.id, note.tags);
+			return;
+		}
 		await db.execute(
-			`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			 ON CONFLICT(id) DO UPDATE SET
+				workspace_id = excluded.workspace_id,
 				title = excluded.title,
 				folder = excluded.folder,
 				body = excluded.body,
@@ -104,6 +124,7 @@ export const notesRepo = {
 				updated = excluded.updated`,
 			[
 				note.id,
+				note.workspaceId ?? 'workspace-default',
 				note.title,
 				note.folder,
 				note.body,
@@ -130,10 +151,11 @@ export const notesRepo = {
 		await db.execute('DELETE FROM notes');
 		for (const note of notes) {
 			await db.execute(
-				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+				`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
+					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 				[
 					note.id,
+					note.workspaceId ?? 'workspace-default',
 					note.title,
 					note.folder,
 					note.body,
@@ -151,11 +173,16 @@ export const notesRepo = {
 };
 
 export const foldersRepo = {
-	async list(): Promise<CustomFolder[]> {
+	async list(workspaceId?: string): Promise<CustomFolder[]> {
 		const db = await getDb();
 		const rows = await db.select<
 			{ id: string; label: string; icon: string | null; position: number | null }[]
-		>('SELECT id, label, icon, position FROM folders ORDER BY position ASC, created_at ASC');
+		>(
+			workspaceId
+				? 'SELECT id, label, icon, position FROM folders WHERE workspace_id = $1 ORDER BY position ASC, created_at ASC'
+				: 'SELECT id, label, icon, position FROM folders ORDER BY position ASC, created_at ASC',
+			workspaceId ? [workspaceId] : []
+		);
 		return rows.map((row) => ({
 			id: row.id,
 			label: row.label,
@@ -164,13 +191,21 @@ export const foldersRepo = {
 		}));
 	},
 
-	async upsert(folder: CustomFolder, position?: number): Promise<void> {
+	async upsert(folder: CustomFolder, position?: number, workspaceId?: string): Promise<void> {
 		const db = await getDb();
 		const pos = position ?? folder.position ?? null;
+		if (!workspaceId) {
+			await db.execute(
+				`INSERT INTO folders (id, label, icon, position) VALUES ($1, $2, $3, $4)
+				 ON CONFLICT(id) DO UPDATE SET label = excluded.label, icon = excluded.icon, position = excluded.position`,
+				[folder.id, folder.label, folder.icon ?? null, pos]
+			);
+			return;
+		}
 		await db.execute(
-			`INSERT INTO folders (id, label, icon, position) VALUES ($1, $2, $3, $4)
-			 ON CONFLICT(id) DO UPDATE SET label = excluded.label, icon = excluded.icon, position = excluded.position`,
-			[folder.id, folder.label, folder.icon ?? null, pos]
+			`INSERT INTO folders (id, workspace_id, label, icon, position) VALUES ($1, $2, $3, $4, $5)
+			 ON CONFLICT(id) DO UPDATE SET workspace_id = excluded.workspace_id, label = excluded.label, icon = excluded.icon, position = excluded.position`,
+			[folder.id, workspaceId, folder.label, folder.icon ?? null, pos]
 		);
 	},
 
@@ -179,12 +214,17 @@ export const foldersRepo = {
 		await db.execute('DELETE FROM folders WHERE id = $1', [id]);
 	},
 
-	async replaceAll(folders: CustomFolder[]): Promise<void> {
+	async replaceAll(folders: CustomFolder[], workspaceId?: string): Promise<void> {
 		const db = await getDb();
-		await db.execute('DELETE FROM folders');
+		await db.execute(workspaceId ? 'DELETE FROM folders WHERE workspace_id = $1' : 'DELETE FROM folders', workspaceId ? [workspaceId] : []);
 		for (const [index, folder] of folders.entries()) {
-			await db.execute('INSERT INTO folders (id, label, icon, position) VALUES ($1, $2, $3, $4)', [
+			if (!workspaceId) {
+				await db.execute('INSERT INTO folders (id, label, icon, position) VALUES ($1, $2, $3, $4)', [folder.id, folder.label, folder.icon ?? null, folder.position ?? index]);
+				continue;
+			}
+			await db.execute('INSERT INTO folders (id, workspace_id, label, icon, position) VALUES ($1, $2, $3, $4, $5)', [
 				folder.id,
+				workspaceId,
 				folder.label,
 				folder.icon ?? null,
 				folder.position ?? index,
@@ -278,6 +318,7 @@ export const metaRepo = {
 
 type TaskRow = {
 	id: string;
+	workspace_id: string;
 	title: string;
 	notes: string;
 	status: string;
@@ -294,6 +335,7 @@ type TaskRow = {
 function toTask(row: TaskRow): Task {
 	return {
 		id: row.id,
+		workspaceId: row.workspace_id ?? 'workspace-default',
 		title: row.title,
 		notes: row.notes,
 		status: row.status as Task['status'],
@@ -309,17 +351,21 @@ function toTask(row: TaskRow): Task {
 }
 
 export const tasksRepo = {
-	async list(): Promise<Task[]> {
+	async list(workspaceId?: string): Promise<Task[]> {
 		const db = await getDb();
 		const rows = await db.select<TaskRow[]>(
-			'SELECT * FROM tasks ORDER BY position ASC, created_at ASC'
+			workspaceId ? 'SELECT * FROM tasks WHERE workspace_id = $1 ORDER BY position ASC, created_at ASC' : 'SELECT * FROM tasks ORDER BY position ASC, created_at ASC',
+			workspaceId ? [workspaceId] : []
 		);
 		return rows.map(toTask);
 	},
 
-	async count(): Promise<number> {
+	async count(workspaceId?: string): Promise<number> {
 		const db = await getDb();
-		const rows = await db.select<{ total: number }[]>('SELECT COUNT(*) AS total FROM tasks');
+		const rows = await db.select<{ total: number }[]>(
+			workspaceId ? 'SELECT COUNT(*) AS total FROM tasks WHERE workspace_id = $1' : 'SELECT COUNT(*) AS total FROM tasks',
+			workspaceId ? [workspaceId] : []
+		);
 		return Number(rows[0]?.total ?? 0);
 	},
 
@@ -327,9 +373,10 @@ export const tasksRepo = {
 		const db = await getDb();
 		await db.execute(
 			`INSERT INTO tasks
-				(id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'))
+				(id, workspace_id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, datetime('now'))
 			 ON CONFLICT(id) DO UPDATE SET
+				workspace_id = excluded.workspace_id,
 				title = excluded.title,
 				notes = excluded.notes,
 				status = excluded.status,
@@ -344,6 +391,7 @@ export const tasksRepo = {
 				updated_at = datetime('now')`,
 			[
 				task.id,
+				task.workspaceId ?? 'workspace-default',
 				task.title,
 				task.notes,
 				task.status,
@@ -361,6 +409,7 @@ export const tasksRepo = {
 
 	async remove(id: string): Promise<void> {
 		const db = await getDb();
+		await db.execute('DELETE FROM task_dependencies WHERE task_id = $1 OR depends_on_task_id = $1', [id]);
 		await db.execute('DELETE FROM tasks WHERE id = $1', [id]);
 	},
 
@@ -375,10 +424,11 @@ export const tasksRepo = {
 		for (const task of tasks) {
 			await db.execute(
 				`INSERT INTO tasks
-					(id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+					(id, workspace_id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay)
+					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 				[
 					task.id,
+					task.workspaceId ?? 'workspace-default',
 					task.title,
 					task.notes,
 					task.status,
@@ -424,3 +474,38 @@ export const settingsRepo = {
 		await db.execute('DELETE FROM settings');
 	},
 };
+
+type DependencyRow = { task_id: string; depends_on_task_id: string; created_at: string };
+
+export const dependenciesRepo = {
+	async list(workspaceId: string): Promise<TaskDependency[]> {
+		const db = await getDb();
+		const rows = await db.select<DependencyRow[]>(
+			`SELECT d.task_id, d.depends_on_task_id, d.created_at
+			 FROM task_dependencies d JOIN tasks t ON t.id = d.task_id
+			 WHERE t.workspace_id = $1 ORDER BY d.created_at ASC`,
+			[workspaceId]
+		);
+		return rows.map((row) => ({ taskId: row.task_id, dependsOnTaskId: row.depends_on_task_id, createdAt: row.created_at }));
+	},
+
+	async add(taskId: string, dependsOnTaskId: string, workspaceId: string): Promise<void> {
+		const db = await getDb();
+		if (taskId === dependsOnTaskId) throw new Error('A task cannot depend on itself');
+		const rows = await db.select<{ total: number }[]>(
+			`SELECT COUNT(*) AS total FROM tasks
+			 WHERE workspace_id = $1 AND id IN ($2, $3)`,
+			[workspaceId, taskId, dependsOnTaskId]
+		);
+		if (Number(rows[0]?.total ?? 0) !== 2) throw new Error('Dependencies must stay inside one workspace');
+		await db.execute('INSERT INTO task_dependencies (task_id, depends_on_task_id) VALUES ($1, $2)', [taskId, dependsOnTaskId]);
+	},
+
+	async remove(taskId: string, dependsOnTaskId: string): Promise<void> {
+		const db = await getDb();
+		await db.execute('DELETE FROM task_dependencies WHERE task_id = $1 AND depends_on_task_id = $2', [taskId, dependsOnTaskId]);
+	},
+};
+
+// `workspacesRepo` lives in `./workspaces`: it owns the workspace table plus
+// the records scoped to it (see the migration that added `workspace_id`).

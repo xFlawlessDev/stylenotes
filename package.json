@@ -44,6 +44,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
+    "@types/node": "^26.6.2",
     "@vitest/coverage-v8": "^5.0.1",
     "bits-ui": "^2.18.0",
     "cn": "^0.3.0",

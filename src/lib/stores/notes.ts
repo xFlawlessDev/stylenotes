@@ -10,6 +10,7 @@ import {
 } from '$lib/content/content';
 import { foldersRepo, metaRepo, notesRepo } from '$lib/db';
 import { isTauri } from '$lib/windows';
+import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
 export const NOTES_CHANGED = 'notes:changed';
 
@@ -141,7 +142,7 @@ const SEED_FLAG = 'notes_seeded_v1';
 export async function listNotes(): Promise<Note[]> {
 	if (!browser) return [...seedNotes];
 	try {
-		return await notesRepo.list();
+		return await notesRepo.list(workspaceStore.activeId);
 	} catch {
 		return [...seedNotes];
 	}
@@ -152,7 +153,7 @@ export async function hydrateNotes(): Promise<Note[]> {
 	try {
 		const seeded = await metaRepo.get(SEED_FLAG);
 		if (!seeded) {
-			await notesRepo.replaceAll(seedNotes);
+			await notesRepo.replaceAll(seedNotes.map((note) => ({ ...note, workspaceId: workspaceStore.activeId })));
 			await metaRepo.set(SEED_FLAG, new Date().toISOString());
 		}
 	} catch {
@@ -164,7 +165,7 @@ export async function hydrateNotes(): Promise<Note[]> {
 export async function loadFolders(): Promise<CustomFolder[]> {
 	if (!browser) return [];
 	try {
-		return await foldersRepo.list();
+		return await foldersRepo.list(workspaceStore.activeId);
 	} catch {
 		return [];
 	}
@@ -173,7 +174,8 @@ export async function loadFolders(): Promise<CustomFolder[]> {
 export async function persistFolders(folders: CustomFolder[]): Promise<void> {
 	if (!browser) return;
 	try {
-		await foldersRepo.replaceAll(folders);
+		if (workspaceStore.loaded) await foldersRepo.replaceAll(folders, workspaceStore.activeId);
+		else await foldersRepo.replaceAll(folders);
 	} catch {
 		/* ignore */
 	}
@@ -182,7 +184,7 @@ export async function persistFolders(folders: CustomFolder[]): Promise<void> {
 export async function persistNote(note: Note): Promise<boolean> {
 	if (!browser) return false;
 	try {
-		await notesRepo.upsert(note);
+		await notesRepo.upsert({ ...note, workspaceId: note.workspaceId || workspaceStore.activeId });
 		notifyNotesChanged();
 		return true;
 	} catch {
@@ -193,7 +195,7 @@ export async function persistNote(note: Note): Promise<boolean> {
 export async function persistNotes(notes: Note[]): Promise<boolean> {
 	if (!browser) return false;
 	try {
-		await notesRepo.replaceAll(notes);
+		await notesRepo.replaceAll(notes.map((note) => ({ ...note, workspaceId: note.workspaceId || workspaceStore.activeId })));
 		notifyNotesChanged();
 		return true;
 	} catch {
@@ -216,7 +218,8 @@ export async function clearNotes(): Promise<void> {
 	if (!browser) return;
 	try {
 		await notesRepo.replaceAll([]);
-		await foldersRepo.replaceAll([]);
+		if (workspaceStore.loaded) await foldersRepo.replaceAll([], workspaceStore.activeId);
+		else await foldersRepo.replaceAll([]);
 	} catch {
 		/* ignore */
 	}

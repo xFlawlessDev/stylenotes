@@ -26,6 +26,9 @@
 		type Settings
 	} from '$lib/stores/settings.svelte';
 	import { currentNoteId, isTauri, revealAndFocusCurrentWindow } from '$lib/windows';
+	import { hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
+	import { activeWorkspace } from '$lib/stores/workspaces.svelte';
+	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import NoteBodyEditor from '$lib/components/note/NoteBodyEditor.svelte';
 	import NoteViewSwitcher from '$lib/components/note/NoteViewSwitcher.svelte';
@@ -119,6 +122,7 @@
 		let disposed = false;
 
 		void (async () => {
+			await hydrateWorkspaces();
 			await hydrateSettings();
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
@@ -189,6 +193,7 @@
 				oninput={() => update({ title })}
 			/>
 			<div class="flex shrink-0 items-center gap-2 px-1.5">
+				<WorkspaceBadge name={activeWorkspace().name} color={activeWorkspace().color} />
 				<Select
 					size="sm"
 					label="Note folder"

@@ -45,6 +45,7 @@
 		type QuickCaptureKind
 	} from '$lib/stores/shortcuts';
 	import type { Task } from '$lib/stores/tasks';
+	import { hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
 	import DockHandle from '$lib/components/overlay/DockHandle.svelte';
 	import DockRailItems from '$lib/components/overlay/DockRailItems.svelte';
 	import DockRailLayers from '$lib/components/overlay/DockRailLayers.svelte';
@@ -232,7 +233,10 @@
 	}
 
 	onMount(() => {
-		void reload();
+		void (async () => {
+			await hydrateWorkspaces();
+			await reload();
+		})();
 
 		let unlistenFocus: (() => void) | undefined;
 		let unlistenTasks: (() => void) | undefined;

@@ -19,20 +19,27 @@
 		fromDateInput,
 		taskPriority,
 		taskStatus,
+		isTaskBlocked,
 		toDateInput,
 		type Task,
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import { addDependency, dependencyStore, refreshDependencies, removeDependency } from '$lib/stores/dependencies.svelte';
 	import {
 		currentTaskId,
 		isTauri,
 		openNoteWindow,
 		revealAndFocusCurrentWindow
 	} from '$lib/windows';
+	import { activeWorkspace, hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
+	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
+	import DependencyPicker from '$lib/components/tasks/DependencyPicker.svelte';
+	import DependencyList from '$lib/components/tasks/DependencyList.svelte';
+	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
 	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -53,6 +60,8 @@
 	let dueDate = $state('');
 	let revealed = $state(false);
 	let closing = false;
+	let dependencyError = $state('');
+	let allTasks = $state<Task[]>([]);
 
 	const folders = $derived(foldersFor(notes, customFolders));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
@@ -118,11 +127,20 @@
 		const [tasks, storedNotes, storedFolders] = await Promise.all([
 			refreshTasks(),
 			listNotes(),
-			loadFolders()
+			loadFolders(),
+			refreshDependencies()
 		]);
 		notes = storedNotes;
 		customFolders = storedFolders;
+		allTasks = tasks;
 		task = tasks.find((item) => item.id === taskId) ?? null;
+	}
+
+	async function addTaskDependency(dependsOnTaskId: string) {
+		if (!task) return;
+		dependencyError = (await addDependency(task.id, dependsOnTaskId, (await refreshTasks())))
+			? ''
+			: 'Dependency is invalid or would create a cycle.';
 	}
 
 	function toggleDock() {
@@ -172,6 +190,7 @@
 		let disposed = false;
 
 		void (async () => {
+			await hydrateWorkspaces();
 			await hydrateSettings();
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
@@ -262,6 +281,23 @@
 				idPrefix="task-window"
 				autofocus={revealed}
 			/>
+			<section class="flex flex-col gap-2 rounded-xl bg-surface-container-low/60 p-2.5">
+				<div class="flex items-center justify-between gap-2">
+					<h2 class="text-label-md font-label font-medium text-on-surface">Task dependencies</h2>
+					<WorkspaceBadge name={activeWorkspace().name} color={activeWorkspace().color} />
+					<BlockedIndicator
+						blocked={isTaskBlocked(task, allTasks, dependencyStore.items)}
+					/>
+				</div>
+				<DependencyPicker
+					taskId={task.id}
+					tasks={allTasks}
+					dependencies={dependencyStore.items}
+					onadd={addTaskDependency}
+				/>
+				<DependencyList task={task} tasks={allTasks} dependencies={dependencyStore.items} onremove={(item) => void removeDependency(item)} />
+				{#if dependencyError}<p class="text-label-sm text-error">{dependencyError}</p>{/if}
+			</section>
 		</div>
 	{:else}
 		<EmptyState

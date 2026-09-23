@@ -51,10 +51,21 @@
 	import TaskBoard, { type TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 	import {
 		hydrateTasks,
+		refreshTasks,
 		clearTasks,
 	} from '$lib/stores/tasks.svelte';
 	import type { Task } from '$lib/stores/tasks';
 	import { isTauri, NAVIGATE_EVENT, toggleOverlay, type WorkspaceNavigate } from '$lib/windows';
+	import {
+		createWorkspace,
+		deleteWorkspace,
+		hydrateWorkspaces,
+		renameWorkspace,
+		setActiveWorkspace,
+		workspaceStore,
+	} from '$lib/stores/workspaces.svelte';
+	import WorkspaceScope from '$lib/components/workspace/WorkspaceScope.svelte';
+	import { refreshDependencies } from '$lib/stores/dependencies.svelte';
 
 	let items = $state<Note[]>([]);
 	let customFolders = $state<CustomFolder[]>([]);
@@ -82,6 +93,7 @@
 	let taskFocusToken = $state(0);
 	let railOpen = $state(false);
 	let feedOpen = $state(false);
+	let workspaceLoading = false;
 
 	const folders = $derived(foldersFor(items, customFolders));
 	const folderLabelMap = $derived(
@@ -102,8 +114,9 @@
 	});
 
 	onMount(() => {
-		void hydrateSettings();
 		void (async () => {
+			await hydrateWorkspaces();
+			await hydrateSettings();
 			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),
 				loadFolders(),
@@ -156,11 +169,61 @@
 		};
 	});
 
+	async function changeWorkspace(id: string) {
+		if (workspaceLoading) return;
+		workspaceLoading = true;
+		if (await setActiveWorkspace(id)) {
+			const [storedNotes, storedFolders, storedTasks] = await Promise.all([
+				listNotes(), loadFolders(), refreshTasks(), refreshDependencies()
+			]);
+			items = storedNotes;
+			customFolders = storedFolders;
+			tasks = storedTasks;
+			selectedId = items[0]?.id ?? '';
+			selectedTaskId = storedTasks[0]?.id ?? '';
+			activeFolder = 'all';
+			activeTag = null;
+			taskFocusToken += 1;
+		}
+		workspaceLoading = false;
+	}
+
 	function showToast(message: string) {
 		toast = message;
 		setTimeout(() => {
 			if (toast === message) toast = '';
 		}, 2200);
+	}
+
+	/** Workspace CRUD for the switcher dialog; every failure becomes a toast. */
+	async function createWorkspaceByName(name: string) {
+		const workspace = await createWorkspace(name);
+		if (!workspace) {
+			showToast('Could not create workspace');
+			return false;
+		}
+		await changeWorkspace(workspace.id);
+		return true;
+	}
+
+	async function renameWorkspaceById(id: string, name: string) {
+		if (!(await renameWorkspace(id, name))) {
+			showToast('Could not rename workspace');
+			return false;
+		}
+		showToast('Workspace renamed');
+		return true;
+	}
+
+	async function deleteWorkspaceById(id: string) {
+		const wasActive = id === workspaceStore.activeId;
+		if (!(await deleteWorkspace(id))) {
+			showToast('Could not delete workspace');
+			return false;
+		}
+		if (wasActive) await changeWorkspace(workspaceStore.activeId);
+		showToast('Workspace deleted');
+		return true;
 	}
 
 	const noteActions = createNoteActions(showToast);
@@ -175,7 +238,7 @@
 	}
 
 	async function commitNewNote(data: { title: string; folder: string; body: string }) {
-		const note = makeNote({ ...data, title: data.title.trim() || 'Untitled note' });
+		const note = makeNote({ ...data, workspaceId: workspaceStore.activeId, title: data.title.trim() || 'Untitled note' });
 		items = [note, ...items];
 		selectedId = note.id;
 		activeFolder = data.folder;
@@ -372,8 +435,15 @@
 	/>
 {/snippet}
 
+<WorkspaceScope>
 <div class="relative flex h-screen w-screen flex-col overflow-hidden bg-surface">
 	<TitleBar
+		workspaceId={workspaceStore.activeId}
+		workspaces={workspaceStore.items}
+		onworkspacechange={changeWorkspace}
+		onworkspacecreate={createWorkspaceByName}
+		onworkspacerename={renameWorkspaceById}
+		onworkspacedelete={deleteWorkspaceById}
 		onpalette={() => {
 			closePanels();
 			paletteOpen = true;
@@ -409,6 +479,7 @@
 				bind:selectedId={selectedTaskId}
 				bind:view={taskView}
 				focusToken={taskFocusToken}
+				workspaceId={workspaceStore.activeId}
 				{folders}
 				notes={items}
 				onnotify={showToast}
@@ -539,3 +610,4 @@
 		onreset={resetData}
 	/>
 </div>
+</WorkspaceScope>

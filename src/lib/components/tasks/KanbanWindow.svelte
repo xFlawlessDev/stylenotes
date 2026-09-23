@@ -23,6 +23,8 @@
 		toggleKanbanLock
 	} from '$lib/stores/kanban.svelte';
 	import { isTauri, openTasksInWorkspace } from '$lib/windows';
+	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
+	import { refreshDependencies } from '$lib/stores/dependencies.svelte';
 	import CompactKanban from '$lib/components/tasks/CompactKanban.svelte';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import { Button, Select } from '$lib/components/base';
@@ -89,7 +91,7 @@
 			notify('Task updated');
 			return;
 		}
-		const task = createTask({ ...data, position: nextPosition(tasks, data.status) });
+		const task = createTask({ ...data, workspaceId: workspaceStore.activeId, position: nextPosition(tasks, data.status) });
 		tasks = [task, ...tasks];
 		selectedId = task.id;
 		void persistOrNotify(task);
@@ -124,8 +126,10 @@
 	}
 
 	onMount(() => {
-		void syncTasks();
 		void (async () => {
+			await hydrateWorkspaces();
+			await syncTasks();
+			await refreshDependencies();
 			const [storedNotes, storedFolders] = await Promise.all([hydrateNotes(), loadFolders()]);
 			notes = storedNotes;
 			customFolders = storedFolders;
