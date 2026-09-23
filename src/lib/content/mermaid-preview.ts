@@ -11,7 +11,9 @@ export async function prewarmMermaid(): Promise<void> {
 function getMermaid(): Promise<typeof import('mermaid').default> {
 	if (!mermaidModule) {
 		mermaidModule = import('mermaid').then(({ default: mermaid }) => {
-			mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+			// DOMPurify strips SVG <foreignObject>, so HTML labels would render as empty
+			// boxes. Plain SVG text labels survive sanitizing and stay readable.
+			mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', htmlLabels: false });
 			return mermaid;
 		});
 		mermaidModule = mermaidModule.catch((error) => {

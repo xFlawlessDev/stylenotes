@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { renderNoteHtml } from '$lib/content/note-actions';
 import { renderMermaidBlocks, renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 
+/** jsdom has no SVG text measurement, which Mermaid needs to lay out labels. */
+function polyfillSvgMeasurements() {
+	const svg = window.SVGElement.prototype as unknown as Record<string, unknown>;
+	svg.getComputedTextLength = () => 80;
+	svg.getBBox = () => ({ x: 0, y: 0, width: 80, height: 20 });
+	svg.getSubStringLength = () => 80;
+	(window.SVGSVGElement.prototype as unknown as Record<string, unknown>).createSVGPoint = () => ({
+		x: 0,
+		y: 0,
+		matrixTransform: () => ({ x: 0, y: 0 }),
+	});
+}
+
 describe('renderMermaidBlocks', () => {
 	it('renders Mermaid blocks and sanitizes generated SVG', async () => {
 		const html = await renderMermaidBlocks(
@@ -39,6 +52,19 @@ describe('renderNotePreviewHtml', () => {
 		expect(html).toContain('data-preview-action="download-svg"');
 		expect(html).toContain('data-preview-action="download-png"');
 	});
+
+	it('keeps real diagram labels as SVG text after sanitizing', async () => {
+		polyfillSvgMeasurements();
+		const html = await renderNotePreviewHtml(
+			await renderNoteHtml('```mermaid\nflowchart LR\n  Capture --> Organize\n```'),
+		);
+
+		expect(html).toContain('class="mermaid-diagram"');
+		expect(html).toContain('<text');
+		expect(html).toContain('Capture');
+		expect(html).toContain('Organize');
+		expect(html).not.toContain('foreignObject');
+	}, 30000);
 
 	it('leaves ordinary markdown and non-Mermaid fences intact', async () => {
 		const html = await renderNotePreviewHtml(await renderNoteHtml('```ts\nconst value = 1;\n```'));
