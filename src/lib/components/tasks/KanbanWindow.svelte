@@ -12,6 +12,7 @@
 		nextPosition,
 		taskStatus,
 		type Task,
+		type TaskDependency,
 		type TaskFormData,
 		type TaskStatus
 	} from '$lib/stores/tasks';
@@ -24,7 +25,13 @@
 	} from '$lib/stores/kanban.svelte';
 	import { isTauri, openTasksInWorkspace } from '$lib/windows';
 	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
-	import { refreshDependencies } from '$lib/stores/dependencies.svelte';
+	import {
+		addDependency,
+		dependencyStore,
+		DEPENDENCIES_CHANGED,
+		refreshDependencies,
+		removeDependency
+	} from '$lib/stores/dependencies.svelte';
 	import CompactKanban from '$lib/components/tasks/CompactKanban.svelte';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import { Button, Select } from '$lib/components/base';
@@ -65,6 +72,22 @@
 
 	async function syncTasks() {
 		tasks = await refreshTasks();
+		// Deleting a task cascades into its dependency rows.
+		await refreshDependencies();
+	}
+
+	function syncDependencies() {
+		void refreshDependencies();
+	}
+
+	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
+		return (await addDependency(taskId, dependsOnTaskId, tasks))
+			? null
+			: 'Could not add dependency — it may be invalid or create a cycle.';
+	}
+
+	async function removeTaskDependency(dependency: TaskDependency): Promise<string | null> {
+		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
 	}
 
 	function openCreate(status: TaskStatus = 'todo') {
@@ -129,19 +152,23 @@
 		void (async () => {
 			await hydrateWorkspaces();
 			await syncTasks();
-			await refreshDependencies();
 			const [storedNotes, storedFolders] = await Promise.all([hydrateNotes(), loadFolders()]);
 			notes = storedNotes;
 			customFolders = storedFolders;
 		})();
 
 		let unlisten: (() => void) | undefined;
+		let unlistenDependencies: (() => void) | undefined;
 		let unlistenLock: (() => void) | undefined;
 		let disposed = false;
 		if (isTauri) {
 			void listen(TASKS_CHANGED, () => void syncTasks()).then((fn) => {
 				if (disposed) fn();
 				else unlisten = fn;
+			});
+			void listen(DEPENDENCIES_CHANGED, syncDependencies).then((fn) => {
+				if (disposed) fn();
+				else unlistenDependencies = fn;
 			});
 			void listenKanbanLockChanged().then((fn) => {
 				if (disposed) fn();
@@ -151,6 +178,7 @@
 		return () => {
 			disposed = true;
 			unlisten?.();
+			unlistenDependencies?.();
 			unlistenLock?.();
 		};
 	});
@@ -268,5 +296,9 @@
 	compact
 	{folders}
 	{notes}
+	tasks={tasks}
+	dependencies={dependencyStore.items}
 	onsubmit={commitForm}
+	onadddependency={addTaskDependency}
+	onremovedependency={removeTaskDependency}
 />

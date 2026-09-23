@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { canAddDependency, createTask, isTaskBlocked, type TaskDependency } from '$lib/stores/tasks';
+import {
+	canAddDependency,
+	createTask,
+	isTaskBlocked,
+	taskBlockers,
+	taskDependents,
+	type TaskDependency
+} from '$lib/stores/tasks';
 
 const task = (id: string, workspaceId: string, completed = false) =>
 	createTask({ id, workspaceId, completed, status: completed ? 'done' : 'todo' });
@@ -31,5 +38,17 @@ describe('task dependency rules', () => {
 		expect(isTaskBlocked(tasks[1], tasks, dependencies)).toBe(false);
 		const completed = tasks.map((item) => (item.id === 'b' ? { ...item, completed: true } : item));
 		expect(isTaskBlocked(completed[0], completed, dependencies)).toBe(false);
+	});
+
+	it('resolves blockers and dependents from the task list', () => {
+		const tasks = [task('a', 'one'), task('b', 'one'), task('c', 'one')];
+		const dependencies: TaskDependency[] = [
+			{ taskId: 'a', dependsOnTaskId: 'b' },
+			{ taskId: 'c', dependsOnTaskId: 'a' },
+			{ taskId: 'a', dependsOnTaskId: 'ghost' },
+		];
+		expect(taskBlockers('a', tasks, dependencies).map((item) => item.id)).toEqual(['b']);
+		expect(taskDependents('a', tasks, dependencies).map((item) => item.id)).toEqual(['c']);
+		expect(taskBlockers('b', tasks, dependencies)).toEqual([]);
 	});
 });

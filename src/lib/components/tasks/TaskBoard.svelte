@@ -22,12 +22,19 @@
 		taskStatus,
 		TASK_STATUSES,
 		type Task,
+		type TaskDependency,
 		type TaskDueFilter,
 		type TaskFormData,
 		type TaskPriorityFilter,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, removeTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import {
+		addDependency,
+		dependencyStore,
+		refreshDependencies,
+		removeDependency
+	} from '$lib/stores/dependencies.svelte';
 	import { isTauri, openKanban } from '$lib/windows';
 	import { Button, Select } from '$lib/components/base';
 	import TaskRail from '$lib/components/tasks/TaskRail.svelte';
@@ -37,7 +44,6 @@
 	import TaskDashboard from '$lib/components/tasks/TaskDashboard.svelte';
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
-	import { dependencyStore } from '$lib/stores/dependencies.svelte';
 	import { isTaskBlocked } from '$lib/stores/tasks';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -122,7 +128,7 @@
 		{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
 		{ id: 'list', label: 'List', icon: LayoutList },
 		{ id: 'kanban', label: 'Kanban', icon: Kanban },
-		{ id: 'gantt', label: 'Calendar', icon: GanttChart }
+		{ id: 'gantt', label: 'Gantt', icon: GanttChart }
 	];
 
 	function openCreate(status: TaskStatus = 'todo') {
@@ -180,6 +186,7 @@
 		if (selectedId === id) selectedId = tasks[0]?.id ?? '';
 		void removeTask(id).then((ok) => {
 			if (!ok) onnotify('Could not delete task');
+			else void refreshDependencies();
 		});
 		if (task) onnotify('Task deleted');
 	}
@@ -191,12 +198,24 @@
 		onnotify(next.overlay ? 'Added to dock' : 'Removed from dock');
 	}
 
-	function syncTasks() {
-		void refreshTasks().then((next) => (tasks = next));
+	async function syncTasks() {
+		tasks = await refreshTasks();
+		// Deleting a task cascades into its dependency rows.
+		await refreshDependencies();
+	}
+
+	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
+		return (await addDependency(taskId, dependsOnTaskId, tasks))
+			? null
+			: 'Could not add dependency — it may be invalid or create a cycle.';
+	}
+
+	async function removeTaskDependency(dependency: TaskDependency): Promise<string | null> {
+		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
 	}
 
 	onMount(() => {
-		syncTasks();
+		void syncTasks();
 		let disposed = false;
 		let unlisten: (() => void) | undefined;
 		if (isTauri) {
@@ -218,7 +237,7 @@
 	});
 </script>
 
-<div class="flex min-h-0 flex-1 gap-2.5">
+<div class="flex min-h-0 min-w-0 flex-1 gap-2.5">
 	{#if railOpen}
 		<button
 			class="fixed inset-0 z-30 cursor-default bg-scrim/40 lg:hidden"
@@ -241,7 +260,7 @@
 		onquery={(value) => (query = value)}
 	/>
 
-	<section class="glass-panel flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
+	<section class="glass-panel flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
 		<div class="flex flex-col gap-2">
 			<div class="flex items-center gap-2">
 				<Button
@@ -371,6 +390,8 @@
 		{:else}
 			<TaskGantt
 				tasks={filtered}
+				allTasks={tasks}
+				dependencies={dependencyStore.items}
 				{selectedId}
 				onselect={(id) => (selectedId = id)}
 				onedit={openEdit}
@@ -379,4 +400,15 @@
 	</section>
 </div>
 
-<TaskDialog bind:open={dialogOpen} task={editing} {defaultStatus} {folders} {notes} onsubmit={commitForm} />
+<TaskDialog
+	bind:open={dialogOpen}
+	task={editing}
+	{defaultStatus}
+	{folders}
+	{notes}
+	tasks={tasks}
+	dependencies={dependencyStore.items}
+	onsubmit={commitForm}
+	onadddependency={addTaskDependency}
+	onremovedependency={removeTaskDependency}
+/>

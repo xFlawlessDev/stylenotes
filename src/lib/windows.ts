@@ -17,6 +17,8 @@ export type WorkspaceSection = "notes" | "tasks" | "graph";
 export type WorkspaceNavigate = {
   section: WorkspaceSection;
   view?: WorkspaceView;
+  /** Record the workspace should select once the section is showing (task id). */
+  recordId?: string;
 };
 export const NOTE_WINDOW_PREFIX = "note-";
 export const TASK_WINDOW_PREFIX = "task-";
@@ -119,6 +121,15 @@ export async function openKanban() {
 export async function openTasksInWorkspace() {
   if (isTauri) {
     const payload: WorkspaceNavigate = { section: "tasks", view: "dashboard" };
+    await emit(NAVIGATE_EVENT, payload).catch(() => undefined);
+  }
+  return openWorkspace();
+}
+
+/** Opens the workspace on the List view of the tasks section with `taskId` selected. */
+export async function openTaskInWorkspace(taskId: string) {
+  if (isTauri) {
+    const payload: WorkspaceNavigate = { section: "tasks", view: "list", recordId: taskId };
     await emit(NAVIGATE_EVENT, payload).catch(() => undefined);
   }
   return openWorkspace();

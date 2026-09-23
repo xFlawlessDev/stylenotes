@@ -22,18 +22,25 @@
 		isTaskBlocked,
 		toDateInput,
 		type Task,
+		type TaskDependency,
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
-	import { addDependency, dependencyStore, refreshDependencies, removeDependency } from '$lib/stores/dependencies.svelte';
+	import {
+		addDependency,
+		dependencyStore,
+		DEPENDENCIES_CHANGED,
+		refreshDependencies,
+		removeDependency
+	} from '$lib/stores/dependencies.svelte';
 	import {
 		currentTaskId,
 		isTauri,
 		NOTE_HEADING_EVENT,
 		NOTE_WINDOW_PREFIX,
 		openNoteWindow,
-		openTaskWindow,
+		openTaskInWorkspace,
 		revealAndFocusCurrentWindow
 	} from '$lib/windows';
 	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
@@ -42,8 +49,7 @@
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
-	import DependencyPicker from '$lib/components/tasks/DependencyPicker.svelte';
-	import DependencyList from '$lib/components/tasks/DependencyList.svelte';
+	import DependencyEditor from '$lib/components/tasks/DependencyEditor.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
 	import { Button, EmptyState } from '$lib/components/base';
@@ -66,7 +72,6 @@
 	let dueDate = $state('');
 	let revealed = $state(false);
 	let closing = false;
-	let dependencyError = $state('');
 	let allTasks = $state<Task[]>([]);
 	let candidateEntities = $state<WikiEntity[]>([]);
 	let candidatesOpen = $state(false);
@@ -145,11 +150,14 @@
 		task = tasks.find((item) => item.id === taskId) ?? null;
 	}
 
-	async function addTaskDependency(dependsOnTaskId: string) {
-		if (!task) return;
-		dependencyError = (await addDependency(task.id, dependsOnTaskId, (await refreshTasks())))
-			? ''
+	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
+		return (await addDependency(taskId, dependsOnTaskId, await refreshTasks()))
+			? null
 			: 'Dependency is invalid or would create a cycle.';
+	}
+
+	async function removeTaskDependency(dependency: TaskDependency): Promise<string | null> {
+		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
 	}
 
 	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
@@ -161,7 +169,7 @@
 	async function openWikiTarget(entity: WikiEntity, heading: string | null) {
 		await queue.flush();
 		if (entity.kind === 'task') {
-			await openTaskWindow(entity.id);
+			await openTaskInWorkspace(entity.id);
 			return;
 		}
 		await openNoteWindow(entity.id);
@@ -257,6 +265,10 @@
 			if (!queue.state.dirty) void load();
 		}).then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
+		void listen(DEPENDENCIES_CHANGED, () => void refreshDependencies()).then((fn) =>
+			disposed ? fn() : unlisteners.push(fn)
+		);
+
 		void listen<Settings>(SETTINGS_CHANGED, (event) => {
 			applySettingsSnapshot(event.payload);
 			void applyAlwaysOnTop(settings.detailAlwaysOnTop);
@@ -314,6 +326,7 @@
 	</DetailWindowHeader>
 
 	{#if task}
+		{@const current = task}
 		<div class="scrollbar-none min-h-0 flex-1 overflow-y-auto p-3">
 			<TaskFormFields
 				bind:title
@@ -338,17 +351,16 @@
 					<h2 class="text-label-md font-label font-medium text-on-surface">Task dependencies</h2>
 					<WorkspaceBadge name={activeWorkspace().name} color={activeWorkspace().color} />
 					<BlockedIndicator
-						blocked={isTaskBlocked(task, allTasks, dependencyStore.items)}
+						blocked={isTaskBlocked(current, allTasks, dependencyStore.items)}
 					/>
 				</div>
-				<DependencyPicker
-					taskId={task.id}
+				<DependencyEditor
+					task={current}
 					tasks={allTasks}
 					dependencies={dependencyStore.items}
-					onadd={addTaskDependency}
+					onadd={(id) => addTaskDependency(current.id, id)}
+					onremove={removeTaskDependency}
 				/>
-				<DependencyList task={task} tasks={allTasks} dependencies={dependencyStore.items} onremove={(item) => void removeDependency(item)} />
-				{#if dependencyError}<p class="text-label-sm text-error">{dependencyError}</p>{/if}
 			</section>
 		</div>
 	{:else}

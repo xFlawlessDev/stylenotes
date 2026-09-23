@@ -6,15 +6,19 @@
 	import type { Folder } from '$lib/stores/notes';
 	import {
 		fromDateInput,
+		isTaskBlocked,
 		taskPriority,
 		taskStatus,
 		toDateInput,
 		type Task,
+		type TaskDependency,
 		type TaskFormData,
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
+	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
+	import DependencyEditor from '$lib/components/tasks/DependencyEditor.svelte';
 
 	let {
 		open = $bindable(false),
@@ -24,18 +28,28 @@
 		compact = false,
 		folders,
 		notes,
-		onsubmit
+		tasks = [],
+		dependencies = [],
+		onsubmit,
+		onadddependency,
+		onremovedependency
 	}: {
 		open?: boolean;
 		task?: Task | null;
 		defaultStatus?: TaskStatus;
 		/** Pre-selected folder for new tasks, e.g. the board's active folder filter. */
 		defaultFolder?: string;
-		/** Denser layout plus a scrollable max height for dialogs in small windows. */
+		/** Denser layout for dialogs in small windows. */
 		compact?: boolean;
 		folders: Folder[];
 		notes: Note[];
+		/** Every task in the workspace, for the dependency picker. */
+		tasks?: Task[];
+		dependencies?: TaskDependency[];
 		onsubmit: (data: TaskFormData) => void;
+		/** Wires the dependency editor; omit it to hide the section entirely. */
+		onadddependency?: (taskId: string, dependsOnTaskId: string) => Promise<string | null> | string | null;
+		onremovedependency?: (dependency: TaskDependency) => Promise<string | null> | string | null | void;
 	} = $props();
 
 	let title = $state('');
@@ -63,6 +77,12 @@
 		}
 	});
 
+	function addDependencyFor(dependsOnTaskId: string) {
+		const current = task;
+		if (!current || !onadddependency) return null;
+		return onadddependency(current.id, dependsOnTaskId);
+	}
+
 	function submit() {
 		if (!title.trim() || dateError) return;
 		onsubmit({
@@ -80,8 +100,11 @@
 </script>
 
 <Dialog.Root bind:open>
+	<!-- Header and footer stay pinned; the body scrolls so a long dependency list never hides the actions. -->
 	<Dialog.Content
-		class="glass-dialog {compact ? 'max-h-[calc(100vh-1.5rem)] overflow-y-auto p-3' : ''}"
+		class="glass-dialog flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden {compact
+			? 'gap-3 p-3'
+			: ''}"
 		onkeydown={(event) => {
 			if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 				event.preventDefault();
@@ -89,7 +112,7 @@
 			}
 		}}
 	>
-		<Dialog.Header class={compact ? 'gap-1' : ''}>
+		<Dialog.Header class="shrink-0 {compact ? 'gap-1' : ''}">
 			{#if !compact}
 				<div
 					class="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-container text-primary"
@@ -106,36 +129,67 @@
 			</Dialog.Title>
 			{#if !compact}
 				<Dialog.Description>
-					Give the task a home, a status, and a date range for the calendar view.
+					Give the task a home, a status, and a date range for the Gantt view.
 				</Dialog.Description>
 			{/if}
 		</Dialog.Header>
 
 		<form
-			class="flex flex-col {compact ? 'gap-3' : 'gap-4'}"
+			class="flex min-h-0 flex-1 flex-col {compact ? 'gap-3' : 'gap-4'}"
 			onsubmit={(event) => {
 				event.preventDefault();
 				submit();
 			}}
 		>
-			<TaskFormFields
-				bind:title
-				bind:detail
-				bind:status
-				bind:priority
-				bind:folder
-				bind:noteId
-				bind:startDate
-				bind:dueDate
-				{folders}
-				{notes}
-				{compact}
-				idPrefix="task-dialog"
-				autofocus
-			/>
+			<div
+				class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain {compact
+					? 'gap-3'
+					: 'gap-4'}"
+			>
+				<TaskFormFields
+					bind:title
+					bind:detail
+					bind:status
+					bind:priority
+					bind:folder
+					bind:noteId
+					bind:startDate
+					bind:dueDate
+					{folders}
+					{notes}
+					{compact}
+					idPrefix="task-dialog"
+					autofocus
+				/>
+
+				{#if onadddependency}
+					<section class="flex flex-col gap-2 rounded-xl bg-surface-container-low/60 p-2.5">
+						<div class="flex items-center justify-between gap-2">
+							<h3 class="text-label-md font-label font-medium text-on-surface">Dependencies</h3>
+							{#if task}
+								<BlockedIndicator blocked={isTaskBlocked(task, tasks, dependencies)} />
+							{/if}
+						</div>
+						{#if task}
+							{@const current = task}
+							<DependencyEditor
+								task={current}
+								{tasks}
+								{dependencies}
+								onadd={addDependencyFor}
+								onremove={onremovedependency}
+							/>
+						{:else}
+							<p class="text-label-sm font-label text-outline">
+								Save the task first, then edit it to add dependencies.
+							</p>
+						{/if}
+					</section>
+				{/if}
+			</div>
 
 			<Dialog.Footer
-				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
+				class="mx-0 mb-0 shrink-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
 				<Button
 					variant="outline"

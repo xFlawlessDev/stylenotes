@@ -70,7 +70,7 @@
 		workspaceStore,
 	} from '$lib/stores/workspaces.svelte';
 	import WorkspaceScope from '$lib/components/workspace/WorkspaceScope.svelte';
-	import { dependencyStore, refreshDependencies } from '$lib/stores/dependencies.svelte';
+	import { dependencyStore, DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
 
 	let items = $state<Note[]>([]);
 	let customFolders = $state<CustomFolder[]>([]);
@@ -141,6 +141,7 @@
 
 		let unlisten: (() => void) | undefined;
 		let unlistenNotes: (() => void) | undefined;
+		let unlistenDependencies: (() => void) | undefined;
 		let disposed = false;
 		if (isTauri) {
 			void listen<WorkspaceNavigate>(NAVIGATE_EVENT, (event) => {
@@ -148,7 +149,10 @@
 				if (!payload) return;
 				section = payload.section;
 				if (payload.view) taskView = payload.view;
-				if (payload.section === 'tasks') taskFocusToken += 1;
+				if (payload.section === 'tasks') {
+					if (payload.recordId) selectedTaskId = payload.recordId;
+					taskFocusToken += 1;
+				}
 			}).then((fn) => {
 				if (disposed) fn();
 				else unlisten = fn;
@@ -170,11 +174,18 @@
 				if (disposed) fn();
 				else unlistenNotes = fn;
 			});
+
+			// Dependencies changed in another window (task detail / Kanban).
+			void listen(DEPENDENCIES_CHANGED, () => void refreshDependencies()).then((fn) => {
+				if (disposed) fn();
+				else unlistenDependencies = fn;
+			});
 		}
 		return () => {
 			disposed = true;
 			unlisten?.();
 			unlistenNotes?.();
+			unlistenDependencies?.();
 		};
 	});
 
@@ -267,6 +278,7 @@
 	async function selectWikiTarget(entity: WikiEntity, heading: string | null) {
 		if (entity.kind === 'task') {
 			section = 'tasks';
+			taskView = 'list';
 			selectedTaskId = entity.id;
 			taskFocusToken += 1;
 			return;

@@ -61,6 +61,24 @@ export function isTaskBlocked(task: Task, tasks: Task[], dependencies: TaskDepen
 		.some((item) => !tasks.find((candidate) => candidate.id === item.dependsOnTaskId)?.completed);
 }
 
+/** Tasks that `taskId` directly depends on, resolved from `tasks` (unknown ids are dropped). */
+export function taskBlockers(taskId: string, tasks: Task[], dependencies: TaskDependency[]): Task[] {
+	const byId = new Map(tasks.map((task) => [task.id, task]));
+	return dependencies
+		.filter((item) => item.taskId === taskId)
+		.map((item) => byId.get(item.dependsOnTaskId))
+		.filter((task): task is Task => task !== undefined);
+}
+
+/** Tasks that directly depend on `taskId`, resolved from `tasks` (unknown ids are dropped). */
+export function taskDependents(taskId: string, tasks: Task[], dependencies: TaskDependency[]): Task[] {
+	const byId = new Map(tasks.map((task) => [task.id, task]));
+	return dependencies
+		.filter((item) => item.dependsOnTaskId === taskId)
+		.map((item) => byId.get(item.taskId))
+		.filter((task): task is Task => task !== undefined);
+}
+
 export type TaskFormData = {
 	title: string;
 	notes: string;

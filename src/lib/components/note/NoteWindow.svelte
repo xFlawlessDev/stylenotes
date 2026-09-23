@@ -6,7 +6,7 @@
 	import { createNote, type Note } from '$lib/content/content';
 	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
 	import { planWikiClick } from '$lib/content/wiki-navigation';
-	import { NOTE_HEADING_EVENT, NOTE_WINDOW_PREFIX, openNoteWindow, openTaskWindow } from '$lib/windows';
+	import { NOTE_HEADING_EVENT, NOTE_WINDOW_PREFIX, openNoteWindow, openTaskInWorkspace } from '$lib/windows';
 	import type { Task } from '$lib/stores/tasks';
 	import { listAllTasks } from '$lib/stores/tasks.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
@@ -115,7 +115,7 @@
 	async function openWikiTarget(entity: WikiEntity, heading: string | null) {
 		await queue.flush();
 		if (entity.kind === 'task') {
-			await openTaskWindow(entity.id);
+			await openTaskInWorkspace(entity.id);
 			return;
 		}
 		if (!isTauri && entity.id === note?.id) return;
