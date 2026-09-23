@@ -168,7 +168,7 @@
 		{/if}
 		<Button
 			shape="pill"
-			class="glass-well h-8 min-w-0 justify-start gap-2 pr-2 pl-3 text-left hover:bg-transparent hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-72 lg:w-80"
+			class="glass-well h-8 min-w-0 justify-start gap-2 pr-2 pl-3 text-left hover:bg-transparent hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-36 lg:w-48"
 			aria-label="Open command palette"
 			onclick={onpalette}
 		>
