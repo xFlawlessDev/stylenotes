@@ -7,12 +7,13 @@
 		PanelRight,
 		NotebookPen,
 		ListTodo,
+		Network,
 		FolderTree,
 		Rows3,
 		Settings as SettingsIcon,
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
-	import { isTauri } from '$lib/windows';
+	import { isTauri, type WorkspaceSection } from '$lib/windows';
 	import { Button, SegmentedControl } from '$lib/components/base';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -40,13 +41,13 @@
 	}: {
 		title?: string;
 		mode?: ThemeMode;
-		section?: 'notes' | 'tasks';
+		section?: WorkspaceSection;
 		showpanelbuttons?: boolean;
 		onpalette?: () => void;
 		onsettings?: () => void;
 		ontogglemode?: () => void;
 		ontoggledock?: () => void;
-		onsection?: (section: 'notes' | 'tasks') => void;
+		onsection?: (section: WorkspaceSection) => void;
 		onopenfolders?: () => void;
 		onopennotes?: () => void;
 		notifications?: Snippet;
@@ -62,6 +63,7 @@
 	const sections = [
 		{ id: 'notes' as const, label: 'Notes', icon: NotebookPen },
 		{ id: 'tasks' as const, label: 'Tasks', icon: ListTodo },
+		{ id: 'graph' as const, label: 'Graph', icon: Network },
 	];
 
 	function win() {
@@ -136,7 +138,7 @@
 			ariaLabel="Workspace section"
 			class="ml-1 hidden rounded-full sm:flex"
 			itemClass="rounded-full px-3 text-label-md"
-			onchange={(id) => onsection?.(id as 'notes' | 'tasks')}
+			onchange={(id) => onsection?.(id as WorkspaceSection)}
 		/>
 	</div>
 

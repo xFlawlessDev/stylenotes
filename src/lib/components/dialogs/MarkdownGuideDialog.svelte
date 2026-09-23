@@ -19,6 +19,10 @@
 		{ example: '``` code ```', note: 'Code block' },
 		{ example: '---', note: 'Divider line' },
 		{ example: '[title](https://example.com)', note: 'Link' },
+		{ example: '[[Note title]]', note: 'Wiki link to a note or task in this workspace' },
+		{ example: '[[Note title|label]]', note: 'Wiki link with display text' },
+		{ example: '[[Folder/Note#Heading]]', note: 'Link to a note heading in a folder' },
+		{ example: '![[Note title]]', note: 'Embed another note; cycles are stopped' },
 		{ example: '![alt](https://example.com/pic.png)', note: 'Image' },
 		{ example: '| a | b |', note: 'Table' },
 	];

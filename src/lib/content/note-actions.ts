@@ -13,6 +13,12 @@ import { repairLocalImageLinks, resolveLocalImages } from '$lib/content/attachme
 import { slugifyFolder } from '$lib/stores/notes';
 import { isTauri } from '$lib/windows';
 import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
+import {
+	installWikiLinkRule,
+	renderWikiToken,
+	slugifyHeading,
+	type WikiRenderContext,
+} from '$lib/content/wiki-links';
 
 /** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset protocol. */
 const ALLOWED_URI =
@@ -20,6 +26,16 @@ const ALLOWED_URI =
 
 function createMarkdownParser() {
 	const parser = new MarkdownIt({ breaks: true, html: true, linkify: true });
+	installWikiLinkRule(parser);
+	parser.renderer.rules.wiki_link = (tokens, index, options, env) =>
+		renderWikiToken(parser, tokens, index, (env as { wiki?: WikiRenderContext }).wiki);
+	parser.renderer.rules.wiki_embed = (tokens, index, options, env) =>
+		renderWikiToken(parser, tokens, index, (env as { wiki?: WikiRenderContext }).wiki);
+	parser.renderer.rules.heading_open = (tokens, index, options, env, renderer) => {
+		const inline = tokens[index + 1];
+		if (inline?.type === 'inline') tokens[index].attrSet('id', slugifyHeading(inline.content));
+		return renderer.renderToken(tokens, index, options);
+	};
 	parser.use(taskLists, { enabled: true, label: false });
 	parser.use(katex, { delimiters: 'dollars', throwOnError: false, trust: false });
 	const defaultFence = parser.renderer.rules.fence;
@@ -77,7 +93,7 @@ function assetUrl(path: string): string | null {
 	}
 }
 
-export async function renderNoteHtml(body: string): Promise<string> {
+export async function renderNoteHtml(body: string, wiki?: WikiRenderContext): Promise<string> {
 	const source = repairLocalImageLinks(body);
 	const markdownSource = preserveBlankLines(source);
 	let rendered: string;
@@ -86,12 +102,12 @@ export async function renderNoteHtml(body: string): Promise<string> {
 		return Boolean(info) && info?.split(/\s+/, 1)[0].toLowerCase() !== 'mermaid';
 	});
 	if (!needsHighlighting) {
-		rendered = fallbackMarkdown.render(markdownSource);
+		rendered = fallbackMarkdown.render(markdownSource, { wiki });
 	} else {
 		try {
-			rendered = (await getMarkdownParser()).render(markdownSource);
+			rendered = (await getMarkdownParser()).render(markdownSource, { wiki });
 		} catch {
-			rendered = fallbackMarkdown.render(markdownSource);
+			rendered = fallbackMarkdown.render(markdownSource, { wiki });
 		}
 	}
 	const resolved = resolveLocalImages(rendered, assetUrl);

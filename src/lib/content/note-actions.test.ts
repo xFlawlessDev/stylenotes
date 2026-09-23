@@ -19,6 +19,31 @@ describe('renderNoteHtml', () => {
 		expect(html).not.toContain('<script>');
 	});
 
+	it('renders resolved wiki links and heading targets', async () => {
+		const source = createNote({ id: 'source', title: 'Source', body: 'See [[Plan#Next step|the plan]] and ![[Plan]]', workspaceId: 'one' });
+		const target = createNote({ id: 'target', title: 'Plan', body: '# Next step', workspaceId: 'one' });
+		const html = await renderNoteHtml(source.body, { source, notes: [source, target] });
+		expect(html).toContain('data-wiki-target="target"');
+		expect(html).toContain('data-wiki-heading="next-step"');
+		expect(html).toContain('>the plan</a>');
+		expect(html).toContain('id="next-step"');
+	});
+
+	it('renders unresolved wiki links without unsafe attributes', async () => {
+		const source = createNote({ id: 'source', title: 'Source', body: '[[<script>alert(1)</script>]]', workspaceId: 'one' });
+		const html = await renderNoteHtml(source.body, { source, notes: [source] });
+		expect(html).toContain('wiki-link-unresolved');
+		expect(html).not.toContain('<script>');
+	});
+
+	it('renders embeds and stops recursive embed cycles', async () => {
+		const source = createNote({ id: 'source', title: 'Source', body: '![[Target]]', workspaceId: 'one' });
+		const target = createNote({ id: 'target', title: 'Target', body: 'Embedded text\n\n![[Source]]', workspaceId: 'one' });
+		const html = await renderNoteHtml(source.body, { source, notes: [source, target] });
+		expect(html).toContain('Embedded text');
+		expect(html).toContain('wiki-embed-cycle');
+	});
+
 	it('keeps Mermaid fences as code for the preview renderer', async () => {
 		const html = await renderNoteHtml('```mermaid\nflowchart LR\nA --> B\n```');
 		expect(html).toContain('<pre><code class="language-mermaid">');

@@ -8,11 +8,14 @@ export const KANBAN_LABEL = "kanban";
 
 /** Event that asks the workspace window to switch section/view. */
 export const NAVIGATE_EVENT = "stylenotes:navigate";
+export const NOTE_HEADING_EVENT = "stylenotes:note-heading";
 
 export type WorkspaceView = "dashboard" | "list" | "kanban" | "gantt";
 
+export type WorkspaceSection = "notes" | "tasks" | "graph";
+
 export type WorkspaceNavigate = {
-  section: "notes" | "tasks";
+  section: WorkspaceSection;
   view?: WorkspaceView;
 };
 export const NOTE_WINDOW_PREFIX = "note-";

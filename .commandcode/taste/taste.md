@@ -7,3 +7,4 @@
 - Wants Markdown previews in document editors to support Shiki syntax highlighting with per-block code copying, KaTeX math rendering, and Mermaid diagram downloads as SVG/PNG. Confidence: 0.95
 - Prefers expensive preview/rendering resources to be prewarmed during idle time to reduce first-use delay without blocking startup; is not concerned about rerender performance absent observed lag. Confidence: 0.9
 - Expects the note editor and note preview panes to scroll together when displayed in split mode. Confidence: 0.9
+- Wants note-taking to support Obsidian-style wiki links and a graph view scoped to each workspace. Confidence: 0.9

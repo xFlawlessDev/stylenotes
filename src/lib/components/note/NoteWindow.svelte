@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { listen } from '@tauri-apps/api/event';
+	import { emitTo, listen } from '@tauri-apps/api/event';
 	import { NotebookPen } from '@lucide/svelte';
-	import type { Note } from '$lib/content/content';
+	import { createNote, type Note } from '$lib/content/content';
+	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
+	import { planWikiClick } from '$lib/content/wiki-navigation';
+	import { NOTE_HEADING_EVENT, NOTE_WINDOW_PREFIX, openNoteWindow, openTaskWindow } from '$lib/windows';
+	import type { Task } from '$lib/stores/tasks';
+	import { listAllTasks } from '$lib/stores/tasks.svelte';
+	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
 	import {
 		applyNotePatch,
 		foldersFor,
 		listNotes,
 		loadFolders,
+		listAllNotes,
 		NOTES_CHANGED,
 		persistNote,
 		type CustomFolder,
@@ -38,6 +45,7 @@
 
 	let note = $state<Note | null>(null);
 	let notes = $state<Note[]>([]);
+	let tasks = $state<Task[]>([]);
 	let customFolders = $state<CustomFolder[]>([]);
 	let loaded = $state(false);
 	let revealed = $state(false);
@@ -45,6 +53,10 @@
 	let folder = $state('personal');
 	let view = $state<EditorView>('write');
 	let closing = false;
+	let candidateEntities = $state<WikiEntity[]>([]);
+	let candidatesOpen = $state(false);
+	let pendingHeading = $state<string | null>(null);
+	let requestedHeading = $state<string | null>(null);
 
 	const queue = createSaveQueue<Note>(persistNote);
 	const folderOptions = $derived(
@@ -58,11 +70,27 @@
 		folder = note?.folder ?? 'personal';
 	});
 
+	$effect(() => {
+		if (!requestedHeading || !loaded) return;
+		const heading = requestedHeading;
+		void (async () => {
+			await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+			document.getElementById(heading)?.scrollIntoView();
+			requestedHeading = null;
+		})();
+	});
+
 	async function load() {
-		const [storedNotes, storedFolders] = await Promise.all([listNotes(), loadFolders()]);
+		const [allNotes, allTasks] = await Promise.all([listAllNotes(), listAllTasks()]);
+		const found = allNotes.find((item) => item.id === noteId) ?? null;
+		const [storedNotes, storedFolders] = await Promise.all([
+			listNotes(found?.workspaceId),
+			loadFolders(found?.workspaceId),
+		]);
 		notes = storedNotes;
 		customFolders = storedFolders;
-		const found = storedNotes.find((item) => item.id === noteId) ?? null;
+		const workspaceId = found?.workspaceId ?? 'workspace-default';
+		tasks = allTasks.filter((task) => (task.workspaceId ?? 'workspace-default') === workspaceId);
 		if (found && !loaded) {
 			view = found.body.trim() ? settings.editorView : 'write';
 			loaded = true;
@@ -76,6 +104,50 @@
 		const next = applyNotePatch(current, patch);
 		note = next;
 		queue.enqueue(next);
+	}
+
+	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
+		candidateEntities = entities;
+		pendingHeading = heading;
+		candidatesOpen = entities.length > 0;
+	}
+
+	async function openWikiTarget(entity: WikiEntity, heading: string | null) {
+		await queue.flush();
+		if (entity.kind === 'task') {
+			await openTaskWindow(entity.id);
+			return;
+		}
+		if (!isTauri && entity.id === note?.id) return;
+		if (entity.id === note?.id) {
+			if (heading) document.getElementById(heading)?.scrollIntoView();
+			return;
+		}
+		await openNoteWindow(entity.id);
+		if (heading) await emitTo(`${NOTE_WINDOW_PREFIX}${entity.id}`, NOTE_HEADING_EVENT, { heading });
+	}
+
+	async function handleWikiClick(click: WikiClick) {
+		const current = note;
+		if (!current) return;
+		const plan = planWikiClick(click, current, notes, customFolders, tasks);
+		if (!plan) return;
+		if (plan.status === 'open') {
+			await openWikiTarget(plan.entity, plan.heading);
+			return;
+		}
+		if (plan.status === 'choose') {
+			showAmbiguous(plan.entities, plan.heading);
+			return;
+		}
+		const created = createNote({
+			title: plan.title,
+			folder: plan.folder,
+			workspaceId: current.workspaceId,
+		});
+		if (!(await persistNote(created))) return;
+		notes = [created, ...notes];
+		await openWikiTarget({ ...created, kind: 'note' }, plan.heading);
 	}
 
 	function toggleDock() {
@@ -147,6 +219,10 @@
 			void applyAlwaysOnTop(settings.detailAlwaysOnTop);
 		}).then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
+		void listen<{ heading: string }>(NOTE_HEADING_EVENT, (event) => {
+			requestedHeading = event.payload.heading;
+		}).then((fn) => (disposed ? fn() : unlisteners.push(fn)));
+
 		void getCurrentWindow()
 			.onCloseRequested((event) => {
 				if (closing) return;
@@ -211,7 +287,12 @@
 			<NoteBodyEditor
 				body={note.body}
 				{view}
+				{note}
+				{notes}
+				{tasks}
+				folders={customFolders}
 				autofocus={revealed}
+				onwikilink={handleWikiClick}
 				onchange={(body) => update({ body })}
 			/>
 			<footer class="shrink-0 px-1.5 text-code-sm font-code text-outline">
@@ -236,4 +317,10 @@
 			</Button>
 		</EmptyState>
 	{/if}
+	<AmbiguousWikiDialog
+		bind:open={candidatesOpen}
+		entities={candidateEntities}
+		heading={pendingHeading}
+		onselect={(entity, heading) => void openWikiTarget(entity, heading)}
+	/>
 </div>

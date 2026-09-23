@@ -36,6 +36,16 @@ export async function refreshTasks(): Promise<Task[]> {
 	return taskStore.items;
 }
 
+/** Reads every task across workspaces, for windows that resolve wiki links by record. */
+export async function listAllTasks(): Promise<Task[]> {
+	if (!browser) return [];
+	try {
+		return await tasksRepo.list();
+	} catch {
+		return [];
+	}
+}
+
 export async function persistTask(task: Task): Promise<boolean> {
 	if (!browser) return false;
 	try {

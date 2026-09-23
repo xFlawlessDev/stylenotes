@@ -7,6 +7,10 @@
 	import { clickedCheckboxIndex, enableTaskCheckboxes } from '$lib/content/markdown-preview';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
+	import type { Note } from '$lib/content/content';
+	import type { CustomFolder } from '$lib/stores/notes';
+	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { toggleChecklistItem } from '$lib/stores/notes';
@@ -20,11 +24,21 @@
 		body,
 		view,
 		autofocus = false,
+		note,
+		notes = [],
+		tasks = [],
+		folders = [],
+		onwikilink,
 		onchange
 	}: {
 		body: string;
 		view: EditorView;
 		autofocus?: boolean;
+		note: Note;
+		notes?: Note[];
+		tasks?: Task[];
+		folders?: CustomFolder[];
+		onwikilink?: (click: WikiClick) => void;
 		onchange: (body: string) => void;
 	} = $props();
 
@@ -53,7 +67,7 @@
 			return;
 		}
 
-		void renderNoteHtml(body).then(renderNotePreviewHtml)
+		void renderNoteHtml(body, { source: note, notes, tasks, folders }).then(renderNotePreviewHtml)
 			.then((rendered) => {
 				if (!cancelled) html = enableTaskCheckboxes(rendered);
 			})
@@ -147,6 +161,12 @@
 	async function togglePreviewCheckbox(event: MouseEvent) {
 		if (!previewEl) return;
 		if (await handlePreviewAction(event, previewEl)) return;
+		const wikiClick = wikiClickFromTarget(event.target, previewEl);
+		if (wikiClick) {
+			event.preventDefault();
+			onwikilink?.(wikiClick);
+			return;
+		}
 		const index = clickedCheckboxIndex(previewEl, event.target);
 		if (index < 0) return;
 		event.preventDefault();

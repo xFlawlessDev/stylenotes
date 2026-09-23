@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { listen } from '@tauri-apps/api/event';
+	import { emitTo, listen } from '@tauri-apps/api/event';
 	import { ListTodo, NotebookPen } from '@lucide/svelte';
-	import type { Note } from '$lib/content/content';
-	import { foldersFor, listNotes, loadFolders, type CustomFolder } from '$lib/stores/notes';
+	import { createNote, type Note } from '$lib/content/content';
+	import { foldersFor, listNotes, loadFolders, persistNote, type CustomFolder } from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
 	import {
 		applySettingsSnapshot,
@@ -30,9 +30,14 @@
 	import {
 		currentTaskId,
 		isTauri,
+		NOTE_HEADING_EVENT,
+		NOTE_WINDOW_PREFIX,
 		openNoteWindow,
+		openTaskWindow,
 		revealAndFocusCurrentWindow
 	} from '$lib/windows';
+	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
+	import { planWikiClick } from '$lib/content/wiki-navigation';
 	import { activeWorkspace, hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
@@ -40,6 +45,7 @@
 	import DependencyPicker from '$lib/components/tasks/DependencyPicker.svelte';
 	import DependencyList from '$lib/components/tasks/DependencyList.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
+	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
 	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -62,6 +68,9 @@
 	let closing = false;
 	let dependencyError = $state('');
 	let allTasks = $state<Task[]>([]);
+	let candidateEntities = $state<WikiEntity[]>([]);
+	let candidatesOpen = $state(false);
+	let pendingHeading = $state<string | null>(null);
 
 	const folders = $derived(foldersFor(notes, customFolders));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
@@ -141,6 +150,45 @@
 		dependencyError = (await addDependency(task.id, dependsOnTaskId, (await refreshTasks())))
 			? ''
 			: 'Dependency is invalid or would create a cycle.';
+	}
+
+	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
+		candidateEntities = entities;
+		pendingHeading = heading;
+		candidatesOpen = entities.length > 0;
+	}
+
+	async function openWikiTarget(entity: WikiEntity, heading: string | null) {
+		await queue.flush();
+		if (entity.kind === 'task') {
+			await openTaskWindow(entity.id);
+			return;
+		}
+		await openNoteWindow(entity.id);
+		if (heading) await emitTo(`${NOTE_WINDOW_PREFIX}${entity.id}`, NOTE_HEADING_EVENT, { heading });
+	}
+
+	async function handleWikiClick(click: WikiClick) {
+		const current = task;
+		if (!current) return;
+		const plan = planWikiClick(click, current, notes, customFolders, allTasks);
+		if (!plan) return;
+		if (plan.status === 'open') {
+			await openWikiTarget(plan.entity, plan.heading);
+			return;
+		}
+		if (plan.status === 'choose') {
+			showAmbiguous(plan.entities, plan.heading);
+			return;
+		}
+		const created = createNote({
+			title: plan.title,
+			folder: plan.folder,
+			workspaceId: current.workspaceId,
+		});
+		if (!(await persistNote(created))) return;
+		notes = [created, ...notes];
+		await openWikiTarget({ ...created, kind: 'note' }, plan.heading);
 	}
 
 	function toggleDock() {
@@ -278,6 +326,10 @@
 				bind:dueDate
 				{folders}
 				{notes}
+				{task}
+				tasks={allTasks}
+				preview
+				onwikilink={handleWikiClick}
 				idPrefix="task-window"
 				autofocus={revealed}
 			/>
@@ -317,4 +369,10 @@
 			</Button>
 		</EmptyState>
 	{/if}
+	<AmbiguousWikiDialog
+		bind:open={candidatesOpen}
+		entities={candidateEntities}
+		heading={pendingHeading}
+		onselect={(entity, heading) => void openWikiTarget(entity, heading)}
+	/>
 </div>

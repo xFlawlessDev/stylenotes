@@ -7,10 +7,13 @@
 		TASK_STATUSES,
 		priorityMeta,
 		statusMeta,
+		type Task,
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
-	import { Field, Input, Select, Textarea } from '$lib/components/base';
+	import type { WikiClick } from '$lib/content/wiki-links';
+	import { Field, Input, Select } from '$lib/components/base';
+	import TaskDetailsEditor from '$lib/components/tasks/TaskDetailsEditor.svelte';
 
 	let {
 		title = $bindable(''),
@@ -23,6 +26,10 @@
 		dueDate = $bindable(''),
 		folders,
 		notes,
+		task = null,
+		tasks = [],
+		preview = false,
+		onwikilink,
 		idPrefix = 'task',
 		autofocus = false,
 		compact = false
@@ -37,6 +44,12 @@
 		dueDate?: string;
 		folders: Folder[];
 		notes: Note[];
+		/** The record being edited, so details can resolve wiki links. */
+		task?: Task | null;
+		tasks?: Task[];
+		/** Adds a Write/Preview switch to the details field. */
+		preview?: boolean;
+		onwikilink?: (click: WikiClick) => void;
 		idPrefix?: string;
 		autofocus?: boolean;
 		compact?: boolean;
@@ -83,13 +96,16 @@
 	</Field>
 
 	<Field label="Details" hint="optional" for="{idPrefix}-notes" class={group} {labelClass}>
-		<Textarea
-			id="{idPrefix}-notes"
-			bind:value={detail}
-			rows={compact ? 2 : 3}
-			size="sm"
-			class={compact ? 'py-1.5' : 'py-2'}
-			placeholder="Context, links, next steps."
+		<TaskDetailsEditor
+			{idPrefix}
+			bind:detail
+			{task}
+			{notes}
+			{tasks}
+			{folders}
+			{preview}
+			{compact}
+			{onwikilink}
 		/>
 	</Field>
 

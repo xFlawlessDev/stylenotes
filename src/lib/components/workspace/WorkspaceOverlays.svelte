@@ -6,6 +6,7 @@
 		Contrast,
 		Download,
 		ListTodo,
+		Network,
 		Trash2,
 		RotateCcw,
 	} from '@lucide/svelte';
@@ -38,6 +39,7 @@
 		ontogglemode,
 		onopensettings,
 		onopentasks,
+		onopengraph,
 		createOpen = $bindable(false),
 		oncreatenote,
 		folderOpen = $bindable(false),
@@ -73,6 +75,7 @@
 		ontogglemode: () => void;
 		onopensettings: () => void;
 		onopentasks: () => void;
+		onopengraph: () => void;
 		createOpen?: boolean;
 		oncreatenote: (data: { title: string; folder: string; body: string }) => void;
 		folderOpen?: boolean;
@@ -94,6 +97,7 @@
 		{ id: 'new', label: 'New note', hint: 'Ctrl N', icon: FilePlus2, run: onnewnote },
 		{ id: 'new-folder', label: 'New folder', icon: FolderPlus, run: onnewfolder },
 		{ id: 'tasks', label: 'Open tasks', icon: ListTodo, run: onopentasks },
+		{ id: 'graph', label: 'Open graph', icon: Network, run: onopengraph },
 		{ id: 'theme', label: 'Toggle light and dark', hint: 'Ctrl /', icon: Contrast, run: ontogglemode },
 		{ id: 'settings', label: 'Open settings', hint: 'Ctrl ,', icon: SettingsIcon, run: onopensettings },
 		{ id: 'export', label: 'Export all notes', icon: Download, run: onexport },

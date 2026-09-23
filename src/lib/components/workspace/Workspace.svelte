@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { createNote as makeNote } from '$lib/content/content';
@@ -49,13 +49,18 @@
 	import NotificationPanel from '$lib/components/workspace/NotificationPanel.svelte';
 	import WorkspaceOverlays from '$lib/components/workspace/WorkspaceOverlays.svelte';
 	import TaskBoard, { type TaskView } from '$lib/components/tasks/TaskBoard.svelte';
+	import GraphPage from '$lib/components/graph/GraphPage.svelte';
+	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
+	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
+	import { planWikiClick, wikiEntityFor } from '$lib/content/wiki-navigation';
+	import type { GraphNode } from '$lib/content/workspace-graph';
 	import {
 		hydrateTasks,
 		refreshTasks,
 		clearTasks,
 	} from '$lib/stores/tasks.svelte';
 	import type { Task } from '$lib/stores/tasks';
-	import { isTauri, NAVIGATE_EVENT, toggleOverlay, type WorkspaceNavigate } from '$lib/windows';
+	import { isTauri, NAVIGATE_EVENT, toggleOverlay, type WorkspaceNavigate, type WorkspaceSection } from '$lib/windows';
 	import {
 		createWorkspace,
 		deleteWorkspace,
@@ -65,7 +70,7 @@
 		workspaceStore,
 	} from '$lib/stores/workspaces.svelte';
 	import WorkspaceScope from '$lib/components/workspace/WorkspaceScope.svelte';
-	import { refreshDependencies } from '$lib/stores/dependencies.svelte';
+	import { dependencyStore, refreshDependencies } from '$lib/stores/dependencies.svelte';
 
 	let items = $state<Note[]>([]);
 	let customFolders = $state<CustomFolder[]>([]);
@@ -86,7 +91,10 @@
 	let toast = $state('');
 	let newNoteToken = $state(0);
 	let fullPreview = $state(false);
-	let section = $state<'notes' | 'tasks'>('notes');
+	let ambiguousEntities = $state<WikiEntity[]>([]);
+	let ambiguousHeading = $state<string | null>(null);
+	let ambiguousOpen = $state(false);
+	let section = $state<WorkspaceSection>('notes');
 	let tasks = $state<Task[]>([]);
 	let selectedTaskId = $state('');
 	let taskView = $state<TaskView>('dashboard');
@@ -122,6 +130,7 @@
 				loadFolders(),
 				loadNotifications(),
 				hydrateTasks(),
+				refreshDependencies(),
 			]);
 			items = storedNotes;
 			customFolders = storedFolders;
@@ -244,8 +253,65 @@
 		activeFolder = data.folder;
 		activeTag = null;
 		newNoteToken += 1;
+		section = 'notes';
 		showToast('Note created');
 		await persistNoteOrToast(note);
+	}
+
+	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
+		ambiguousEntities = entities;
+		ambiguousHeading = heading;
+		ambiguousOpen = entities.length > 0;
+	}
+
+	async function selectWikiTarget(entity: WikiEntity, heading: string | null) {
+		if (entity.kind === 'task') {
+			section = 'tasks';
+			selectedTaskId = entity.id;
+			taskFocusToken += 1;
+			return;
+		}
+		section = 'notes';
+		activeFolder = 'all';
+		activeTag = null;
+		selectedId = entity.id;
+		if (heading) {
+			await tick();
+			requestAnimationFrame(() => document.getElementById(heading)?.scrollIntoView());
+		}
+	}
+
+	async function handleWikiClick(click: WikiClick) {
+		const source = items.find((item) => item.id === selectedId);
+		if (!source) return;
+		const plan = planWikiClick(click, source, items, customFolders, tasks);
+		if (!plan) return;
+		if (plan.status === 'open') {
+			await selectWikiTarget(plan.entity, plan.heading);
+			return;
+		}
+		if (plan.status === 'choose') {
+			showAmbiguous(plan.entities, plan.heading);
+			return;
+		}
+		const created = makeNote({
+			title: plan.title,
+			folder: plan.folder,
+			workspaceId: source.workspaceId ?? workspaceStore.activeId,
+		});
+		items = [created, ...items];
+		const ok = await persistNote(created);
+		if (!ok) {
+			items = items.filter((item) => item.id !== created.id);
+			showToast('Could not create linked note');
+			return;
+		}
+		await selectWikiTarget({ ...created, kind: 'note' }, plan.heading);
+	}
+
+	function openGraphNode(node: GraphNode) {
+		const entity = wikiEntityFor({ id: node.entityId, kind: node.kind }, items, tasks);
+		if (entity) void selectWikiTarget(entity, null);
 	}
 
 	function openAddFolder() {
@@ -472,7 +538,17 @@
 		notifications={notificationsSlot}
 	/>
 
-	{#if section === 'tasks'}
+	{#if section === 'graph'}
+		<div class="ws-grid relative flex min-h-0 flex-1">
+			<GraphPage
+				notes={items}
+				{tasks}
+				folders={customFolders}
+				dependencies={dependencyStore.items}
+				onopen={openGraphNode}
+			/>
+		</div>
+	{:else if section === 'tasks'}
 		<div class="ws-grid relative flex min-h-0 flex-1">
 			<TaskBoard
 				bind:tasks
@@ -546,6 +622,10 @@
 
 			<NoteEditor
 				note={selected}
+				notes={items}
+				tasks={tasks}
+				customFolders={customFolders}
+				onwikilink={handleWikiClick}
 				{folders}
 				focusToken={newNoteToken}
 				{fullPreview}
@@ -572,7 +652,10 @@
 		{items}
 		{folders}
 		{tasks}
-		onselectnote={(id) => (selectedId = id)}
+		onselectnote={(id) => {
+			selectedId = id;
+			section = 'notes';
+		}}
 		onselecttask={(id) => {
 			selectedTaskId = id;
 			taskFocusToken += 1;
@@ -592,6 +675,7 @@
 			settingsOpen = true;
 		}}
 		onopentasks={() => (section = 'tasks')}
+		onopengraph={() => (section = 'graph')}
 		oncreatenote={commitNewNote}
 		folderLabels={folders.map((folder) => folder.label)}
 		oncreatefolder={commitNewFolder}
@@ -608,6 +692,12 @@
 		}}
 		oncancelfolderdelete={() => (pendingFolder = null)}
 		onreset={resetData}
+	/>
+	<AmbiguousWikiDialog
+		bind:open={ambiguousOpen}
+		entities={ambiguousEntities}
+		heading={ambiguousHeading}
+		onselect={(entity, heading) => void selectWikiTarget(entity, heading)}
 	/>
 </div>
 </WorkspaceScope>
