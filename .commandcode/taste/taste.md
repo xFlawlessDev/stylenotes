@@ -1,0 +1,3 @@
+- In the task UI, prefers the Dashboard as the default view when opening Tasks and the “Today” control in the mini calendar rather than Events. Confidence: 0.95
+- Expects UI components to be responsive and work well at narrow/mobile widths. Confidence: 0.82
+- Prefers task cards in the dashboard to display task status as a visible badge. Confidence: 0.9
