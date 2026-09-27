@@ -68,9 +68,10 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
-							variant={view === item.id ? 'secondary' : 'ghost'}
+							variant={view === item.id ? 'tonal' : 'ghost'}
 							size="icon-sm"
 							aria-label={item.title}
+							aria-pressed={view === item.id}
 							onclick={() => onview(item.id)}
 						>
 							<Icon size={15} />
@@ -103,10 +104,11 @@
 			{#snippet child({ props })}
 				<Button
 					{...props}
-					variant="secondary"
+					variant={pinned ? 'tonal' : 'secondary'}
 					size="icon"
-					class={pinned ? 'text-primary' : 'text-on-surface-variant'}
+					class={pinned ? undefined : 'text-on-surface-variant'}
 					aria-label="Pin note"
+					aria-pressed={pinned}
 					onclick={ontogglepin}
 				>
 					<Pin size={16} />
@@ -137,10 +139,11 @@
 			{#snippet child({ props })}
 				<Button
 					{...props}
-					variant="secondary"
+					variant={docked ? 'tonal' : 'secondary'}
 					size="icon"
-					class={docked ? 'text-tertiary' : 'text-on-surface-variant'}
+					class={docked ? undefined : 'text-on-surface-variant'}
 					aria-label={docked ? 'Remove from dock' : 'Add to dock'}
+					aria-pressed={docked}
 					onclick={ontoggledock}
 				>
 					<PictureInPicture2 size={16} />
@@ -154,10 +157,11 @@
 			{#snippet child({ props })}
 				<Button
 					{...props}
-					variant="secondary"
+					variant={archived ? 'tonal' : 'secondary'}
 					size="icon"
-					class={archived ? 'text-tertiary' : 'text-on-surface-variant'}
+					class={archived ? undefined : 'text-on-surface-variant'}
 					aria-label={archived ? 'Unarchive note' : 'Archive note'}
+					aria-pressed={archived}
 					onclick={ontogglearchive}
 				>
 					{#if archived}
