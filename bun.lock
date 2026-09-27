@@ -5,6 +5,7 @@
     "": {
       "name": "stylenotes",
       "dependencies": {
+        "@floating-ui/dom": "^1.8.0",
         "@mdit/plugin-katex": "^1.1.1",
         "@olets/markdown-it-wrapperless-fence-rule": "^1.2.1",
         "@shikijs/markdown-it": "^4.4.3",

@@ -6,6 +6,14 @@
 	import type { CustomFolder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
 	import { SegmentedControl, Textarea } from '$lib/components/base';
+	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import {
+		applyWikilink,
+		moveSuggestion,
+		wikiSuggestionsFor,
+		type WikiSuggestion,
+		type WikiSuggestionSet
+	} from '$lib/content/wiki-autocomplete';
 
 	let {
 		detail = $bindable(''),
@@ -33,6 +41,81 @@
 	let mode = $state<'write' | 'preview'>('write');
 	let html = $state('');
 	let previewEl = $state<HTMLDivElement>();
+	let textareaEl = $state<HTMLTextAreaElement | null>(null);
+	let suggestions = $state<WikiSuggestionSet | null>(null);
+	let activeIndex = $state(0);
+
+	/** Workspace-scoped pools; a task never links to itself. */
+	const wikiContext = $derived({
+		source: task ?? { id: '', title: '', folder: '' },
+		notes: notes.filter(scopeToTask),
+		tasks: tasks.filter(scopeToTask),
+		folders
+	});
+
+	const open = $derived(!!suggestions?.items.length);
+
+	function scopeToTask(item: { workspaceId?: string }): boolean {
+		const id = task?.workspaceId ?? 'workspace-default';
+		return (item.workspaceId ?? 'workspace-default') === id;
+	}
+
+	/** Recomputes the query from the live caret. */
+	function refreshSuggestions() {
+		const el = textareaEl;
+		if (!el || mode !== 'write') {
+			suggestions = null;
+			return;
+		}
+		const next = wikiSuggestionsFor(detail, el.selectionStart, wikiContext);
+		suggestions = next?.items.length ? next : null;
+		activeIndex = next?.items.length ? next.index : 0;
+	}
+
+	function choose(item: WikiSuggestion) {
+		const current = suggestions;
+		if (!current || !textareaEl) return;
+		const next = applyWikilink(detail, current.query, item.entity, current.query);
+		suggestions = null;
+		detail = next.value;
+		requestAnimationFrame(() => {
+			textareaEl?.focus();
+			textareaEl?.setSelectionRange(next.caret, next.caret);
+		});
+	}
+
+	/**
+	 * Recomputes the query from the live caret. Keyups the popover consumed are
+	 * skipped: after `Enter` the caret sits past the inserted link, and
+	 * refreshing there would immediately reopen the list.
+	 */
+	function refreshFromKeyup(event: KeyboardEvent) {
+		if (event.key.startsWith('Arrow') || event.key === 'Escape') return;
+		if (event.key === 'Enter' || event.key === 'Tab') return;
+		refreshSuggestions();
+	}
+
+	/** Popover keys win over the textarea's own Enter/Tab/Escape handling. */
+	function handleKeydown(event: KeyboardEvent) {
+		const items = suggestions?.items ?? [];
+		if (!items.length) return;
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			activeIndex = moveSuggestion(activeIndex, items.length, event.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		if (event.key === 'Enter' || event.key === 'Tab') {
+			event.preventDefault();
+			event.stopPropagation();
+			choose(items[activeIndex] ?? items[0]);
+			return;
+		}
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			suggestions = null;
+		}
+	}
 
 	$effect(() => {
 		let cancelled = false;
@@ -93,12 +176,28 @@
 		{/if}
 	</div>
 {:else}
-	<Textarea
-		id="{idPrefix}-notes"
-		bind:value={detail}
-		rows={compact ? 2 : 3}
-		size="sm"
-		class={compact ? 'py-1.5' : 'py-2'}
-		placeholder="Context, links, next steps. Type [[ to link a note or task."
-	/>
+	<div class="relative">
+		<Textarea
+			id="{idPrefix}-notes"
+			bind:ref={textareaEl}
+			bind:value={detail}
+			oninput={refreshSuggestions}
+			onkeydown={handleKeydown}
+			onkeyup={refreshFromKeyup}
+			onclick={refreshSuggestions}
+			onblur={() => (suggestions = null)}
+			rows={compact ? 2 : 3}
+			size="sm"
+			class={compact ? 'py-1.5' : 'py-2'}
+			placeholder="Context, links, next steps. Type [[ to link a note or task."
+		/>
+		<WikiLinkPopover
+			{open}
+			target={textareaEl}
+			items={suggestions?.items ?? []}
+			index={activeIndex}
+			onselect={choose}
+			onhover={(position) => (activeIndex = position)}
+		/>
+	</div>
 {/if}

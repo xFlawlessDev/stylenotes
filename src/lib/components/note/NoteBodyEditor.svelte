@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { EditorCommand } from '$lib/content/markdown-editor';
 	import { continueList, indentLines } from '$lib/content/markdown-lines';
 	import { transform } from '$lib/content/markdown-commands';
@@ -19,6 +19,14 @@
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
+	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import {
+		applyWikilink,
+		moveSuggestion,
+		wikiSuggestionsFor,
+		type WikiSuggestion,
+		type WikiSuggestionSet
+	} from '$lib/content/wiki-autocomplete';
 
 	let {
 		body,
@@ -47,6 +55,58 @@
 	let previewEl = $state<HTMLDivElement>();
 	let guideOpen = $state(false);
 	let focusedOnce = false;
+	let suggestions = $state<WikiSuggestionSet | null>(null);
+	let activeIndex = $state(0);
+
+	/** Workspace-scoped pools, so the popover offers what a link can reach. */
+	const wikiContext = $derived({
+		source: note,
+		notes: notes.filter((item) => (item.workspaceId ?? 'workspace-default') === (note.workspaceId ?? 'workspace-default')),
+		tasks: tasks.filter((item) => (item.workspaceId ?? 'workspace-default') === (note.workspaceId ?? 'workspace-default')),
+		folders
+	});
+
+	const open = $derived(!!suggestions?.items.length);
+
+	/** Recomputes the query from the live caret. */
+	function refreshSuggestions() {
+		const el = textareaEl;
+		if (!el || (view !== 'write' && view !== 'split')) {
+			suggestions = null;
+			return;
+		}
+		const next = wikiSuggestionsFor(draft, el.selectionStart, wikiContext);
+		suggestions = next?.items.length ? next : null;
+		activeIndex = next?.items.length ? next.index : 0;
+	}
+
+	/**
+	 * Keeps the popover in step when the pools change under it, without stealing
+	 * the keyboard selection: `refreshSuggestions` would reset `activeIndex` to
+	 * the head on every run, so the caret-derived list is rebuilt only when the
+	 * query text actually moved.
+	 */
+	$effect(() => {
+		const pools = wikiContext;
+		const current = untrack(() => (suggestions ? suggestions.query.text : null));
+		if (current === null) return;
+		const el = textareaEl;
+		if (!el) return;
+		const caret = untrack(() => el.selectionStart);
+		const next = wikiSuggestionsFor(draft, caret, pools);
+		untrack(() => {
+			suggestions = next?.items.length ? next : null;
+		});
+	});
+
+	function choose(item: WikiSuggestion) {
+		const el = textareaEl;
+		const current = suggestions;
+		if (!el || !current) return;
+		const next = applyWikilink(draft, current.query, item.entity, current.query);
+		suggestions = null;
+		applyEdit({ value: next.value, start: next.caret, end: next.caret });
+	}
 
 	$effect(() => {
 		draft = body;
@@ -115,6 +175,8 @@
 	}
 
 	function onEditorKeydown(event: KeyboardEvent) {
+		if (suggestions?.items.length && handlePopoverKey(event)) return;
+
 		if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
 			const current = editorState();
 			if (!current) return;
@@ -142,6 +204,41 @@
 		event.preventDefault();
 		event.stopPropagation();
 		runCommand(command);
+	}
+
+	/**
+	 * Recomputes the query from the live caret. Keyups the popover consumed are
+	 * skipped: after `Enter` the caret sits past the inserted link, and
+	 * refreshing there would immediately reopen the list.
+	 */
+	function refreshFromKeyup(event: KeyboardEvent) {
+		if (event.key.startsWith('Arrow') || event.key === 'Escape') return;
+		if (event.key === 'Enter' || event.key === 'Tab') return;
+		refreshSuggestions();
+	}
+
+	/** Popover keys win over the editor's own Enter/Tab/Escape handling. */
+	function handlePopoverKey(event: KeyboardEvent): boolean {
+		const items = suggestions?.items ?? [];
+		if (!items.length) return false;
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			activeIndex = moveSuggestion(activeIndex, items.length, event.key === 'ArrowDown' ? 1 : -1);
+			return true;
+		}
+		if (event.key === 'Enter' || event.key === 'Tab') {
+			event.preventDefault();
+			event.stopPropagation();
+			choose(items[activeIndex] ?? items[0]);
+			return true;
+		}
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			suggestions = null;
+			return true;
+		}
+		return false;
 	}
 
 	function syncSplitScroll(source: HTMLElement, target: HTMLElement) {
@@ -206,13 +303,19 @@
 			<EditorFormatBar oncommand={runCommand} onguide={() => (guideOpen = true)} />
 		{/if}
 
-		<div class="grid min-h-0 flex-1 overflow-hidden">
+		<div class="relative grid min-h-0 flex-1 overflow-hidden">
 			{#if view === 'write'}
 				<Textarea
 					bind:ref={textareaEl}
 					value={draft}
-					oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
+					oninput={(event) => {
+						commitBody((event.currentTarget as HTMLTextAreaElement).value);
+						refreshSuggestions();
+					}}
 					onkeydown={onEditorKeydown}
+					onkeyup={refreshFromKeyup}
+					onclick={refreshSuggestions}
+					onblur={() => (suggestions = null)}
 					spellcheck={settings.spellcheck}
 					variant="bare"
 					size="md"
@@ -224,8 +327,14 @@
 					<Textarea
 						bind:ref={textareaEl}
 						value={draft}
-						oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
+						oninput={(event) => {
+							commitBody((event.currentTarget as HTMLTextAreaElement).value);
+							refreshSuggestions();
+						}}
 						onkeydown={onEditorKeydown}
+						onkeyup={refreshFromKeyup}
+						onclick={refreshSuggestions}
+						onblur={() => (suggestions = null)}
 						spellcheck={settings.spellcheck}
 						variant="bare"
 						size="sm"
@@ -263,6 +372,15 @@
 					{/if}
 				</div>
 			{/if}
+
+			<WikiLinkPopover
+				{open}
+				target={textareaEl}
+				items={suggestions?.items ?? []}
+				index={activeIndex}
+				onselect={choose}
+				onhover={(position) => (activeIndex = position)}
+			/>
 		</div>
 	{/snippet}
 </FileDropZone>

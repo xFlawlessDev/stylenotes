@@ -27,6 +27,14 @@
 	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
+	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import {
+		applyWikilink,
+		moveSuggestion,
+		wikiSuggestionsFor,
+		type WikiSuggestion,
+		type WikiSuggestionSet
+	} from '$lib/content/wiki-autocomplete';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned' | 'overlay'>>;
 
@@ -75,6 +83,78 @@
 	let guideOpen = $state(false);
 	let moveFolder = $state('');
 	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
+	let suggestions = $state<WikiSuggestionSet | null>(null);
+	let activeIndex = $state(0);
+
+	/** Workspace-scoped pools, so the popover offers what a link can reach. */
+	const wikiContext = $derived({
+		source: note ?? { id: '', title: '', folder: '' },
+		notes: notes.filter(scopeToNote),
+		tasks: tasks.filter(scopeToNote),
+		folders: customFolders
+	});
+
+	const open = $derived(!!suggestions?.items.length);
+
+	function scopeToNote(item: { workspaceId?: string }): boolean {
+		const id = note?.workspaceId ?? 'workspace-default';
+		return (item.workspaceId ?? 'workspace-default') === id;
+	}
+
+	/** Recomputes the query from the live caret. */
+	function refreshSuggestions() {
+		const el = textareaEl;
+		if (!el || view === 'preview') {
+			suggestions = null;
+			return;
+		}
+		const next = wikiSuggestionsFor(draft, el.selectionStart, wikiContext);
+		suggestions = next?.items.length ? next : null;
+		activeIndex = next?.items.length ? next.index : 0;
+	}
+
+	function choose(item: WikiSuggestion) {
+		const current = suggestions;
+		if (!current) return;
+		const next = applyWikilink(draft, current.query, item.entity, current.query);
+		suggestions = null;
+		applyEdit({ value: next.value, start: next.caret, end: next.caret });
+	}
+
+	/**
+	 * Recomputes the query from the live caret. Keyups the popover consumed are
+	 * skipped: after `Enter` the caret sits past the inserted link, and
+	 * refreshing there would immediately reopen the list.
+	 */
+	function refreshFromKeyup(event: KeyboardEvent) {
+		if (event.key.startsWith('Arrow') || event.key === 'Escape') return;
+		if (event.key === 'Enter' || event.key === 'Tab') return;
+		refreshSuggestions();
+	}
+
+	/** Popover keys win over the editor's own Enter/Tab/Escape handling. */
+	function handlePopoverKey(event: KeyboardEvent): boolean {
+		const items = suggestions?.items ?? [];
+		if (!items.length) return false;
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			activeIndex = moveSuggestion(activeIndex, items.length, event.key === 'ArrowDown' ? 1 : -1);
+			return true;
+		}
+		if (event.key === 'Enter' || event.key === 'Tab') {
+			event.preventDefault();
+			event.stopPropagation();
+			choose(items[activeIndex] ?? items[0]);
+			return true;
+		}
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			suggestions = null;
+			return true;
+		}
+		return false;
+	}
 
 	const view = $derived(
 		fullPreview
@@ -171,6 +251,8 @@
 	}
 
 	function onEditorKeydown(event: KeyboardEvent) {
+		if (suggestions?.items.length && handlePopoverKey(event)) return;
+
 		if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
 			const current = editorState();
 			if (!current) return;
@@ -372,13 +454,19 @@
 				<EditorFormatBar oncommand={runCommand} onguide={() => (guideOpen = true)} />
 			{/if}
 
-			<div class="grid min-h-0 flex-1 overflow-hidden">
+			<div class="relative grid min-h-0 flex-1 overflow-hidden">
 				{#if view === 'write'}
 					<Textarea
 						bind:ref={textareaEl}
 						value={draft}
-						oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
+						oninput={(event) => {
+							commitBody((event.currentTarget as HTMLTextAreaElement).value);
+							refreshSuggestions();
+						}}
 						onkeydown={onEditorKeydown}
+						onkeyup={refreshFromKeyup}
+						onclick={refreshSuggestions}
+						onblur={() => (suggestions = null)}
 						spellcheck={settings.spellcheck}
 						variant="bare"
 						size="lg"
@@ -390,8 +478,14 @@
 						<Textarea
 							bind:ref={textareaEl}
 							value={draft}
-							oninput={(event) => commitBody((event.currentTarget as HTMLTextAreaElement).value)}
+							oninput={(event) => {
+								commitBody((event.currentTarget as HTMLTextAreaElement).value);
+								refreshSuggestions();
+							}}
 							onkeydown={onEditorKeydown}
+							onkeyup={refreshFromKeyup}
+							onclick={refreshSuggestions}
+							onblur={() => (suggestions = null)}
 							spellcheck={settings.spellcheck}
 							variant="bare"
 							size="md"
@@ -429,6 +523,15 @@
 						{/if}
 					</div>
 				{/if}
+
+				<WikiLinkPopover
+					{open}
+					target={textareaEl}
+					items={suggestions?.items ?? []}
+					index={activeIndex}
+					onselect={choose}
+					onhover={(position) => (activeIndex = position)}
+				/>
 			</div>
 		{:else}
 			<EmptyState
