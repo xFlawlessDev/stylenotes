@@ -76,6 +76,7 @@
 	let captureEl: HTMLElement | undefined = $state();
 	let plusEl: HTMLElement | undefined = $state();
 	let ignoring = false;
+	let ignoreChain: Promise<void> = Promise.resolve();
 	let dragging = false;
 	let tracker: DockCursorTracker | undefined;
 	let captureCloseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -184,10 +185,27 @@
 		return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 	}
 
-	async function setIgnore(value: boolean) {
-		if (!isTauri || ignoring === value) return;
-		ignoring = value;
-		await getCurrentWindow().setIgnoreCursorEvents(value);
+	/**
+	 * Toggles OS click-through for the dock window.
+	 *
+	 * Calls are chained so the OS state can never lag behind `ignoring`: the
+	 * flag is only committed once the IPC settles, and a failed call rolls it
+	 * back. Committing early (the old behaviour) left the window permanently
+	 * click-through whenever a call rejected — hover still worked because it is
+	 * driven by the poller, but no click ever reached the webview.
+	 */
+	function setIgnore(value: boolean): Promise<void> {
+		if (!isTauri) return Promise.resolve();
+		ignoreChain = ignoreChain.then(async () => {
+			if (ignoring === value) return;
+			try {
+				await getCurrentWindow().setIgnoreCursorEvents(value);
+				ignoring = value;
+			} catch {
+				/* keep `ignoring` in sync with the OS; the next tick retries */
+			}
+		});
+		return ignoreChain;
 	}
 
 	function itemAtPoint(x: number, y: number): { hover: DockHover; anchor: DockPoint } | null {
@@ -213,6 +231,12 @@
 	 * and hover targets. Runs once per tick while the dock window is visible.
 	 */
 	async function handleCursor({ x, y }: DockPoint) {
+		// Before the rail mounts there is nothing to hit-test against; keep the
+		// mount-time click-through state instead of deciding on empty rects
+		// (which would pin the window as ignored until the pointer left and
+		// returned).
+		if (!railEl) return;
+
 		const overRail = inRect(railEl, x, y);
 		const overPlus = inRect(plusEl, x, y);
 		const overCard = inRect(cardEl, x, y);
