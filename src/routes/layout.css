@@ -120,6 +120,17 @@
 	--accent-sand: #ddc39a;
 	--accent-rose: #e3b6bd;
 	--on-swatch: #101821;
+
+	/* Graph palette: hue-separated so node statuses stay distinguishable.
+	   Lightness adapts per mode; hue is intentionally independent of accent. */
+	--graph-note: #6f9dff;
+	--graph-task-todo: #8b98ab;
+	--graph-task-doing: #4fd0d8;
+	--graph-task-review: #f0a44b;
+	--graph-task-done: #6fdc8c;
+	--graph-edge-wiki: #7f8ea3;
+	--graph-edge-link: #4a9ff5;
+	--graph-edge-dependency: #e5698f;
 }
 
 /* ------------------------------------------------------------------ *
@@ -195,6 +206,16 @@ html.light {
 	--color-on-success: #ffffff;
 	--window-control-glyph: rgba(0, 0, 0, 0.45);
 	--on-swatch: #ffffff;
+
+	/* Graph palette, darkened for light surfaces (same hues as dark mode). */
+	--graph-note: #3f6fdb;
+	--graph-task-todo: #6b7788;
+	--graph-task-doing: #158fa0;
+	--graph-task-review: #b9741a;
+	--graph-task-done: #2f8a52;
+	--graph-edge-wiki: #7c8798;
+	--graph-edge-link: #2563c9;
+	--graph-edge-dependency: #b83a63;
 }
 
 /* Light mode: containers are already pale, so keep the lit stop subtle and
@@ -452,6 +473,16 @@ html[data-motion='reduced'] *::after {
 	--color-on-swatch: var(--on-swatch);
 	--color-emphasis-ring: var(--emphasis-ring);
 	--color-emphasis-container-ring: var(--emphasis-container-ring);
+
+	/* Graph palette utilities */
+	--color-graph-note: var(--graph-note);
+	--color-graph-task-todo: var(--graph-task-todo);
+	--color-graph-task-doing: var(--graph-task-doing);
+	--color-graph-task-review: var(--graph-task-review);
+	--color-graph-task-done: var(--graph-task-done);
+	--color-graph-edge-wiki: var(--graph-edge-wiki);
+	--color-graph-edge-link: var(--graph-edge-link);
+	--color-graph-edge-dependency: var(--graph-edge-dependency);
 
 	/* Typography scale */
 	--font-headline: 'Inter Variable', 'Inter', sans-serif;

@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
 	import { createGraphEngine, type GraphEngine } from '$lib/components/graph/graph-engine';
+	import { refreshGraphPalette } from '$lib/components/graph/graph-palette';
+	import { settings } from '$lib/stores/settings.svelte';
 
 	let {
 		nodes,
@@ -31,6 +33,7 @@
 	onMount(() => {
 		let disposed = false;
 		let created: GraphEngine | null = null;
+		refreshGraphPalette();
 		void createGraphEngine({ host: host!, onselect, onfocus })
 			.then((next) => {
 				if (disposed) {
@@ -75,11 +78,19 @@
 		void fitToken;
 		engine?.fit();
 	});
+
+	// Theme changes repaint the scene: resolve the tokens again, then re-tint.
+	$effect(() => {
+		void settings.mode;
+		void settings.accent;
+		refreshGraphPalette();
+		engine?.refreshTheme();
+	});
 </script>
 
 <div bind:this={host} class="absolute inset-0" aria-label="Force-directed graph canvas"></div>
 {#if !ready}
-	<p class="absolute inset-0 grid place-items-center text-[12px] text-[#9ca7b6]">
+	<p class="absolute inset-0 grid place-items-center text-[12px] text-on-surface-variant">
 		{failed ? 'Could not render the graph on this device.' : 'Laying out the graph…'}
 	</p>
 {/if}

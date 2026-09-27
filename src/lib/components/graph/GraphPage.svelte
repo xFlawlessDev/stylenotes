@@ -4,7 +4,14 @@
 	import type { CustomFolder } from '$lib/stores/notes';
 	import { statusMeta, type Task, type TaskDependency, type TaskStatus } from '$lib/stores/tasks';
 	import { buildWorkspaceGraph, type GraphEdgeKind, type GraphNode } from '$lib/content/workspace-graph';
-	import { GRAPH_COLORS, graphColorHex, graphNodeColor } from '$lib/components/graph/graph-palette';
+	import {
+		GRAPH_TOKENS,
+		graphColorHex,
+		graphNodeColor,
+		graphTokenColor,
+		graphTokenHex,
+	} from '$lib/components/graph/graph-palette';
+	import { settings } from '$lib/stores/settings.svelte';
 	import { Button, EmptyState, Input } from '$lib/components/base';
 	import GraphCanvas from '$lib/components/graph/GraphCanvas.svelte';
 	import GraphDrawer from '$lib/components/graph/GraphDrawer.svelte';
@@ -42,6 +49,7 @@
 	);
 
 	const active = $derived(hovered ?? selected);
+	const themeToken = $derived(`${settings.mode}:${settings.accent}`);
 	const statusText = $derived(
 		active
 			? `${active.kind === 'note' ? 'Note' : 'Task'} · ${active.title} · ${active.degree} ${
@@ -49,28 +57,37 @@
 				}`
 			: 'Hover a node to inspect links · drag nodes to move · scroll to zoom',
 	);
-	const statusColor = $derived(
-		active ? graphColorHex(graphNodeColor(active)) : graphColorHex(GRAPH_COLORS.edges.link),
-	);
+	const statusColor = $derived.by(() => {
+		void themeToken;
+		return graphColorHex(
+			active ? graphNodeColor(active) : graphTokenColor(GRAPH_TOKENS.edges.link),
+		);
+	});
 
-	const nodeLegend: { label: string; color: string }[] = [
-		{ label: 'Note', color: graphColorHex(GRAPH_COLORS.note) },
+	const nodeLegend: { label: string; token: string }[] = [
+		{ label: 'Note', token: GRAPH_TOKENS.note },
 		...(['todo', 'doing', 'review', 'done'] as TaskStatus[]).map((status) => ({
 			label: statusMeta[status].label,
-			color: graphColorHex(GRAPH_COLORS.task[status]),
+			token: GRAPH_TOKENS.task[status],
 		})),
 	];
 
-	const edgeLegend: { id: GraphEdgeKind; label: string; color: string }[] = [
-		{ id: 'wiki', label: 'Wiki links', color: graphColorHex(GRAPH_COLORS.edges.wiki) },
-		{ id: 'link', label: 'Linked note', color: graphColorHex(GRAPH_COLORS.edges.link) },
-		{ id: 'dependency', label: 'Dependencies', color: graphColorHex(GRAPH_COLORS.edges.dependency) },
+	const edgeLegend: { id: GraphEdgeKind; label: string; token: string }[] = [
+		{ id: 'wiki', label: 'Wiki links', token: GRAPH_TOKENS.edges.wiki },
+		{ id: 'link', label: 'Linked note', token: GRAPH_TOKENS.edges.link },
+		{ id: 'dependency', label: 'Dependencies', token: GRAPH_TOKENS.edges.dependency },
 	];
+
+	/** Resolve a theme token to a hex colour, re-evaluated on theme changes. */
+	function legendColor(token: string): string {
+		void themeToken;
+		return graphTokenHex(token);
+	}
 </script>
 
 <section
-	class="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl"
-	style="background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.035), transparent 38%), #05070b;"
+	class="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-surface"
+	style="background-image: radial-gradient(circle at 50% 32%, var(--glass-glow), transparent 42%);"
 	aria-label="Workspace graph of notes and tasks"
 >
 	{#if !graph.nodes.length}
@@ -79,7 +96,7 @@
 			icon={Network}
 			heading="Nothing to graph yet"
 			title="Create a note or task in this workspace to see it here."
-			class="m-auto [&_div]:text-[#9ca7b6] [&_h2]:text-[#f6f7fb] [&_p]:text-[#aeb7c5]"
+			class="m-auto"
 		/>
 	{:else}
 		<GraphCanvas
@@ -96,18 +113,18 @@
 		<!-- Compact header: a pill and the highlight search, nothing more. -->
 		<div class="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
 			<div
-				class="flex items-center gap-2 rounded-full border border-white/10 bg-[#080b11]/70 px-3 py-1.5 backdrop-blur-xl"
+				class="glass-chip flex items-center gap-2 rounded-full px-3 py-1.5 text-on-surface"
 			>
-				<Network size={14} class="shrink-0 text-[#71d2df]" />
-				<span class="text-[12px] font-medium text-[#f6f7fb]">Workspace graph</span>
-				<span class="hidden text-[11px] text-[#9ca7b6] sm:inline">
+				<Network size={14} class="shrink-0 text-primary" />
+				<span class="text-label-md font-medium">Workspace graph</span>
+				<span class="hidden text-label-sm text-on-surface-variant sm:inline">
 					{notes.length} notes · {tasks.length} tasks · {graph.edges.length} links
 				</span>
 			</div>
 			<Input
-				variant="bare"
+				variant="well"
 				size="sm"
-				class="h-8 w-40 rounded-full bg-[#080b11]/70 px-3 text-[12px] text-[#f6f7fb] ring-1 ring-white/10 placeholder:text-[#9ca7b6] focus-visible:ring-[#5484ff]/60 sm:w-52"
+				class="h-8 w-40 rounded-full px-3 sm:w-52"
 				aria-label="Highlight graph nodes"
 				placeholder="Highlight nodes"
 				bind:value={query}
@@ -117,7 +134,7 @@
 
 		<!-- Status pill, bottom-left. -->
 		<div
-			class="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%_-_24px)] items-center gap-2.5 rounded-full border border-white/10 bg-[#080b11]/70 px-3.5 py-2 text-[12px] text-[#dce2eb] backdrop-blur-xl"
+			class="glass-chip absolute bottom-3 left-3 z-10 flex max-w-[calc(100%_-_24px)] items-center gap-2.5 rounded-full px-3.5 py-2 text-label-md text-on-surface"
 		>
 			<span
 				class="size-[7px] shrink-0 rounded-full"
@@ -128,30 +145,34 @@
 
 		<!-- Legend panel, bottom-right; slides left while the drawer is open. -->
 		<div
-			class="absolute bottom-3 z-10 w-60 rounded-[14px] border border-white/10 bg-[#080b11]/65 px-4 py-3 text-[12px] text-[#c4ccd7] backdrop-blur-xl max-[720px]:hidden {selected
+			class="glass-panel absolute bottom-3 z-10 w-60 rounded-2xl px-4 py-3 text-label-md text-on-surface-variant max-[720px]:hidden {selected
 				? 'right-[308px] max-[1100px]:hidden'
 				: 'right-3'}"
 		>
-			<p class="mb-2 text-[10px] font-bold tracking-[0.14em] text-[#9ca7b6] uppercase">Nodes</p>
+			<p class="mb-2 text-label-sm font-bold tracking-[0.14em] text-on-surface-variant uppercase">
+				Nodes
+			</p>
 			<div class="grid gap-2">
 				{#each nodeLegend as item (item.label)}
 					<div class="flex items-center gap-2.5">
 						<span
-							class="size-[9px] shrink-0 rounded-full"
-							style="background: {item.color}; box-shadow: 0 0 12px color-mix(in srgb, {item.color} 70%, transparent)"
+							class="size-2.5 shrink-0 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/15"
+							style="background: {legendColor(item.token)}"
 						></span>
 						<span>{item.label}</span>
 					</div>
 				{/each}
 			</div>
 
-			<p class="mt-3 mb-1.5 text-[10px] font-bold tracking-[0.14em] text-[#9ca7b6] uppercase">Links</p>
+			<p class="mt-3 mb-1.5 text-label-sm font-bold tracking-[0.14em] text-on-surface-variant uppercase">
+				Links
+			</p>
 			<div class="grid gap-0.5">
 				{#each edgeLegend as item (item.id)}
 					<Button
 						variant="ghost"
 						size="sm"
-						class="h-auto w-full justify-start gap-2.5 rounded-lg px-1.5 py-1 text-[12px] text-[#c4ccd7] hover:bg-white/5 hover:text-[#f6f7fb] {kinds[
+						class="h-auto w-full justify-start gap-2.5 rounded-lg px-1.5 py-1 text-label-md {kinds[
 							item.id
 						]
 							? ''
@@ -159,17 +180,20 @@
 						aria-pressed={kinds[item.id]}
 						onclick={() => (kinds = { ...kinds, [item.id]: !kinds[item.id] })}
 					>
-						<span class="size-[9px] shrink-0 rounded-full" style="background: {item.color}"></span>
+						<span
+							class="h-[3px] w-4 shrink-0 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/15"
+							style="background: {legendColor(item.token)}"
+						></span>
 						<span class="flex-1 text-left">{item.label}</span>
-						<span class="text-[#9ca7b6]">{graph.counts[item.id]}</span>
+						<span class="text-on-surface-variant">{graph.counts[item.id]}</span>
 					</Button>
 				{/each}
 			</div>
 
 			<Button
-				variant="ghost"
+				variant="secondary"
 				size="sm"
-				class="mt-3 w-full justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 text-[12px] text-[#f6f7fb] hover:bg-white/10 hover:text-[#f6f7fb]"
+				class="mt-3 w-full justify-center gap-1.5"
 				onclick={() => (fitToken += 1)}
 			>
 				<ScanSearch size={13} /> Fit view

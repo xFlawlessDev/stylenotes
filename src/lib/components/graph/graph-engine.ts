@@ -1,7 +1,7 @@
 import type { Container, FederatedPointerEvent, Graphics, Sprite, Text } from 'pixi.js';
 import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
 import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
-import { GRAPH_COLORS, graphNodeColor } from '$lib/components/graph/graph-palette';
+import { GRAPH_TOKENS, graphEdgeColor, graphNodeColor, graphTokenColor } from '$lib/components/graph/graph-palette';
 
 type SimNode = GraphNode & SimulationNodeDatum;
 type SimLink = SimulationLinkDatum<SimNode> & { id: string; kind: GraphEdgeKind };
@@ -21,6 +21,8 @@ export type GraphEngine = {
 	setVisibleKinds(kinds: Record<GraphEdgeKind, boolean>): void;
 	/** Persistent focus driven by the details drawer. */
 	setSelected(id: string | null): void;
+	/** Re-tint nodes, links and labels after a light/dark or accent change. */
+	refreshTheme(): void;
 	fit(): void;
 	destroy(): void;
 };
@@ -33,11 +35,12 @@ export type GraphEngineOptions = {
 	onfocus?: (node: GraphNode | null) => void;
 };
 
-const EDGE_STYLE: Record<GraphEdgeKind, { width: number; alpha: number; color: number }> = {
-	wiki: { width: 0.8, alpha: 0.16, color: GRAPH_COLORS.edges.wiki },
-	link: { width: 0.9, alpha: 0.2, color: GRAPH_COLORS.edges.link },
-	dependency: { width: 0.9, alpha: 0.18, color: GRAPH_COLORS.edges.dependency },
-};
+function edgeStyle(kind: GraphEdgeKind): { width: number; alpha: number; color: number } {
+	const color = graphEdgeColor(kind);
+	if (kind === 'wiki') return { width: 0.8, alpha: 0.34, color };
+	if (kind === 'link') return { width: 0.9, alpha: 0.42, color };
+	return { width: 0.9, alpha: 0.38, color };
+}
 
 function seededRandom(seed = 42) {
 	let value = seed >>> 0;
@@ -48,9 +51,10 @@ function seededRandom(seed = 42) {
 }
 
 /**
- * Force-directed Pixi canvas following the reference demo: dark scene, haloed
- * nodes, labels with a dark stroke, links drawn as one redrawable Graphics, and
- * hover focus that isolates a node's connections.
+ * Force-directed Pixi canvas themed by the workspace: node, link and label
+ * colours resolve from CSS custom properties (see `graph-palette`), links are
+ * drawn as one redrawable Graphics, and hover focus isolates a node's
+ * connections. `refreshTheme` re-tints the scene after a light/dark swap.
  */
 export async function createGraphEngine({ host, onselect, onfocus }: GraphEngineOptions): Promise<GraphEngine> {
 	const PIXI = await import('pixi.js');
@@ -117,6 +121,26 @@ export async function createGraphEngine({ host, onselect, onfocus }: GraphEngine
 		return Math.min(18, 7 + Math.sqrt(node.degree) * 3.2);
 	}
 
+	/** Label style follows the workspace theme so text stays legible in both modes. */
+	function labelStyle(fontSize: number, degree: number) {
+		return {
+			fontFamily: 'Inter, Arial, sans-serif',
+			fontSize,
+			fill: graphTokenColor(GRAPH_TOKENS.label),
+			stroke: { color: graphTokenColor(GRAPH_TOKENS.labelStroke), width: degree >= 4 ? 5 : 4 },
+			fontWeight: (degree >= 4 ? '600' : '400') as '600' | '400',
+		};
+	}
+
+	function refreshTheme() {
+		for (const view of nodeViews.values()) {
+			view.halo.tint = graphNodeColor(view.node);
+			view.circle.tint = graphNodeColor(view.node);
+			view.label.style = labelStyle(view.fontSize, view.node.degree);
+		}
+		drawLinks();
+	}
+
 	function linkNode(endpoint: string | number | SimNode): SimNode | undefined {
 		return typeof endpoint === 'object' ? endpoint : simNodes.find((node) => node.id === String(endpoint));
 	}
@@ -144,9 +168,9 @@ export async function createGraphEngine({ host, onselect, onfocus }: GraphEngine
 
 	function drawLinks() {
 		linksLayer.clear();
-		for (const kind of Object.keys(EDGE_STYLE) as GraphEdgeKind[]) {
+		for (const kind of ['wiki', 'link', 'dependency'] as GraphEdgeKind[]) {
 			if (!visibleKinds[kind]) continue;
-			const style = EDGE_STYLE[kind];
+			const style = edgeStyle(kind);
 			let drew = false;
 			for (const link of simLinks) {
 				if (link.kind !== kind) continue;
@@ -164,7 +188,7 @@ export async function createGraphEngine({ host, onselect, onfocus }: GraphEngine
 		const focusView = focusNodeId ? nodeViews.get(focusNodeId) : undefined;
 		const activeIds = focusNodeId ? connectedTo(focusNodeId) : highlight;
 		if (!activeIds || activeIds.size === 0) return;
-		const color = focusView ? graphNodeColor(focusView.node) : GRAPH_COLORS.label;
+		const color = focusView ? graphNodeColor(focusView.node) : graphTokenColor(GRAPH_TOKENS.label);
 		let drew = false;
 		for (const link of simLinks) {
 			if (!visibleKinds[link.kind]) continue;
@@ -375,13 +399,7 @@ export async function createGraphEngine({ host, onselect, onfocus }: GraphEngine
 			const fontSize = node.degree >= 4 ? 14 : node.degree >= 1 ? 12 : 11;
 			const label = new PIXI.Text({
 				text: node.title,
-				style: {
-					fontFamily: 'Inter, Arial, sans-serif',
-					fontSize,
-					fill: GRAPH_COLORS.label,
-					stroke: { color: GRAPH_COLORS.labelStroke, width: node.degree >= 4 ? 5 : 4 },
-					fontWeight: node.degree >= 4 ? '600' : '400',
-				},
+				style: labelStyle(fontSize, node.degree),
 			});
 			label.resolution = 2;
 			label.position.set((node.x ?? 0) + radius + 5, (node.y ?? 0) - fontSize * 0.45);
@@ -477,6 +495,7 @@ export async function createGraphEngine({ host, onselect, onfocus }: GraphEngine
 			drawLinks();
 		},
 		setSelected,
+		refreshTheme,
 		fit,
 		destroy() {
 			simulation?.stop();
