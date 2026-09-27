@@ -15,6 +15,7 @@
 		task,
 		selected = false,
 		noteTitle = null,
+		noteCount = 0,
 		dragging = false,
 		showStatus = false,
 		onselect,
@@ -22,7 +23,9 @@
 	}: {
 		task: Task;
 		selected?: boolean;
+		/** First linked note; extra links are summarised by {@link noteCount}. */
 		noteTitle?: string | null;
+		noteCount?: number;
 		dragging?: boolean;
 		showStatus?: boolean;
 		onselect: () => void;
@@ -102,6 +105,9 @@
 			>
 				<Link2 size={11} class="shrink-0" />
 				<span class="truncate">{noteTitle}</span>
+				{#if noteCount > 1}
+					<span class="shrink-0 text-outline">+{noteCount - 1}</span>
+				{/if}
 			</span>
 		{/if}
 	</div>

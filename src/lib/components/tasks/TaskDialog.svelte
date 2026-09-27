@@ -7,6 +7,7 @@
 	import {
 		fromDateInput,
 		isTaskBlocked,
+		taskNoteIds,
 		taskPriority,
 		taskStatus,
 		toDateInput,
@@ -57,7 +58,7 @@
 	let status = $state<TaskStatus>('todo');
 	let priority = $state<TaskPriority>('medium');
 	let folder = $state('personal');
-	let noteId = $state('');
+	let noteIds = $state<string[]>([]);
 	let startDate = $state('');
 	let dueDate = $state('');
 
@@ -71,7 +72,7 @@
 			status = task ? taskStatus(task) : defaultStatus;
 			priority = task ? taskPriority(task) : 'medium';
 			folder = task?.folder ?? defaultFolder ?? folderOptions[0]?.id ?? 'personal';
-			noteId = task?.noteId ?? '';
+			noteIds = task ? taskNoteIds(task) : [];
 			startDate = toDateInput(task?.startAt ?? null);
 			dueDate = toDateInput(task?.dueAt ?? null);
 		}
@@ -91,7 +92,7 @@
 			status,
 			priority,
 			folder,
-			noteId: noteId || null,
+			noteIds: [...noteIds],
 			startAt: fromDateInput(startDate),
 			dueAt: fromDateInput(dueDate)
 		});
@@ -152,7 +153,7 @@
 					bind:status
 					bind:priority
 					bind:folder
-					bind:noteId
+					bind:noteIds
 					bind:startDate
 					bind:dueDate
 					{folders}

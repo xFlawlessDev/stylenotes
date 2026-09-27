@@ -2,6 +2,7 @@ import { flushSync, mount, unmount } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
+import type { Note } from '$lib/content/content';
 import { createTask, type Task, type TaskDependency } from '$lib/stores/tasks';
 
 const noop = () => {};
@@ -94,6 +95,44 @@ describe('task dependency UI', () => {
 		expect(document.body.textContent).toContain('Dependencies');
 		expect(document.body.textContent).toContain('Task A');
 		expect(document.querySelectorAll('[data-slot="base-button"]').length).toBeGreaterThan(0);
+
+		unmount(app);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		target.remove();
+	});
+
+	it('lists every linked note and submits the whole list', async () => {
+		const notes = [
+			{ id: 'n1', title: 'Spec' },
+			{ id: 'n2', title: 'Plan' }
+		] as unknown as Note[];
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+
+		let submittedNoteIds: string[] | null = null;
+		const app = mount(TaskDialog, {
+			target,
+			props: {
+				open: true,
+				task: createTask({ id: 't1', title: 'Ship it', noteIds: ['n1', 'n2'] }),
+				folders: [],
+				notes,
+				onsubmit: (data) => {
+					submittedNoteIds = data.noteIds;
+				}
+			}
+		});
+		flushSync();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+
+		expect(document.body.textContent).toContain('Linked notes');
+		expect(document.body.textContent).toContain('Spec');
+		expect(document.body.textContent).toContain('Plan');
+
+		const submit = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')][0];
+		submit?.click();
+		flushSync();
+		expect(submittedNoteIds).toEqual(['n1', 'n2']);
 
 		unmount(app);
 		await new Promise((resolve) => setTimeout(resolve, 20));

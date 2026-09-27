@@ -20,6 +20,7 @@
 		taskPriority,
 		taskStatus,
 		isTaskBlocked,
+		taskNoteIds,
 		toDateInput,
 		type Task,
 		type TaskDependency,
@@ -67,7 +68,7 @@
 	let status = $state<TaskStatus>('todo');
 	let priority = $state<TaskPriority>('medium');
 	let folder = $state('personal');
-	let noteId = $state('');
+	let noteIds = $state<string[]>([]);
 	let startDate = $state('');
 	let dueDate = $state('');
 	let revealed = $state(false);
@@ -79,6 +80,11 @@
 
 	const folders = $derived(foldersFor(notes, customFolders));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
+	const linkedNotes = $derived(
+		taskNoteIds({ noteId: task?.noteId ?? null, noteIds })
+			.map((id) => notes.find((note) => note.id === id))
+			.filter((note): note is Note => !!note)
+	);
 	const queue = createSaveQueue<Task>(persistTask);
 
 	/** Mirrors the loaded task into the form fields. */
@@ -90,7 +96,7 @@
 		status = taskStatus(current);
 		priority = taskPriority(current);
 		folder = current.folder;
-		noteId = current.noteId ?? '';
+		noteIds = taskNoteIds(current);
 		startDate = toDateInput(current.startAt);
 		dueDate = toDateInput(current.dueAt);
 		loaded = true;
@@ -117,7 +123,7 @@
 			status,
 			priority,
 			folder,
-			noteId: noteId || null,
+			noteIds: [...noteIds],
 			startAt: fromDateInput(startDate),
 			dueAt: fromDateInput(dueDate)
 		};
@@ -125,13 +131,16 @@
 
 	/** Field-level comparison so the initial form sync does not trigger a write. */
 	function sameTask(a: Task, b: Task): boolean {
+		const aLinks = taskNoteIds(a);
+		const bLinks = taskNoteIds(b);
 		return (
 			a.title === b.title &&
 			a.notes === b.notes &&
 			a.status === b.status &&
 			a.priority === b.priority &&
 			a.folder === b.folder &&
-			a.noteId === b.noteId &&
+			aLinks.length === bLinks.length &&
+			aLinks.every((id, index) => id === bLinks[index]) &&
 			a.startAt === b.startAt &&
 			a.dueAt === b.dueAt
 		);
@@ -304,7 +313,7 @@
 		onclose={closeWindow}
 	>
 		{#snippet actions()}
-			{#if task?.noteId}
+			{#each linkedNotes as note (note.id)}
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
@@ -312,16 +321,16 @@
 								{...props}
 								bare
 								class="size-6 rounded-md text-on-surface-variant"
-								aria-label="Open linked note"
-								onclick={() => task?.noteId && void openNoteWindow(task.noteId)}
+								aria-label="Open {note.title || 'Untitled note'}"
+								onclick={() => void openNoteWindow(note.id)}
 							>
 								<NotebookPen size={13} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Open linked note</Tooltip.Content>
+					<Tooltip.Content>Open {note.title || 'Untitled note'}</Tooltip.Content>
 				</Tooltip.Root>
-			{/if}
+			{/each}
 		{/snippet}
 	</DetailWindowHeader>
 
@@ -334,7 +343,7 @@
 				bind:status
 				bind:priority
 				bind:folder
-				bind:noteId
+				bind:noteIds
 				bind:startDate
 				bind:dueDate
 				{folders}

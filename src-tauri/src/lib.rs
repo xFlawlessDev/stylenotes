@@ -233,6 +233,35 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 9,
+            description: "create_task_notes",
+            sql: "
+                CREATE TABLE IF NOT EXISTS task_notes (
+                    task_id TEXT NOT NULL,
+                    note_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (task_id, note_id),
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_task_notes_note_id ON task_notes (note_id);
+            ",
+            kind: MigrationKind::Up,
+        },
+        // Runs as its own migration: the plugin prepares migrations with the
+        // bind-parameter path, which only executes the first statement of a
+        // multi-statement string — this INSERT would be dropped inside v9.
+        Migration {
+            version: 10,
+            description: "backfill_task_note_links",
+            sql: "
+                INSERT OR IGNORE INTO task_notes (task_id, note_id)
+                SELECT id, note_id FROM tasks WHERE note_id IS NOT NULL;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

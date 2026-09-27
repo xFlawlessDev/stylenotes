@@ -15,6 +15,7 @@ import {
 	applyTaskPatch,
 	createTask,
 	filterTasks,
+	firstNoteTitle,
 	matchesTaskQuery,
 	isTaskOverdue,
 	moveTaskInList,
@@ -22,9 +23,11 @@ import {
 	overlayTasks,
 	matchesDueFilter,
 	reorderWithinColumn,
+	resolveNoteTitles,
 	sortOverlayTasks,
 	sortTasks,
 	taskBar,
+	taskNoteIds,
 	tasksByStatus,
 	timelineRange,
 	toDateInput,
@@ -75,6 +78,53 @@ describe('createTask', () => {
 		const item = createTask({ status: 'nope' as Task['status'], priority: 'urgent' as Task['priority'] });
 		expect(item.status).toBe('todo');
 		expect(item.priority).toBe('medium');
+	});
+});
+
+describe('task note links', () => {
+	it('lifts a legacy noteId into the list', () => {
+		const item = createTask({ noteId: 'n1' });
+		expect(item.noteIds).toEqual(['n1']);
+		expect(item.noteId).toBe('n1');
+	});
+
+	it('trims, de-duplicates, and keeps the first link as the head', () => {
+		const item = createTask({ noteIds: [' n2 ', 'n1', 'n2', ''] });
+		expect(item.noteIds).toEqual(['n2', 'n1']);
+		expect(item.noteId).toBe('n2');
+	});
+
+	it('reads legacy and list links back together', () => {
+		expect(taskNoteIds({ noteId: 'n1', noteIds: ['n1', 'n2'] })).toEqual(['n1', 'n2']);
+		expect(taskNoteIds({ noteId: null, noteIds: [] })).toEqual([]);
+	});
+
+	it('sets the noteIds list through a patch and mirrors the head', () => {
+		const patched = applyTaskPatch(task({ noteId: 'old' }), { noteIds: ['a', 'b'] });
+		expect(patched.noteIds).toEqual(['a', 'b']);
+		expect(patched.noteId).toBe('a');
+	});
+
+	it('still honours a patch that only touches the legacy field', () => {
+		const patched = applyTaskPatch(task({ noteIds: ['a', 'b'] }), { noteId: 'c' });
+		expect(patched.noteIds).toEqual(['c', 'a', 'b']);
+		expect(patched.noteId).toBe('c');
+	});
+
+	it('resolves titles in link order, dropping unknown notes', () => {
+		const notes = [
+			{ id: 'a', title: 'Alpha' },
+			{ id: 'b', title: 'Beta' }
+		] as Parameters<typeof resolveNoteTitles>[1];
+		expect(resolveNoteTitles(['b', 'missing', 'a'], notes)).toEqual(['Beta', 'Alpha']);
+		expect(resolveNoteTitles([], notes)).toEqual([]);
+	});
+
+	it('picks the first linked note title for a card chip', () => {
+		const item = task({ noteIds: ['b', 'a'] });
+		expect(firstNoteTitle(item, { a: 'Alpha', b: 'Beta' })).toBe('Beta');
+		expect(firstNoteTitle(item, { a: 'Alpha' })).toBeNull();
+		expect(firstNoteTitle(task({}), { a: 'Alpha' })).toBeNull();
 	});
 });
 
@@ -163,19 +213,22 @@ describe('filterTasks', () => {
 	const items = [
 		task({ id: 'a', title: 'Alpha report', folder: 'work', noteId: 'n1' }),
 		task({ id: 'b', title: 'Beta cleanup', notes: 'alpha mention', folder: 'personal' }),
+		task({ id: 'c', title: 'Gamma review', noteIds: ['n2', 'n1'] }),
 	];
 
 	it('filters by folder', () => {
 		expect(filterTasks(items, { folder: 'work' }).map((t) => t.id)).toEqual(['a']);
-		expect(filterTasks(items, { folder: 'all' })).toHaveLength(2);
+		expect(filterTasks(items, { folder: 'all' })).toHaveLength(3);
 	});
 
 	it('matches title and notes case-insensitively', () => {
 		expect(filterTasks(items, { query: 'ALPHA' }).map((t) => t.id)).toEqual(['a', 'b']);
 	});
 
-	it('filters by linked note', () => {
-		expect(filterTasks(items, { noteId: 'n1' }).map((t) => t.id)).toEqual(['a']);
+	it('filters by linked note across legacy and list links', () => {
+		expect(filterTasks(items, { noteId: 'n1' }).map((t) => t.id)).toEqual(['a', 'c']);
+		expect(filterTasks(items, { noteId: 'n2' }).map((t) => t.id)).toEqual(['c']);
+		expect(filterTasks(items, { noteId: 'missing' })).toHaveLength(0);
 	});
 
 	it('filters by priority', () => {

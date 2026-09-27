@@ -4,6 +4,7 @@ import type { CustomFolder } from '$lib/stores/notes';
 import type { AppNotification } from '$lib/stores/notifications';
 import type { Settings } from '$lib/stores/settings.svelte';
 import type { Task, TaskDependency } from '$lib/stores/tasks';
+import { taskNoteIds } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 
 export const DB_URL = 'sqlite:stylenotes.db';
@@ -332,7 +333,42 @@ type TaskRow = {
 	overlay: number;
 };
 
-function toTask(row: TaskRow): Task {
+type TaskNoteRow = { task_id: string; note_id: string };
+
+/**
+ * Linked notes per task, in insertion order. `task_notes` is the source of
+ * truth; `note_id` is mirrored on the task row so older builds still see the
+ * first link.
+ */
+async function linkRowsByTask(): Promise<Map<string, string[]>> {
+	const db = await getDb();
+	const rows = await db.select<TaskNoteRow[]>(
+		'SELECT task_id, note_id FROM task_notes ORDER BY rowid ASC'
+	);
+	const map = new Map<string, string[]>();
+	for (const row of rows) {
+		const list = map.get(row.task_id) ?? [];
+		list.push(row.note_id);
+		map.set(row.task_id, list);
+	}
+	return map;
+}
+
+async function writeTaskNotes(taskId: string, noteIds: string[]) {
+	const db = await getDb();
+	await db.execute('DELETE FROM task_notes WHERE task_id = $1', [taskId]);
+	for (const noteId of noteIds) {
+		await db.execute('INSERT OR IGNORE INTO task_notes (task_id, note_id) VALUES ($1, $2)', [
+			taskId,
+			noteId,
+		]);
+	}
+}
+
+function toTask(row: TaskRow, noteIds: string[] = []): Task {
+	// `note_id` is only a mirror of the head, so prefer the ordered link rows and
+	// fall back to the column for rows written before `task_notes` existed.
+	const links = noteIds.length ? noteIds : row.note_id ? [row.note_id] : [];
 	return {
 		id: row.id,
 		workspaceId: row.workspace_id ?? 'workspace-default',
@@ -341,7 +377,8 @@ function toTask(row: TaskRow): Task {
 		status: row.status as Task['status'],
 		priority: row.priority as Task['priority'],
 		folder: row.folder,
-		noteId: row.note_id ?? null,
+		noteId: links[0] ?? row.note_id ?? null,
+		noteIds: links,
 		startAt: row.start_at ?? null,
 		dueAt: row.due_at ?? null,
 		position: Number(row.position) || 0,
@@ -357,7 +394,8 @@ export const tasksRepo = {
 			workspaceId ? 'SELECT * FROM tasks WHERE workspace_id = $1 ORDER BY position ASC, created_at ASC' : 'SELECT * FROM tasks ORDER BY position ASC, created_at ASC',
 			workspaceId ? [workspaceId] : []
 		);
-		return rows.map(toTask);
+		const links = await linkRowsByTask();
+		return rows.map((row) => toTask(row, links.get(row.id) ?? []));
 	},
 
 	async count(workspaceId?: string): Promise<number> {
@@ -371,6 +409,7 @@ export const tasksRepo = {
 
 	async upsert(task: Task): Promise<void> {
 		const db = await getDb();
+		const noteIds = taskNoteIds(task);
 		await db.execute(
 			`INSERT INTO tasks
 				(id, workspace_id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay, updated_at)
@@ -397,7 +436,8 @@ export const tasksRepo = {
 				task.status,
 				task.priority,
 				task.folder,
-				task.noteId,
+				// `task_notes` owns the full list; this column mirrors the first link.
+				noteIds[0] ?? null,
 				task.startAt,
 				task.dueAt,
 				task.position,
@@ -405,23 +445,28 @@ export const tasksRepo = {
 				task.overlay ? 1 : 0,
 			]
 		);
+		await writeTaskNotes(task.id, noteIds);
 	},
 
 	async remove(id: string): Promise<void> {
 		const db = await getDb();
 		await db.execute('DELETE FROM task_dependencies WHERE task_id = $1 OR depends_on_task_id = $1', [id]);
+		await db.execute('DELETE FROM task_notes WHERE task_id = $1', [id]);
 		await db.execute('DELETE FROM tasks WHERE id = $1', [id]);
 	},
 
 	async clear(): Promise<void> {
 		const db = await getDb();
+		await db.execute('DELETE FROM task_notes');
 		await db.execute('DELETE FROM tasks');
 	},
 
 	async replaceAll(tasks: Task[]): Promise<void> {
 		const db = await getDb();
+		await db.execute('DELETE FROM task_notes');
 		await db.execute('DELETE FROM tasks');
 		for (const task of tasks) {
+			const noteIds = taskNoteIds(task);
 			await db.execute(
 				`INSERT INTO tasks
 					(id, workspace_id, title, notes, status, priority, folder, note_id, start_at, due_at, position, completed, overlay)
@@ -434,7 +479,7 @@ export const tasksRepo = {
 					task.status,
 					task.priority,
 					task.folder,
-					task.noteId,
+					noteIds[0] ?? null,
 					task.startAt,
 					task.dueAt,
 					task.position,
@@ -442,6 +487,12 @@ export const tasksRepo = {
 					task.overlay ? 1 : 0,
 				]
 			);
+			for (const noteId of noteIds) {
+				await db.execute(
+					'INSERT OR IGNORE INTO task_notes (task_id, note_id) VALUES ($1, $2)',
+					[task.id, noteId]
+				);
+			}
 		}
 	},
 };

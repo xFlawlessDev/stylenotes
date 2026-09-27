@@ -9,7 +9,8 @@ vi.mock('@tauri-apps/plugin-sql', () => ({
 
 vi.mock('$lib/windows', () => ({ isTauri: true }));
 
-import { notesRepo, foldersRepo, notificationsRepo, settingsRepo, metaRepo } from '$lib/db';
+import { notesRepo, foldersRepo, notificationsRepo, settingsRepo, metaRepo, tasksRepo } from '$lib/db';
+import { createTask } from '$lib/stores/tasks';
 
 beforeEach(() => {
 	execute.mockReset().mockResolvedValue({ rowsAffected: 1 });
@@ -195,5 +196,65 @@ describe('metaRepo', () => {
 
 		await metaRepo.set('k', 'v');
 		expect(execute.mock.calls[0][1]).toEqual(['k', 'v']);
+	});
+});
+
+describe('tasksRepo note links', () => {
+	const row = (over: Partial<Record<string, unknown>> = {}) => ({
+		id: 'n1',
+		workspace_id: 'workspace-default',
+		title: 'Do it',
+		notes: '',
+		status: 'todo',
+		priority: 'medium',
+		folder: 'personal',
+		note_id: 'legacy',
+		start_at: null,
+		due_at: null,
+		position: 0,
+		completed: 0,
+		overlay: 0,
+		...over,
+	});
+
+	it('hydrates the link list per task', async () => {
+		select
+			.mockResolvedValueOnce([row(), row({ id: 'n2', note_id: null })])
+			.mockResolvedValueOnce([
+				{ task_id: 'n1', note_id: 'a' },
+				{ task_id: 'n1', note_id: 'b' },
+			]);
+
+		const tasks = await tasksRepo.list();
+		expect(tasks[0].noteIds).toEqual(['a', 'b']);
+		expect(tasks[0].noteId).toBe('a');
+		// A task with no ledger rows falls back to the legacy column, never null.
+		expect(tasks[1].noteIds).toEqual([]);
+		expect(tasks[1].noteId).toBeNull();
+	});
+
+	it('rewrites the link rows and mirrors the first link on upsert', async () => {
+		await tasksRepo.upsert(createTask({ id: 'n1', noteIds: ['a', 'b'] }));
+
+		const insert = execute.mock.calls.find(([sql]) => sql.includes('INSERT INTO tasks'));
+		expect(insert![1][7]).toBe('a');
+		expect(execute).toHaveBeenCalledWith('DELETE FROM task_notes WHERE task_id = $1', ['n1']);
+		expect(execute).toHaveBeenCalledWith(
+			'INSERT OR IGNORE INTO task_notes (task_id, note_id) VALUES ($1, $2)',
+			['n1', 'a']
+		);
+		expect(execute).toHaveBeenCalledWith(
+			'INSERT OR IGNORE INTO task_notes (task_id, note_id) VALUES ($1, $2)',
+			['n1', 'b']
+		);
+	});
+
+	it('clears link rows before the task row', async () => {
+		await tasksRepo.remove('n1');
+		expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
+			'DELETE FROM task_dependencies WHERE task_id = $1 OR depends_on_task_id = $1',
+			'DELETE FROM task_notes WHERE task_id = $1',
+			'DELETE FROM tasks WHERE id = $1',
+		]);
 	});
 });

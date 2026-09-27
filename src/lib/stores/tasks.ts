@@ -16,7 +16,12 @@ export type Task = {
 	status: TaskStatus;
 	priority: TaskPriority;
 	folder: string;
+	/**
+	 * Head of {@link Task.noteIds}, kept so task ↔ note links written by older
+	 * builds (or by seed data) are still read and written back.
+	 */
 	noteId: string | null;
+	noteIds: string[];
 	startAt: string | null;
 	dueAt: string | null;
 	position: number;
@@ -85,7 +90,7 @@ export type TaskFormData = {
 	status: TaskStatus;
 	priority: TaskPriority;
 	folder: string;
-	noteId: string | null;
+	noteIds: string[];
 	startAt: string | null;
 	dueAt: string | null;
 };
@@ -114,7 +119,31 @@ export function isTaskPriority(value: string): value is TaskPriority {
 	return (TASK_PRIORITIES as readonly string[]).includes(value);
 }
 
+/**
+ * Normalises a note list for persistence: trimmed, de-duplicated, and always
+ * derived from `noteId` when the caller only supplied the legacy field.
+ */
+export function normalizeNoteIds(noteIds: string[] | null | undefined): string[] {
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const id of noteIds ?? []) {
+		const value = typeof id === 'string' ? id.trim() : '';
+		if (!value || seen.has(value)) continue;
+		seen.add(value);
+		result.push(value);
+	}
+	return result;
+}
+
+/** The notes a task links to, including the legacy {@link Task.noteId} field. */
+export function taskNoteIds(task: Pick<Task, 'noteId'> & Partial<Pick<Task, 'noteIds'>>): string[] {
+	return normalizeNoteIds([...(task.noteId ? [task.noteId] : []), ...(task.noteIds ?? [])]);
+}
+
 export function createTask(seed: Partial<Task> = {}): Task {
+	const noteIds = normalizeNoteIds(
+		seed.noteIds ?? (seed.noteId !== undefined && seed.noteId !== null ? [seed.noteId] : [])
+	);
 	return {
 		id: seed.id ?? crypto.randomUUID(),
 		workspaceId: seed.workspaceId ?? 'workspace-default',
@@ -123,7 +152,8 @@ export function createTask(seed: Partial<Task> = {}): Task {
 		status: seed.status && isTaskStatus(seed.status) ? seed.status : 'todo',
 		priority: seed.priority && isTaskPriority(seed.priority) ? seed.priority : 'medium',
 		folder: seed.folder ?? 'personal',
-		noteId: seed.noteId ?? null,
+		noteId: noteIds[0] ?? null,
+		noteIds,
 		startAt: seed.startAt ?? null,
 		dueAt: seed.dueAt ?? null,
 		position: seed.position ?? 0,
@@ -233,6 +263,7 @@ export type TaskPatch = Partial<
 		| 'priority'
 		| 'folder'
 		| 'noteId'
+		| 'noteIds'
 		| 'startAt'
 		| 'dueAt'
 		| 'position'
@@ -254,6 +285,18 @@ export function applyTaskPatch(task: Task, patch: TaskPatch): Task {
 		if (patch.startAt && patch.dueAt && patch.dueAt < patch.startAt) {
 			next.dueAt = patch.startAt;
 		}
+	}
+	if (patch.noteIds !== undefined) {
+		// `noteIds` is the whole list, so supplying it replaces the links.
+		next.noteIds = normalizeNoteIds(patch.noteIds);
+		next.noteId = next.noteIds[0] ?? null;
+	} else if (patch.noteId !== undefined) {
+		// Legacy callers move the head only, keeping the existing list behind it.
+		next.noteIds = normalizeNoteIds([
+			...(patch.noteId ? [patch.noteId] : []),
+			...taskNoteIds(task)
+		]);
+		next.noteId = next.noteIds[0] ?? null;
 	}
 	return next;
 }
@@ -308,7 +351,7 @@ export function filterTasks(
 	const due = opts.due ?? 'any';
 	return tasks.filter((task) => {
 		if (opts.folder && opts.folder !== 'all' && task.folder !== opts.folder) return false;
-		if (opts.noteId && task.noteId !== opts.noteId) return false;
+		if (opts.noteId && !taskNoteIds(task).includes(opts.noteId)) return false;
 		if (priority !== 'all' && taskPriority(task) !== priority) return false;
 		if (!matchesDueFilter(task, due, opts.now)) return false;
 		if (!query) return true;
@@ -420,6 +463,27 @@ export function isTaskOverdue(task: Task, now = new Date()): boolean {
 	return due !== null && due < startOfDay(now);
 }
 
+/** First linked note title for a card chip, or null when nothing is linked. */
+export function firstNoteTitle(
+	task: Pick<Task, 'noteId'> & Partial<Pick<Task, 'noteIds'>>,
+	noteTitles: Record<string, string>
+): string | null {
+	const id = taskNoteIds(task)[0];
+	return id ? (noteTitles[id] ?? null) : null;
+}
+
+/** Titles for every note a task links to, in link order (unknown notes dropped). */
+export function resolveNoteTitles(noteIds: string[] | null | undefined, notes: Note[]): string[] {
+	const byId = new Map(notes.map((note) => [note.id, note.title]));
+	return normalizeNoteIds(noteIds)
+		.map((id) => byId.get(id))
+		.filter((title): title is string => !!title);
+}
+
+/**
+ * First linked note title, or null. Callers that render one chip (kanban cards)
+ * use this; callers that list links use {@link resolveNoteTitles}.
+ */
 export function resolveNoteTitle(noteId: string | null, notes: Note[]): string | null {
 	if (!noteId) return null;
 	const note = notes.find((item) => item.id === noteId);

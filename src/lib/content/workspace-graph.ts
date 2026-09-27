@@ -1,7 +1,7 @@
 import type { Note } from '$lib/content/content';
 import type { CustomFolder } from '$lib/stores/notes';
 import type { Task, TaskDependency, TaskStatus } from '$lib/stores/tasks';
-import { taskStatus } from '$lib/stores/tasks';
+import { taskNoteIds, taskStatus } from '$lib/stores/tasks';
 import { parseWikiReferences, resolveWikiReference, type WikiEntityKind } from '$lib/content/wiki-links';
 
 export type GraphNodeKind = WikiEntityKind;
@@ -96,7 +96,9 @@ export function buildWorkspaceGraph(
 			if (resolution.status !== 'resolved') continue;
 			addEdge('wiki', graphNodeId('task', task.id), graphNodeId(resolution.entity.kind, resolution.entity.id));
 		}
-		if (task.noteId) addEdge('link', graphNodeId('task', task.id), graphNodeId('note', task.noteId));
+		for (const noteId of taskNoteIds(task)) {
+			addEdge('link', graphNodeId('task', task.id), graphNodeId('note', noteId));
+		}
 	}
 
 	for (const dependency of options.dependencies ?? []) {

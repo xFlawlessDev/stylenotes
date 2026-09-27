@@ -4,7 +4,9 @@
 	import CompactTaskCard from '$lib/components/tasks/CompactTaskCard.svelte';
 	import { kanbanDrag } from '$lib/content/kanban-drag';
 	import {
+		firstNoteTitle,
 		statusMeta,
+		taskNoteIds,
 		tasksByStatus,
 		taskStatus,
 		TASK_STATUSES,
@@ -91,7 +93,8 @@
 							<CompactTaskCard
 								{task}
 								selected={selectedId === task.id}
-								noteTitle={task.noteId ? (noteTitles[task.noteId] ?? null) : null}
+								noteTitle={firstNoteTitle(task, noteTitles)}
+								noteCount={taskNoteIds(task).length}
 								dragging={draggingId === task.id}
 								onselect={() => onselect(task.id)}
 								onedit={() => onedit(task)}

@@ -14,6 +14,7 @@
 	import type { WikiClick } from '$lib/content/wiki-links';
 	import { Field, Input, Select } from '$lib/components/base';
 	import TaskDetailsEditor from '$lib/components/tasks/TaskDetailsEditor.svelte';
+	import TaskNoteLinks from '$lib/components/tasks/TaskNoteLinks.svelte';
 
 	let {
 		title = $bindable(''),
@@ -21,7 +22,7 @@
 		status = $bindable<TaskStatus>('todo'),
 		priority = $bindable<TaskPriority>('medium'),
 		folder = $bindable('personal'),
-		noteId = $bindable(''),
+		noteIds = $bindable<string[]>([]),
 		startDate = $bindable(''),
 		dueDate = $bindable(''),
 		folders,
@@ -39,7 +40,8 @@
 		status?: TaskStatus;
 		priority?: TaskPriority;
 		folder?: string;
-		noteId?: string;
+		/** Notes this task links to; the picker reads and writes the whole list. */
+		noteIds?: string[];
 		startDate?: string;
 		dueDate?: string;
 		folders: Folder[];
@@ -165,19 +167,13 @@
 				bind:value={folder}
 			/>
 		</Field>
-
-		<Field label="Linked note" hint="optional" class={group} {labelClass}>
-			<Select
-				label="Linked note"
-				placeholder="None"
-				size={selectSize}
-				class={selectClass}
-				options={[
-					{ value: '', label: 'None' },
-					...notes.map((note) => ({ value: note.id, label: note.title || 'Untitled note' }))
-				]}
-				bind:value={noteId}
-			/>
-		</Field>
 	</div>
+
+	<TaskNoteLinks
+		bind:noteIds
+		{notes}
+		{compact}
+		class={group}
+		{labelClass}
+	/>
 </div>
