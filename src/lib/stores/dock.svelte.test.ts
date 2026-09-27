@@ -128,6 +128,23 @@ describe('loadDockItems', () => {
 		expect(dockStore.notes.map((item) => item.id)).toEqual(['n1']);
 		expect(dockStore.docked).toBe(2);
 	});
+
+	it('lists docked records from every workspace', async () => {
+		// The dock is the cross-workspace inbox: `list()` returns every task,
+		// `listAllNotes()` reads across workspaces too.
+		vi.mocked(repo.notesList).mockResolvedValue([
+			note({ id: 'n-work', title: 'Work', overlay: true, workspaceId: 'work' }),
+			note({ id: 'n-home', title: 'Home', overlay: true })
+		]);
+		vi.mocked(repo.tasksList).mockResolvedValue([
+			task({ id: 't-work', overlay: true, workspaceId: 'work' })
+		]);
+
+		await loadDockItems();
+
+		expect(dockStore.tasks.map((item) => item.id)).toEqual(['t-work']);
+		expect(dockStore.notes.map((item) => item.id)).toEqual(['n-home', 'n-work']);
+	});
 });
 
 describe('applyDockFilters', () => {

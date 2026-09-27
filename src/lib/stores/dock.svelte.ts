@@ -1,6 +1,6 @@
 import type { Note } from '$lib/content/content';
 import { refreshSettings, settings } from '$lib/stores/settings.svelte';
-import { dockedNotes, listNotes, persistNote } from '$lib/stores/notes';
+import { dockedNotes, listAllNotes, listNotes, persistNote } from '$lib/stores/notes';
 import {
 	applyTaskPatch,
 	matchesOverlayFilter,
@@ -9,7 +9,7 @@ import {
 	taskStatus,
 	type Task
 } from '$lib/stores/tasks';
-import { persistTask, refreshTasks } from '$lib/stores/tasks.svelte';
+import { listAllTasks, persistTask, refreshTasks } from '$lib/stores/tasks.svelte';
 
 /** Docked quick notes and tasks, plus how many are docked in total. */
 export const dockStore = $state<{ tasks: Task[]; notes: Note[]; docked: number }>({
@@ -22,7 +22,11 @@ let loadedTasks: Task[] = [];
 let loadedNotes: Note[] = [];
 let loadToken = 0;
 
-/** Rebuilds the dock from the last loaded items and the current settings. */
+/**
+ * Rebuilds the dock from the last loaded items and the current settings.
+ * Docked records are a cross-workspace inbox: every workspace is listed and
+ * the UI labels each item with its workspace instead of filtering it out.
+ */
 export function applyDockFilters() {
 	const docked = overlayTasks(loadedTasks);
 	const notes = dockedNotes(loadedNotes);
@@ -43,7 +47,7 @@ export function applyDockFilters() {
 export async function loadDockItems(): Promise<void> {
 	const token = ++loadToken;
 	await refreshSettings();
-	const [tasks, notes] = await Promise.all([refreshTasks(), listNotes()]);
+	const [tasks, notes] = await Promise.all([listAllTasks(), listAllNotes()]);
 	if (token !== loadToken) return;
 	loadedTasks = tasks;
 	loadedNotes = notes;

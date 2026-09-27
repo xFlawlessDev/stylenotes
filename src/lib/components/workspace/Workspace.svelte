@@ -67,8 +67,15 @@
 		hydrateWorkspaces,
 		renameWorkspace,
 		setActiveWorkspace,
+		WORKSPACES_CHANGED,
 		workspaceStore,
 	} from '$lib/stores/workspaces.svelte';
+	import {
+		applyExternalWorkspaces,
+		notifyWorkspacesChanged,
+		startWorkspaceSync,
+		type WorkspacesChangedPayload,
+	} from '$lib/workspace-sync.svelte';
 	import WorkspaceScope from '$lib/components/workspace/WorkspaceScope.svelte';
 	import { dependencyStore, DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
 
@@ -139,9 +146,12 @@
 			if (!selectedId && items.length) selectedId = items[0].id;
 		})();
 
+		void startWorkspaceSync();
+
 		let unlisten: (() => void) | undefined;
 		let unlistenNotes: (() => void) | undefined;
 		let unlistenDependencies: (() => void) | undefined;
+		let unlistenWorkspaces: (() => void) | undefined;
 		let disposed = false;
 		if (isTauri) {
 			void listen<WorkspaceNavigate>(NAVIGATE_EVENT, (event) => {
@@ -156,6 +166,18 @@
 			}).then((fn) => {
 				if (disposed) fn();
 				else unlisten = fn;
+			});
+
+			// The Kanban window (and any other window) may switch, create,
+			// rename or delete a workspace: reload everything it changed and,
+			// when the selection moved, follow it.
+			void listen<WorkspacesChangedPayload>(WORKSPACES_CHANGED, (event) => {
+				void applyExternalWorkspaces(event.payload).then((activeChanged) => {
+					if (activeChanged) void reloadWorkspaceRecords();
+				});
+			}).then((fn) => {
+				if (disposed) fn();
+				else unlistenWorkspaces = fn;
 			});
 
 			// Quick-captured notes arrive from the dock or a note window; mirror
@@ -186,24 +208,34 @@
 			unlisten?.();
 			unlistenNotes?.();
 			unlistenDependencies?.();
+			unlistenWorkspaces?.();
 		};
 	});
+
+	/** Reloads the notes, folders and tasks of the active workspace. */
+	async function reloadWorkspaceRecords() {
+		const [storedNotes, storedFolders, storedTasks] = await Promise.all([
+			listNotes(), loadFolders(), refreshTasks(), refreshDependencies()
+		]);
+		items = storedNotes;
+		customFolders = storedFolders;
+		tasks = storedTasks;
+		selectedId = items[0]?.id ?? '';
+		selectedTaskId = storedTasks[0]?.id ?? '';
+		activeFolder = 'all';
+		activeTag = null;
+		taskFocusToken += 1;
+	}
 
 	async function changeWorkspace(id: string) {
 		if (workspaceLoading) return;
 		workspaceLoading = true;
 		if (await setActiveWorkspace(id)) {
-			const [storedNotes, storedFolders, storedTasks] = await Promise.all([
-				listNotes(), loadFolders(), refreshTasks(), refreshDependencies()
-			]);
-			items = storedNotes;
-			customFolders = storedFolders;
-			tasks = storedTasks;
-			selectedId = items[0]?.id ?? '';
-			selectedTaskId = storedTasks[0]?.id ?? '';
-			activeFolder = 'all';
-			activeTag = null;
-			taskFocusToken += 1;
+			await reloadWorkspaceRecords();
+			// The dock, Kanban and detail windows follow the selection.
+			notifyWorkspacesChanged();
+		} else {
+			showToast('Could not save the workspace choice — it may reset on restart');
 		}
 		workspaceLoading = false;
 	}
@@ -231,6 +263,7 @@
 			showToast('Could not rename workspace');
 			return false;
 		}
+		notifyWorkspacesChanged();
 		showToast('Workspace renamed');
 		return true;
 	}
@@ -242,6 +275,7 @@
 			return false;
 		}
 		if (wasActive) await changeWorkspace(workspaceStore.activeId);
+		else notifyWorkspacesChanged();
 		showToast('Workspace deleted');
 		return true;
 	}

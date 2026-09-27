@@ -15,13 +15,21 @@ function notifyDependenciesChanged() {
 	void emit(DEPENDENCIES_CHANGED).catch(() => undefined);
 }
 
-export async function refreshDependencies(): Promise<TaskDependency[]> {
+/**
+ * Loads the dependency rows of `workspaceId` (the active workspace by
+ * default). Callers that show a specific record — the task detail window —
+ * pass that record's workspace, because they may be pinned to a workspace the
+ * rest of the app is not showing.
+ */
+export async function refreshDependencies(
+	workspaceId = workspaceStore.activeId
+): Promise<TaskDependency[]> {
 	if (!browser) {
 		dependencyStore.items = [];
 		return dependencyStore.items;
 	}
 	try {
-		dependencyStore.items = await dependenciesRepo.list(workspaceStore.activeId);
+		dependencyStore.items = await dependenciesRepo.list(workspaceId);
 	} catch {
 		dependencyStore.items = [];
 	}
@@ -34,9 +42,11 @@ export async function addDependency(
 	tasks: Task[]
 ): Promise<boolean> {
 	if (!canAddDependency(taskId, dependsOnTaskId, tasks, dependencyStore.items)) return false;
+	const workspaceId =
+		tasks.find((task) => task.id === taskId)?.workspaceId ?? workspaceStore.activeId;
 	try {
-		await dependenciesRepo.add(taskId, dependsOnTaskId, workspaceStore.activeId);
-		await refreshDependencies();
+		await dependenciesRepo.add(taskId, dependsOnTaskId, workspaceId);
+		await refreshDependencies(workspaceId);
 		notifyDependenciesChanged();
 		return true;
 	} catch {

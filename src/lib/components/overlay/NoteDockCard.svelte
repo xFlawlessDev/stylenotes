@@ -2,6 +2,8 @@
 	import { ArrowUpRight, FileText, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import type { Note } from '$lib/content/content';
+	import { workspaceLookup } from '$lib/workspace-sync.svelte';
+	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
@@ -19,10 +21,11 @@
 	const folderLabel = $derived(
 		note.folder.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 	);
+	const workspace = $derived(workspaceLookup()(note.workspaceId));
 </script>
 
 <div
-	class="glass-solid flex w-full flex-col gap-2 rounded-xl p-3 shadow-2xl ring-1 ring-hairline"
+	class="glass-solid flex w-full flex-col gap-2 rounded-xl p-3 ring-1 ring-hairline shadow-none"
 	role="tooltip"
 	onmouseleave={onclose}
 >
@@ -53,6 +56,7 @@
 		<span class="rounded-md bg-surface-container-highest px-1.5 py-px text-code-sm font-code text-on-surface">
 			{folderLabel}
 		</span>
+		<WorkspaceBadge name={workspace.name} color={workspace.color} />
 		{#if note.pinned}
 			<span class="rounded-md px-1.5 py-px text-code-sm font-code text-tertiary">Pinned</span>
 		{/if}

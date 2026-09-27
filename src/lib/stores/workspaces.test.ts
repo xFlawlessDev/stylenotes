@@ -11,7 +11,12 @@ const meta = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn() }));
 vi.mock('$lib/db', () => ({ metaRepo: meta }));
 vi.mock('$lib/db/workspaces', () => ({ workspacesRepo: repo }));
 
-import { deleteWorkspace, renameWorkspace, workspaceStore } from '$lib/stores/workspaces.svelte';
+import {
+	deleteWorkspace,
+	hydrateWorkspaces,
+	renameWorkspace,
+	workspaceStore,
+} from '$lib/stores/workspaces.svelte';
 
 const workspace = (id: string, name: string) => ({
 	id,
@@ -25,8 +30,36 @@ beforeEach(() => {
 	workspaceStore.activeId = 'one';
 	workspaceStore.loaded = true;
 	meta.set.mockResolvedValue(undefined);
+	meta.get.mockReset();
+	repo.list.mockReset();
 	repo.rename.mockResolvedValue(true);
 	repo.remove.mockResolvedValue(true);
+});
+
+describe('hydrateWorkspaces', () => {
+	it('keeps the active workspace once loaded', async () => {
+		repo.list.mockResolvedValue([workspace('one', 'Personal'), workspace('two', 'Work')]);
+		// Another window switched the global selection to `two` after this one
+		// hydrated; a second hydration must not undo it.
+		repo.list.mockClear();
+		meta.get.mockClear();
+
+		await expect(hydrateWorkspaces()).resolves.toHaveLength(2);
+
+		expect(workspaceStore.activeId).toBe('one');
+		expect(repo.list).not.toHaveBeenCalled();
+		expect(meta.get).not.toHaveBeenCalled();
+	});
+
+	it('reloads the stored selection while not loaded', async () => {
+		workspaceStore.loaded = false;
+		repo.list.mockResolvedValue([workspace('one', 'Personal'), workspace('two', 'Work')]);
+		meta.get.mockResolvedValue('two');
+
+		await hydrateWorkspaces();
+
+		expect(workspaceStore.activeId).toBe('two');
+	});
 });
 
 describe('renameWorkspace', () => {

@@ -179,6 +179,8 @@ describe('settingsRepo', () => {
 			overlaySort: 'smart',
 			overlayPosition: 'right',
 			kanbanLocked: false,
+			kanbanPinned: false,
+			kanbanBoards: [],
 			detailAlwaysOnTop: true,
 		});
 		expect(execute.mock.calls[0][0]).toContain('ON CONFLICT(id) DO UPDATE');

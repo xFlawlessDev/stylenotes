@@ -14,11 +14,17 @@
 		task,
 		edge,
 		active,
+		workspace = '',
+		tone = '',
 		onopen
 	}: {
 		task: Task;
 		edge: DockEdge;
 		active: boolean;
+		/** Workspace label, shown only when the dock mixes workspaces. */
+		workspace?: string;
+		/** Workspace chip classes for the dot. */
+		tone?: string;
 		onopen: (task: Task) => void;
 	} = $props();
 
@@ -45,18 +51,19 @@
 	const priority = $derived(taskPriority(task));
 	const Icon = $derived(statusIcons[status]);
 	const bar = $derived(dockItemBar(edge, active));
+	const label = $derived(
+		`${task.title} — double-click to open task window${workspace ? ` (${workspace})` : ''}`
+	);
 </script>
 
-<!-- No tooltip here: the hover card next to the rail already shows the task. -->
+<!-- The hover card beside the rail already previews the task; no tooltip. -->
 <Button
 	data-dock-id={task.id}
 	data-dock-kind="task"
 	variant="secondary"
 	size="icon-lg"
-	class="group relative shrink-0 {active
-		? 'scale-105 ring-1 ring-inset ring-primary/60'
-		: 'hover:scale-105'}"
-	aria-label="{task.title} — double-click to open task window"
+	class="group relative shrink-0 {active ? 'scale-105 ring-1 ring-inset ring-primary/60' : 'hover:scale-105'}"
+	aria-label={label}
 	ondblclick={() => onopen(task)}
 	onclick={(event) => {
 		// Keyboard and assistive tech report detail 0; pointer clicks wait for
@@ -66,4 +73,10 @@
 >
 	<Icon size={19} class={priorityText[priority]} />
 	<span class="{bar} {priorityBar[priority]}"></span>
+	{#if workspace}
+		<span
+			class="absolute top-0.5 left-0.5 size-1.5 rounded-full border border-surface {tone}"
+			aria-hidden="true"
+		></span>
+	{/if}
 </Button>

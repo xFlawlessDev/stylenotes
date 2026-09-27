@@ -46,6 +46,7 @@ describe('defaults', () => {
 			overlayPriority: 'all',
 			overlaySort: 'smart',
 			overlayPosition: 'right',
+			kanbanPinned: false,
 		});
 		expect(accents.map((a) => a.id)).toContain('sage');
 	});

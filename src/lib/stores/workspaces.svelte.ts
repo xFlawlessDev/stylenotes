@@ -5,6 +5,9 @@ import { DEFAULT_WORKSPACE_ID, type Workspace } from '$lib/workspace';
 
 export const ACTIVE_WORKSPACE_KEY = 'active_workspace_id';
 
+/** Event telling the other windows the workspace list or selection changed. */
+export const WORKSPACES_CHANGED = 'workspaces:changed';
+
 export const workspaceStore = $state<{
 	items: Workspace[];
 	activeId: string;
@@ -19,26 +22,48 @@ const defaultWorkspace = (): Workspace => ({
 });
 
 export async function hydrateWorkspaces(): Promise<Workspace[]> {
+	// Every window hydrates its own module state, but `active_workspace_id` is
+	// global. Re-reading it on each call meant a late hydration (the dock runs
+	// one on mount) could reset the active workspace under the workspace
+	// window, so records landed in the wrong workspace and disappeared from
+	// the view that created them.
+	if (workspaceStore.loaded) return workspaceStore.items;
 	if (!browser) {
 		workspaceStore.items = [defaultWorkspace()];
 		workspaceStore.loaded = true;
 		return workspaceStore.items;
 	}
 	try {
-		const [items, activeId] = await Promise.all([
-			workspacesRepo.list(),
-			metaRepo.get(ACTIVE_WORKSPACE_KEY),
-		]);
-		workspaceStore.items = items.length ? items : [defaultWorkspace()];
-		workspaceStore.activeId = workspaceStore.items.some((item) => item.id === activeId)
-			? activeId!
-			: workspaceStore.items[0].id;
-		if (!activeId || workspaceStore.activeId !== activeId) {
-			await metaRepo.set(ACTIVE_WORKSPACE_KEY, workspaceStore.activeId);
-		}
+		return await reloadWorkspaces();
 	} catch {
 		workspaceStore.items = [defaultWorkspace()];
 		workspaceStore.activeId = DEFAULT_WORKSPACE_ID;
+	}
+	workspaceStore.loaded = true;
+	return workspaceStore.items;
+}
+
+/**
+ * Re-reads the workspace list and the stored selection from the database,
+ * repair-migrating the hidden active selection when the list changed. Unlike
+ * {@link hydrateWorkspaces} this always hits the database, so the cross-window
+ * sync (`$lib/workspace-sync.svelte`) can broadcast the change.
+ */
+export async function reloadWorkspaces(): Promise<Workspace[]> {
+	if (!browser) return workspaceStore.items;
+	const items = await workspacesRepo.list();
+	workspaceStore.items = items.length ? items : [defaultWorkspace()];
+	let activeId: string | null = null;
+	try {
+		activeId = await metaRepo.get(ACTIVE_WORKSPACE_KEY);
+	} catch {
+		/* keep the first workspace; the caller decides whether to re-assert */
+	}
+	workspaceStore.activeId = workspaceStore.items.some((item) => item.id === activeId)
+		? activeId!
+		: workspaceStore.items[0].id;
+	if (activeId !== workspaceStore.activeId) {
+		await metaRepo.set(ACTIVE_WORKSPACE_KEY, workspaceStore.activeId).catch(() => undefined);
 	}
 	workspaceStore.loaded = true;
 	return workspaceStore.items;
@@ -52,8 +77,26 @@ export async function setActiveWorkspace(id: string): Promise<boolean> {
 		await metaRepo.set(ACTIVE_WORKSPACE_KEY, id);
 		return true;
 	} catch {
+		// The selection stays in this session, but it is not persisted: the app
+		// comes back to the previous workspace after a restart. Callers surface
+		// that so the user is not surprised later.
 		return false;
 	}
+}
+
+/**
+ * Keeps `activeId` valid after the list changed (another window created,
+ * renamed or deleted a workspace): falls back to the first entry when the
+ * current selection is gone, and never leaves the list empty.
+ */
+export function ensureActiveWorkspace(): string {
+	if (!workspaceStore.items.length) {
+		workspaceStore.items = [defaultWorkspace()];
+	}
+	if (!workspaceStore.items.some((item) => item.id === workspaceStore.activeId)) {
+		workspaceStore.activeId = workspaceStore.items[0].id;
+	}
+	return workspaceStore.activeId;
 }
 
 export async function createWorkspace(name: string, color = 'primary'): Promise<Workspace | null> {

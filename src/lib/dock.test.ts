@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
 	DOCK_CARD_GAP,
+	DOCK_CARD_MARGIN,
 	DOCK_EDGES,
+	DOCK_EXPANDED,
+	DOCK_MIN_LENGTH,
+	DOCK_RAIL_INSET,
 	dockAxis,
 	dockCardOffset,
 	dockEdgeLabels,
 	dockItemBar,
+	dockOverlayMinLength,
 	dockTooltipSide,
+	dockWindowLength,
 	dockWindowSize,
+	fitDockWindow,
 	snapToDockEdge
 } from './dock';
 
@@ -40,8 +47,8 @@ describe('dockTooltipSide', () => {
 
 describe('dockWindowSize', () => {
 	it('uses the expanded window when the rail is open', () => {
-		expect(dockWindowSize('left', false)).toEqual({ width: 360, height: 304 });
-		expect(dockWindowSize('top', false)).toEqual({ width: 360, height: 304 });
+		expect(dockWindowSize('left', false)).toEqual({ ...DOCK_EXPANDED });
+		expect(dockWindowSize('top', false)).toEqual({ ...DOCK_EXPANDED });
 	});
 
 	it('shrinks to a matching pill against side edges', () => {
@@ -51,6 +58,62 @@ describe('dockWindowSize', () => {
 
 	it('shrinks to the same pill rotated against the top edge', () => {
 		expect(dockWindowSize('top', true)).toEqual({ width: 52, height: 28 });
+	});
+});
+
+describe('fitDockWindow', () => {
+	it('fits the top edge width to the measured content', () => {
+		expect(fitDockWindow('top', 204)).toEqual({ width: 204, height: DOCK_EXPANDED.height });
+	});
+
+	it('fits side edges height to the measured content', () => {
+		expect(fitDockWindow('left', 172)).toEqual({ width: DOCK_EXPANDED.width, height: 172 });
+		expect(fitDockWindow('right', 172)).toEqual({ width: DOCK_EXPANDED.width, height: 172 });
+	});
+
+	it('keeps the thickness axis at the expanded rail size', () => {
+		expect(fitDockWindow('top', 204).height).toBe(DOCK_EXPANDED.height);
+		expect(fitDockWindow('left', 172).width).toBe(DOCK_EXPANDED.width);
+	});
+
+	it('clamps short content up to the minimum length', () => {
+		expect(fitDockWindow('top', 40).width).toBe(DOCK_MIN_LENGTH);
+		expect(fitDockWindow('right', 12).height).toBe(DOCK_MIN_LENGTH);
+	});
+
+	it('clamps long content to the expanded window cap', () => {
+		expect(fitDockWindow('top', 9999).width).toBe(DOCK_EXPANDED.width);
+		expect(fitDockWindow('left', 9999).height).toBe(DOCK_EXPANDED.height);
+	});
+
+	it('falls back to the cap before layout has run', () => {
+		expect(fitDockWindow('top', 0)).toEqual({ ...DOCK_EXPANDED });
+	});
+
+	it('grows past the default minimum when an overlay needs the room', () => {
+		const min = dockOverlayMinLength(288);
+		expect(fitDockWindow('top', 150, min).width).toBe(min);
+	});
+
+	it('never exceeds the expanded cap even for a wide overlay', () => {
+		expect(fitDockWindow('top', 9999, dockOverlayMinLength(9999)).width).toBe(DOCK_EXPANDED.width);
+	});
+});
+
+describe('dockOverlayMinLength', () => {
+	it('keeps a card margin on both sides of the overlay', () => {
+		expect(dockOverlayMinLength(288)).toBe(288 + 2 * DOCK_CARD_MARGIN);
+	});
+});
+
+describe('dockWindowLength', () => {
+	it('adds the rail inset for side edges so the rail bottom is not clipped', () => {
+		expect(dockWindowLength('left', 300)).toBe(300 + DOCK_RAIL_INSET);
+		expect(dockWindowLength('right', 300)).toBe(300 + DOCK_RAIL_INSET);
+	});
+
+	it('uses the rail length directly for the flush top edge', () => {
+		expect(dockWindowLength('top', 300)).toBe(300);
 	});
 });
 

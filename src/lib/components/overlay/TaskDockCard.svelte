@@ -11,6 +11,8 @@
 		type Task,
 		type TaskStatus
 	} from '$lib/stores/tasks';
+	import { workspaceLookup } from '$lib/workspace-sync.svelte';
+	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
@@ -34,6 +36,7 @@
 	const done = $derived(status === 'done');
 	const doing = $derived(status === 'doing');
 	const overdue = $derived(isTaskOverdue(task));
+	const workspace = $derived(workspaceLookup()(task.workspaceId));
 
 	const statusDot: Record<TaskStatus, string> = {
 		todo: 'bg-outline',
@@ -91,6 +94,7 @@
 		>
 			{task.folder}
 		</span>
+		<WorkspaceBadge name={workspace.name} color={workspace.color} />
 	</div>
 
 	<div class="flex items-center justify-end gap-0.5">

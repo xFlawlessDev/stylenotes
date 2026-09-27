@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import {
 		getCurrentWindow,
 		currentMonitor,
@@ -10,10 +10,15 @@
 	import type { Note } from '$lib/content/content';
 	import { isTauri, openNoteWindow, openTaskWindow } from '$lib/windows';
 	import {
+		DOCK_EXPANDED,
+		DOCK_MIN_LENGTH,
 		DOCK_RAIL,
 		dockCardOffset,
+		dockOverlayMinLength,
 		dockTooltipSide,
+		dockWindowLength,
 		dockWindowSize,
+		fitDockWindow,
 		snapToDockEdge,
 		type DockEdge,
 		type DockHover,
@@ -21,6 +26,7 @@
 		type DockSize
 	} from '$lib/dock';
 	import { createDockCursorTracker, type DockCursorTracker } from '$lib/dock-tracker';
+	import { captureWorkspaceId, hoverWorkspaceId } from '$lib/dock-workspace';
 	import {
 		applySettingsSnapshot,
 		settings,
@@ -45,7 +51,8 @@
 		type QuickCaptureKind
 	} from '$lib/stores/shortcuts';
 	import type { Task } from '$lib/stores/tasks';
-	import { hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
+	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
+	import { startWorkspaceSync, workspaceLookup } from '$lib/workspace-sync.svelte';
 	import DockHandle from '$lib/components/overlay/DockHandle.svelte';
 	import DockRailItems from '$lib/components/overlay/DockRailItems.svelte';
 	import DockRailLayers from '$lib/components/overlay/DockRailLayers.svelte';
@@ -57,29 +64,96 @@
 	const CAPTURE_LINGER_MS = 250;
 
 	const railClasses: Record<DockEdge, string> = {
-		left: 'top-3 left-0 flex-col rounded-r-2xl py-3',
-		right: 'top-3 right-0 flex-col rounded-l-2xl py-3',
-		top: 'top-0 left-0 w-full flex-row rounded-b-2xl px-3'
+		left: 'top-3 left-0 flex-col rounded-r-2xl pt-3 pb-4',
+		right: 'top-3 right-0 flex-col rounded-l-2xl pt-3 pb-4',
+		top: 'top-0 left-0 w-max flex-row rounded-b-2xl px-3'
 	};
 
 	const edge = $derived(settings.overlayPosition);
 	const railSide = $derived(railClasses[edge]);
 	const tooltipSide = $derived(dockTooltipSide(edge));
-
+	/** Resolves each docked record's workspace for the badge and quick capture. */
+	const workspaceFor = $derived(workspaceLookup());
 	let collapsed = $state(false);
 	let hovered = $state<DockHover | null>(null);
-	let cardOffset = $state<DockPoint>({ x: 0, y: 0 });
 	let captureOpen = $state(false);
-	let captureOffset = $state<DockPoint>({ x: 0, y: 0 });
+	/** Workspace the capture menu was opened from (defaults to the active one). */
+	let captureWorkspace = $state('');
 	let railEl: HTMLElement | undefined = $state();
 	let cardEl: HTMLElement | undefined = $state();
 	let captureEl: HTMLElement | undefined = $state();
 	let plusEl: HTMLElement | undefined = $state();
+	/**
+	 * Window size fitted to the rail content. Updated by `fitRail` once the rail
+	 * is measurable; `dockWindowSize` (the cap) is the pre-measurement fallback.
+	 */
+	let windowSize = $state<DockSize>({ ...DOCK_EXPANDED });
+	/**
+	 * Window-local anchors the cards hang off. Kept separate from the computed
+	 * offsets so they can be re-clamped when the window grows to fit a card.
+	 */
+	const cardAnchor = $state<DockPoint>({ x: 0, y: 0 });
+	const captureAnchor = $state<DockPoint>({ x: 0, y: 0 });
+	const cardOffset = $derived(
+		dockCardOffset({ edge, pointer: cardAnchor, window: windowSize, card: CARD })
+	);
+	const captureOffset = $derived(
+		dockCardOffset({ edge, pointer: captureAnchor, window: windowSize, card: CAPTURE_CARD })
+	);
+	/**
+	 * Overlay currently open beside the rail, which the window has to be long
+	 * enough to hold. A hover card or capture menu is wider than a short rail, so
+	 * fitting only to the rail would clip it.
+	 */
+	const openOverlay = $derived(captureOpen ? CAPTURE_CARD : hovered ? CARD : null);
 	let ignoring = false;
 	let ignoreChain: Promise<void> = Promise.resolve();
 	let dragging = false;
 	let tracker: DockCursorTracker | undefined;
 	let captureCloseTimer: ReturnType<typeof setTimeout> | undefined;
+	let railObserver: ResizeObserver | undefined;
+
+	/**
+	 * Sizes the window to the rail's natural content length so the transparent,
+	 * click-through overlay leaves no dead space beside the rail. The rail fills
+	 * the thickness axis on its own, so only the free axis is measured — the
+	 * window is fitted after layout every time the rail content changes, and
+	 * grown while a hover card or capture menu needs the room.
+	 *
+	 * Collapsed fits the fixed tab instead; off-screen (nothing to measure) it
+	 * keeps the expanded cap as the fallback. Geometry is only applied when the
+	 * size actually changed, so the resize never feeds back into the observer.
+	 */
+	function fitRail(force = false) {
+		if (!isTauri) return;
+		const overlay = openOverlay;
+		const min = overlay
+			? dockOverlayMinLength(edge === 'top' ? overlay.width : overlay.height)
+			: DOCK_MIN_LENGTH;
+		const next =
+			collapsed || !railEl
+				? dockWindowSize(edge, collapsed)
+				: fitDockWindow(
+						edge,
+						dockWindowLength(edge, edge === 'top' ? railEl.offsetWidth : railEl.offsetHeight),
+						min
+					);
+		const changed = next.width !== windowSize.width || next.height !== windowSize.height;
+		// An edge change can keep the size (right ↔ left) while the pin has to
+		// move; `force` still re-applies the position in that case.
+		if (!changed && !force) return;
+		windowSize = next;
+		void applyDockGeometry();
+	}
+
+	// An open card/menu needs more room than the rail itself; re-fit whenever it
+	// appears or disappears so the window grows and shrinks with it. `fitRail`
+	// also reads `windowSize`, which it writes — untrack so the effect depends
+	// only on `openOverlay` and cannot re-trigger itself.
+	$effect(() => {
+		void openOverlay;
+		untrack(fitRail);
+	});
 
 	function syncHovered() {
 		const current = hovered;
@@ -127,10 +201,17 @@
 		void openTaskWindow(task.id);
 	}
 
+	/**
+	 * Quick capture targets the workspace the menu was opened from: the dock
+	 * mixes every workspace, so a capture started on a "Work" item must not
+	 * silently land in whichever workspace is active elsewhere.
+	 */
 	async function createDockItem(kind: QuickCaptureKind) {
+		const target = captureWorkspaceId(captureWorkspace, workspaceStore.activeId);
 		closeCaptureMenu();
-		if (kind === 'note') await createQuickNote();
-		else await createQuickTask();
+		if (kind === 'note') await createQuickNote(target);
+		else await createQuickTask(target);
+		await reload();
 	}
 
 	/** Sizes the window for the current edge and pins it against that edge. */
@@ -142,7 +223,7 @@
 			win.scaleFactor(),
 			currentMonitor()
 		]);
-		const size = dockWindowSize(settings.overlayPosition, collapsed);
+		const size = windowSize;
 		await win.setSize(new LogicalSize(size.width, size.height));
 		if (monitor) {
 			const next = snapToDockEdge({
@@ -172,7 +253,10 @@
 			hovered = null;
 			closeCaptureMenu();
 		}
-		await applyDockGeometry();
+		// The rail mounts/unmounts with `collapsed`, so wait for layout before
+		// measuring the new content and sizing the window to it.
+		await tick();
+		fitRail(true);
 	}
 
 	function inRect(el: HTMLElement | undefined, x: number, y: number) {
@@ -256,12 +340,10 @@
 			if (hit) {
 				closeCaptureMenu();
 				hovered = hit.hover;
-				cardOffset = dockCardOffset({
-					edge: settings.overlayPosition,
-					pointer: hit.anchor,
-					window: dockWindowSize(settings.overlayPosition, false),
-					card: CARD
-				});
+				// Captures started on an item follow that item's workspace.
+				captureWorkspace = hoverWorkspaceId(hit.hover);
+				cardAnchor.x = hit.anchor.x;
+				cardAnchor.y = hit.anchor.y;
 			} else {
 				scheduleCaptureClose();
 			}
@@ -280,12 +362,9 @@
 		cancelCaptureClose();
 		captureOpen = true;
 		hovered = null;
-		captureOffset = dockCardOffset({
-			edge: settings.overlayPosition,
-			pointer: rectCenter(plusEl.getBoundingClientRect()),
-			window: dockWindowSize(settings.overlayPosition, false),
-			card: CAPTURE_CARD
-		});
+		const anchor = rectCenter(plusEl.getBoundingClientRect());
+		captureAnchor.x = anchor.x;
+		captureAnchor.y = anchor.y;
 	}
 
 	function cancelCaptureClose() {
@@ -307,11 +386,13 @@
 	function closeCaptureMenu() {
 		cancelCaptureClose();
 		captureOpen = false;
+		// `captureWorkspace` survives until the click it belongs to is handled.
 	}
 
 	onMount(() => {
 		void (async () => {
 			await hydrateWorkspaces();
+			await startWorkspaceSync();
 			await reload();
 		})();
 
@@ -341,7 +422,9 @@
 				if (edgeChanged) {
 					hovered = null;
 					closeCaptureMenu();
-					void applyDockGeometry();
+					// The rail re-renders along the other axis; re-fit and always
+					// re-pin, since a side→side switch keeps the window size.
+					void tick().then(() => fitRail(true));
 				}
 			}).then((fn) => (unlistenSettings = fn));
 		} else {
@@ -369,10 +452,15 @@
 			onCursor: handleCursor
 		});
 
-		void applyDockGeometry();
+		railObserver = new ResizeObserver(() => fitRail());
+		if (railEl) railObserver.observe(railEl);
+
+		void fitRail();
 		void setIgnore(true);
 
 		return () => {
+			railObserver?.disconnect();
+			railObserver = undefined;
 			tracker?.dispose();
 			tracker = undefined;
 			cancelCaptureClose();
@@ -387,6 +475,7 @@
 		{cardOffset}
 		{captureOpen}
 		{captureOffset}
+		{captureWorkspace}
 		bind:cardEl
 		bind:captureEl
 		onopennote={openNote}
@@ -402,7 +491,7 @@
 		<!-- Rail (full) -->
 		<div
 			bind:this={railEl}
-			class="absolute flex items-center gap-2.5 bg-surface-container-lowest/90 shadow-2xl backdrop-blur-2xl {railSide}"
+			class="absolute flex items-center gap-2.5 bg-surface-container-lowest/90 backdrop-blur-2xl {railSide}"
 			style={edge === 'top' ? `height: ${DOCK_RAIL}px;` : `width: ${DOCK_RAIL}px;`}
 		>
 			<DockHandle
@@ -418,6 +507,7 @@
 				{edge}
 				{hovered}
 				{tooltipSide}
+				{workspaceFor}
 				bind:plusEl
 				onopennote={openNote}
 				onopentask={openTask}

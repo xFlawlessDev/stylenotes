@@ -33,8 +33,8 @@
 		type Settings
 	} from '$lib/stores/settings.svelte';
 	import { currentNoteId, isTauri, revealAndFocusCurrentWindow } from '$lib/windows';
-	import { hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
-	import { activeWorkspace } from '$lib/stores/workspaces.svelte';
+	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
+	import { startWorkspaceSync, workspaceLookup } from '$lib/workspace-sync.svelte';
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import NoteBodyEditor from '$lib/components/note/NoteBodyEditor.svelte';
@@ -64,6 +64,11 @@
 		foldersFor(notes, customFolders)
 			.filter((item) => item.id !== 'all')
 			.map((item) => ({ value: item.id, label: item.label }))
+	);
+	/** The window is universal: the badge names the note's own workspace. */
+	const noteWorkspace = $derived(workspaceLookup()(note?.workspaceId));
+	const foreignWorkspace = $derived(
+		!!note && (note.workspaceId ?? 'workspace-default') !== workspaceStore.activeId
 	);
 
 	$effect(() => {
@@ -196,6 +201,7 @@
 
 		void (async () => {
 			await hydrateWorkspaces();
+			await startWorkspaceSync();
 			await hydrateSettings();
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
@@ -270,7 +276,11 @@
 				oninput={() => update({ title })}
 			/>
 			<div class="flex shrink-0 items-center gap-2 px-1.5">
-				<WorkspaceBadge name={activeWorkspace().name} color={activeWorkspace().color} />
+				<WorkspaceBadge
+					name={noteWorkspace.name}
+					color={noteWorkspace.color}
+					foreign={foreignWorkspace}
+				/>
 				<Select
 					size="sm"
 					label="Note folder"

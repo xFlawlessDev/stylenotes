@@ -490,25 +490,40 @@ export function resolveNoteTitle(noteId: string | null, notes: Note[]): string |
 	return note?.title ?? null;
 }
 
-export function nextPosition(tasks: Task[], status: TaskStatus): number {
-	const column = tasks.filter((task) => taskStatus(task) === status);
+export function nextPosition(tasks: Task[], status: TaskStatus, workspaceId?: string): number {
+	const column = tasks.filter(
+		(task) =>
+			taskStatus(task) === status &&
+			(workspaceId === undefined || (task.workspaceId ?? 'workspace-default') === workspaceId)
+	);
 	return column.reduce((max, task) => Math.max(max, task.position), -1) + 1;
 }
 
 /**
  * Moves a task into `status`, right before `beforeId` (or at the end of the
  * column), renumbering the target column so positions stay dense.
+ *
+ * A window may hold tasks from every workspace, so the column is scoped to
+ * `workspaceId` when the caller supplies it: positions must not be shared with
+ * another workspace that happens to sit in the same list.
  */
 export function moveTaskInList(
 	tasks: Task[],
 	id: string,
 	status: TaskStatus,
-	beforeId: string | null
+	beforeId: string | null,
+	workspaceId?: string
 ): Task[] {
 	const task = tasks.find((item) => item.id === id);
 	if (!task) return tasks;
+	const scoped = workspaceId ?? task.workspaceId ?? 'workspace-default';
 	const column = tasks
-		.filter((item) => taskStatus(item) === status && item.id !== id)
+		.filter(
+			(item) =>
+				taskStatus(item) === status &&
+				item.id !== id &&
+				(item.workspaceId ?? 'workspace-default') === scoped
+		)
 		.sort((a, b) => a.position - b.position);
 	const index = beforeId ? column.findIndex((item) => item.id === beforeId) : -1;
 	const target = index >= 0 ? index : column.length;

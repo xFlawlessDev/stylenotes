@@ -4,6 +4,8 @@
 	import type { Task } from '$lib/stores/tasks';
 	import { type DockEdge, type DockHover } from '$lib/dock';
 	import { openWorkspace } from '$lib/windows';
+	import { workspaceChipClass } from '$lib/workspace';
+	import type { WorkspaceNameLookup } from '$lib/workspace-sync.svelte';
 	import { Button } from '$lib/components/base';
 	import DockNoteButton from '$lib/components/overlay/DockNoteButton.svelte';
 	import DockTaskButton from '$lib/components/overlay/DockTaskButton.svelte';
@@ -16,6 +18,7 @@
 		edge,
 		hovered,
 		tooltipSide,
+		workspaceFor,
 		plusEl = $bindable<HTMLElement | undefined>(),
 		onopennote,
 		onopentask,
@@ -28,6 +31,7 @@
 		edge: DockEdge;
 		hovered: DockHover | null;
 		tooltipSide: 'left' | 'right' | 'bottom';
+		workspaceFor: WorkspaceNameLookup;
 		plusEl?: HTMLElement | undefined;
 		onopennote: (note: Note) => void;
 		onopentask: (task: Task) => void;
@@ -36,6 +40,21 @@
 	} = $props();
 
 	const empty = $derived(notes.length === 0 && tasks.length === 0);
+	/** Only worth labelling items when the dock actually mixes workspaces. */
+	const multiWorkspace = $derived(
+		new Set([
+			...notes.map((note) => note.workspaceId ?? ''),
+			...tasks.map((task) => task.workspaceId ?? '')
+		]).size > 1
+	);
+
+	function workspaceTone(id: string | undefined): string {
+		return workspaceChipClass(workspaceFor(id).color);
+	}
+
+	function workspaceName(id: string | undefined): string {
+		return workspaceFor(id).name;
+	}
 </script>
 
 <!-- Scrollable items: docked notes first, then tasks, then the rail divider. -->
@@ -49,6 +68,8 @@
 			{note}
 			{edge}
 			active={hovered?.kind === 'note' && hovered.note.id === note.id}
+			workspace={multiWorkspace ? workspaceName(note.workspaceId) : ''}
+			tone={workspaceTone(note.workspaceId)}
 			onopen={onopennote}
 		/>
 	{/each}
@@ -66,6 +87,8 @@
 			{task}
 			{edge}
 			active={hovered?.kind === 'task' && hovered.task.id === task.id}
+			workspace={multiWorkspace ? workspaceName(task.workspaceId) : ''}
+			tone={workspaceTone(task.workspaceId)}
 			onopen={onopentask}
 		/>
 	{/each}

@@ -25,6 +25,10 @@ export type Settings = {
 	overlaySort: OverlaySort;
 	overlayPosition: DockEdge;
 	kanbanLocked: boolean;
+	/** Pins the Kanban window to one workspace instead of following the app. */
+	kanbanPinned: boolean;
+	/** Kanban board layout: one workspace id per board, left to right. */
+	kanbanBoards: string[];
 	detailAlwaysOnTop: boolean;
 };
 
@@ -50,6 +54,8 @@ const defaults: Settings = {
 	overlaySort: 'smart',
 	overlayPosition: 'right',
 	kanbanLocked: false,
+	kanbanPinned: false,
+	kanbanBoards: [],
 	detailAlwaysOnTop: true,
 };
 

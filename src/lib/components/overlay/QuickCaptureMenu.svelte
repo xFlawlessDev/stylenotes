@@ -14,7 +14,7 @@
 	} = $props();
 </script>
 
-<div class="glass-solid flex w-full flex-col gap-0.5 rounded-xl p-1.5 shadow-2xl ring-1 ring-hairline">
+<div class="glass-solid flex w-full flex-col gap-0.5 rounded-xl p-1.5 ring-1 ring-hairline shadow-none">
 	<span class="px-2 pt-1 pb-0.5 text-label-sm font-label tracking-wider text-outline uppercase">
 		Quick capture
 	</span>

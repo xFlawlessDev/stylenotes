@@ -25,15 +25,61 @@ export async function hydrateTasks(): Promise<Task[]> {
 	return refreshTasks();
 }
 
-export async function refreshTasks(): Promise<Task[]> {
+/**
+ * Reads the tasks of the active workspace and merges them into `taskStore`.
+ *
+ * Windows that show more than one workspace (the Kanban window, the dock)
+ * keep their extra rows: rows of `workspaceId` are replaced, everything else
+ * is preserved, so refreshing after a switch cannot drop them.
+ */
+export async function refreshTasks(workspaceId = workspaceStore.activeId): Promise<Task[]> {
 	if (!browser) return taskStore.items;
 	try {
-		taskStore.items = await tasksRepo.list(workspaceStore.activeId);
+		const rows = await tasksRepo.list(workspaceId);
+		const seen = new Set(rows.map((task) => task.id));
+		taskStore.items = [
+			...rows,
+			...taskStore.items.filter((task) => !seen.has(task.id) && (task.workspaceId ?? DEFAULT_ID) !== workspaceId)
+		];
 	} catch {
 		/* keep the last known tasks */
 	}
 	hydrated = true;
 	return taskStore.items;
+}
+
+/**
+ * Swaps a window's loaded task list over to the records of `workspaceId`.
+ * The caller owns the list (Kanban window, dock); `taskStore` is left alone.
+ */
+export async function listWorkspaceTasks(workspaceId: string): Promise<Task[]> {
+	if (!browser) return [];
+	try {
+		return await tasksRepo.list(workspaceId);
+	} catch {
+		return [];
+	}
+}
+
+/** Constraint: the DB and the UI both fall back to this id when a record has none. */
+const DEFAULT_ID = 'workspace-default';
+
+/**
+ * Workspace a record belongs to, normalised for the two representations the
+ * app uses: an explicit id, or the pre-workspace fallback.
+ */
+export function recordWorkspaceId(record: { workspaceId?: string } | null | undefined): string {
+	return record?.workspaceId || DEFAULT_ID;
+}
+
+/**
+ * Resolves the workspace a detail window should load, given the record it
+ * shows. The windows are universal, so the record — not the app's active
+ * workspace — decides which folders, notes and tasks are relevant.
+ */
+export function detailWorkspaceId(records: { id: string; workspaceId?: string }[], recordId: string | null): string {
+	if (!recordId) return DEFAULT_ID;
+	return recordWorkspaceId(records.find((item) => item.id === recordId));
 }
 
 /** Reads every task across workspaces, for windows that resolve wiki links by record. */

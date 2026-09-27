@@ -2,29 +2,38 @@
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { listen } from '@tauri-apps/api/event';
-	import { Lock, LockOpen, Minus, NotebookPen, X } from '@lucide/svelte';
-	import type { Note } from '$lib/content/content';
-	import { foldersFor, hydrateNotes, loadFolders, type CustomFolder } from '$lib/stores/notes';
+	import { Columns3, Lock, LockOpen, Minus, NotebookPen, X } from '@lucide/svelte';
+	import { foldersFor } from '$lib/stores/notes';
 	import {
-		applyTaskPatch,
-		createTask,
-		moveTaskInList,
-		nextPosition,
-		taskStatus,
 		type Task,
 		type TaskDependency,
 		type TaskFormData,
 		type TaskStatus
 	} from '$lib/stores/tasks';
-	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
-	import { settings } from '$lib/stores/settings.svelte';
+	import { TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import { settings, hydrateSettings } from '$lib/stores/settings.svelte';
 	import {
 		KANBAN_SHORTCUT_LABEL,
 		listenKanbanLockChanged,
 		toggleKanbanLock
 	} from '$lib/stores/kanban.svelte';
 	import { isTauri, openTasksInWorkspace } from '$lib/windows';
-	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
+	import {
+		hydrateWorkspaces,
+		setActiveWorkspace,
+		WORKSPACES_CHANGED,
+		workspaceStore
+	} from '$lib/stores/workspaces.svelte';
+	import {
+		boardStore,
+		boardsFollowActive,
+		nextBoardWorkspace,
+		reconcileBoards,
+		reloadBoards,
+		setBoards,
+		isSplit
+	} from '$lib/stores/workspace-boards.svelte';
+	import { notifyWorkspacesChanged } from '$lib/workspace-sync.svelte';
 	import {
 		addDependency,
 		dependencyStore,
@@ -32,36 +41,50 @@
 		refreshDependencies,
 		removeDependency
 	} from '$lib/stores/dependencies.svelte';
-	import CompactKanban from '$lib/components/tasks/CompactKanban.svelte';
+	import KanbanBoard from '$lib/components/tasks/KanbanBoard.svelte';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
-	import { Button, Select } from '$lib/components/base';
+	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	let tasks = $state<Task[]>([]);
-	let notes = $state<Note[]>([]);
-	let customFolders = $state<CustomFolder[]>([]);
+	/**
+	 * The window is a view over one or more boards, each showing a single
+	 * workspace. A single board follows the app's active workspace; splitting
+	 * adds boards and stops the window from following, because two boards
+	 * cannot both track the same selection.
+	 */
 	let selectedId = $state('');
 	let dialogOpen = $state(false);
 	let editing = $state<Task | null>(null);
+	let editingWorkspace = $state('');
 	let defaultStatus = $state<TaskStatus>('todo');
-	let folderFilter = $state('all');
 	let notice = $state('');
+	/** Bound to the open board so submissions land in the right workspace. */
+	let boardRefs = $state<Record<string, ReturnType<typeof KanbanBoard> | undefined>>({});
 
-	const folders = $derived(foldersFor(notes, customFolders));
-	const folderOptions = $derived([
-		{ value: 'all', label: 'All folders' },
-		...folders
-			.filter((folder) => folder.id !== 'all')
-			.map((folder) => ({ value: folder.id, label: folder.label }))
-	]);
-	const visibleTasks = $derived(
-		folderFilter === 'all' ? tasks : tasks.filter((task) => task.folder === folderFilter)
-	);
-	const noteTitles = $derived(
-		Object.fromEntries(notes.map((note) => [note.id, note.title || 'Untitled note']))
-	);
+	const workspaces = $derived(boardStore.workspaces);
+	const split = $derived(isSplit());
 	const locked = $derived(settings.kanbanLocked);
-	const openCount = $derived(visibleTasks.filter((task) => taskStatus(task) !== 'done').length);
+	/** Workspaces each board's picker can point at. */
+	const boardChoices = $derived(
+		workspaceStore.items.map((workspace) => ({
+			value: workspace.id,
+			label: workspace.name
+		}))
+	);
+	const dialogTasks = $derived(
+		editingWorkspace ? boardStore.boards[editingWorkspace]?.tasks ?? [] : []
+	);
+	const dialogNotes = $derived(
+		editingWorkspace ? boardStore.boards[editingWorkspace]?.notes ?? [] : []
+	);
+	const dialogFolders = $derived(
+		editingWorkspace
+			? foldersFor(
+					boardStore.boards[editingWorkspace]?.notes ?? [],
+					boardStore.boards[editingWorkspace]?.folders ?? []
+				)
+			: []
+	);
 
 	function notify(message: string) {
 		notice = message;
@@ -70,18 +93,38 @@
 		}, 2200);
 	}
 
-	async function syncTasks() {
-		tasks = await refreshTasks();
-		// Deleting a task cascades into its dependency rows.
-		await refreshDependencies();
+	/** Adds a board and points it at the first workspace not shown yet. */
+	async function addBoard() {
+		const next = nextBoardWorkspace();
+		setBoards([...workspaces, next]);
+		await reloadBoards();
+		notify(`Split — showing ${workspaceStore.items.find((w) => w.id === next)?.name ?? 'another workspace'}`);
 	}
 
-	function syncDependencies() {
-		void refreshDependencies();
+	function openCreate(workspaceId: string, status: TaskStatus = 'todo') {
+		editingWorkspace = workspaceId;
+		editing = null;
+		defaultStatus = status;
+		dialogOpen = true;
+	}
+
+	function openEdit(workspaceId: string, task: Task) {
+		editingWorkspace = workspaceId;
+		editing = task;
+		dialogOpen = true;
+	}
+
+	function closeBoard(workspaceId: string) {
+		setBoards(workspaces.filter((id) => id !== workspaceId));
+		if (!isSplit()) void applyActiveWorkspace();
+	}
+
+	function commitForm(data: TaskFormData) {
+		boardRefs[editingWorkspace]?.applyForm(editing, data);
 	}
 
 	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
-		return (await addDependency(taskId, dependsOnTaskId, tasks))
+		return (await addDependency(taskId, dependsOnTaskId, dialogTasks))
 			? null
 			: 'Could not add dependency — it may be invalid or create a cycle.';
 	}
@@ -90,42 +133,30 @@
 		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
 	}
 
-	function openCreate(status: TaskStatus = 'todo') {
-		editing = null;
-		defaultStatus = status;
-		dialogOpen = true;
+	function syncDependencies() {
+		void refreshDependencies();
 	}
 
-	function openEdit(task: Task) {
-		editing = task;
-		dialogOpen = true;
+	/**
+	 * Makes the single board follow the app's active workspace. A split window
+	 * keeps its own boards instead: they are independent views.
+	 */
+	async function applyActiveWorkspace() {
+		if (!boardsFollowActive()) return;
+		setBoards([workspaceStore.activeId]);
+		selectedId = '';
+		await reloadBoards();
 	}
 
-	async function persistOrNotify(task: Task) {
-		if (!(await persistTask(task))) notify('Could not save task — changes may be lost');
-	}
-
-	function commitForm(data: TaskFormData) {
-		if (editing) {
-			const current = editing;
-			const next = applyTaskPatch(current, data);
-			tasks = tasks.map((task) => (task.id === current.id ? next : task));
-			void persistOrNotify(next);
-			notify('Task updated');
-			return;
-		}
-		const task = createTask({ ...data, workspaceId: workspaceStore.activeId, position: nextPosition(tasks, data.status) });
-		tasks = [task, ...tasks];
-		selectedId = task.id;
-		void persistOrNotify(task);
-		notify('Task created');
-	}
-
-	function moveTask(id: string, status: TaskStatus, beforeId: string | null) {
-		const next = moveTaskInList(tasks, id, status, beforeId);
-		tasks = next;
-		const moved = next.find((item) => item.id === id);
-		if (moved) void persistOrNotify(moved);
+	/**
+	 * A single board is the app's workspace view: changing it moves the rest of
+	 * the app too. A split window keeps its boards private, so nothing is
+	 * announced from here.
+	 */
+	async function onBoardWorkspaceChanged(workspaceId: string) {
+		if (isSplit()) return;
+		if (await setActiveWorkspace(workspaceId)) notifyWorkspacesChanged();
+		else notify('Workspace choice not saved — it may reset on restart');
 	}
 
 	async function toggleLock() {
@@ -151,24 +182,43 @@
 	onMount(() => {
 		void (async () => {
 			await hydrateWorkspaces();
-			await syncTasks();
-			const [storedNotes, storedFolders] = await Promise.all([hydrateNotes(), loadFolders()]);
-			notes = storedNotes;
-			customFolders = storedFolders;
+			await hydrateSettings();
+			setBoards(settings.kanbanBoards.length ? [...settings.kanbanBoards] : [workspaceStore.activeId]);
+			await reloadBoards();
 		})();
 
-		let unlisten: (() => void) | undefined;
+		let unlistenTasks: (() => void) | undefined;
 		let unlistenDependencies: (() => void) | undefined;
 		let unlistenLock: (() => void) | undefined;
+		let unlistenWorkspaces: (() => void) | undefined;
 		let disposed = false;
 		if (isTauri) {
-			void listen(TASKS_CHANGED, () => void syncTasks()).then((fn) => {
+			void listen(TASKS_CHANGED, () => void reloadBoards()).then((fn) => {
 				if (disposed) fn();
-				else unlisten = fn;
+				else unlistenTasks = fn;
 			});
 			void listen(DEPENDENCIES_CHANGED, syncDependencies).then((fn) => {
 				if (disposed) fn();
 				else unlistenDependencies = fn;
+			});
+			void listen<{ activeId?: string }>(WORKSPACES_CHANGED, (event) => {
+				const announced = event.payload?.activeId;
+				void (async () => {
+					// A workspace that was deleted must leave no ghost board.
+					await reconcileBoards();
+					if (!boardsFollowActive()) return;
+					const target =
+						announced && workspaceStore.items.some((w) => w.id === announced)
+							? announced
+							: workspaceStore.activeId;
+					if (target !== boardStore.workspaces[0]) {
+						setBoards([target]);
+						await reloadBoards();
+					}
+				})();
+			}).then((fn) => {
+				if (disposed) fn();
+				else unlistenWorkspaces = fn;
 			});
 			void listenKanbanLockChanged().then((fn) => {
 				if (disposed) fn();
@@ -177,9 +227,10 @@
 		}
 		return () => {
 			disposed = true;
-			unlisten?.();
+			unlistenTasks?.();
 			unlistenDependencies?.();
 			unlistenLock?.();
+			unlistenWorkspaces?.();
 		};
 	});
 </script>
@@ -193,17 +244,25 @@
 			<img src="/icon-128.png" alt="StyleNotes" class="size-4 shrink-0 object-cover" />
 			<span class="text-label-md font-label font-semibold tracking-tight text-on-surface">Kanban</span>
 			<span class="shrink-0 text-code-sm font-code text-outline">
-				{openCount} open · {visibleTasks.length} total
+				{split ? `${workspaces.length} workspaces` : 'Following the app'}
 			</span>
-			<div class="hidden shrink-0 @[560px]:block">
-				<Select
-					size="sm"
-					label="Filter tasks by folder"
-					class="w-[124px] px-2 font-code text-code-sm"
-					options={folderOptions}
-					bind:value={folderFilter}
-				/>
-			</div>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							size="icon-sm"
+							class="shrink-0 text-outline hover:text-on-surface"
+							aria-label="Add a board for another workspace"
+							onclick={() => void addBoard()}
+						>
+							<Columns3 size={14} />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Split: add another workspace board</Tooltip.Content>
+			</Tooltip.Root>
 		</div>
 
 		{#if locked}
@@ -269,15 +328,22 @@
 		{/if}
 	</header>
 
-	<CompactKanban
-		tasks={visibleTasks}
-		{selectedId}
-		{noteTitles}
-		onselect={(id) => (selectedId = id)}
-		onedit={openEdit}
-		onmove={moveTask}
-		onadd={openCreate}
-	/>
+	<div class="flex min-h-0 flex-1 gap-1.5 overflow-x-auto">
+		{#each workspaces as workspaceId, index (workspaceId)}
+			<KanbanBoard
+				bind:this={boardRefs[workspaceId]}
+				{workspaceId}
+				{index}
+				choices={boardChoices}
+				bind:selectedId
+				onworkspacechange={onBoardWorkspaceChanged}
+				onadd={openCreate}
+				onedit={openEdit}
+				onnotify={notify}
+				onclose={closeBoard}
+			/>
+		{/each}
+	</div>
 
 	{#if notice}
 		<div
@@ -292,11 +358,10 @@
 	bind:open={dialogOpen}
 	task={editing}
 	{defaultStatus}
-	defaultFolder={folderFilter === 'all' ? undefined : folderFilter}
 	compact
-	{folders}
-	{notes}
-	tasks={tasks}
+	folders={dialogFolders}
+	notes={dialogNotes}
+	tasks={dialogTasks}
 	dependencies={dependencyStore.items}
 	onsubmit={commitForm}
 	onadddependency={addTaskDependency}

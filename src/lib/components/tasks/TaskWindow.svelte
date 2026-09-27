@@ -27,8 +27,8 @@
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
-	import { persistTask, refreshTasks, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
-	import {
+	import { persistTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
+	import { detailWorkspaceId, listAllTasks, listWorkspaceTasks } from '$lib/stores/tasks.svelte';	import {
 		addDependency,
 		dependencyStore,
 		DEPENDENCIES_CHANGED,
@@ -46,7 +46,8 @@
 	} from '$lib/windows';
 	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
 	import { planWikiClick } from '$lib/content/wiki-navigation';
-	import { activeWorkspace, hydrateWorkspaces } from '$lib/stores/workspaces.svelte';
+	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
+	import { startWorkspaceSync, workspaceLookup } from '$lib/workspace-sync.svelte';
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
@@ -77,6 +78,8 @@
 	let candidateEntities = $state<WikiEntity[]>([]);
 	let candidatesOpen = $state(false);
 	let pendingHeading = $state<string | null>(null);
+	/** Workspace of the shown task; the window may follow a different one. */
+	let recordWorkspaceId = $state('workspace-default');
 
 	const folders = $derived(foldersFor(notes, customFolders));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
@@ -86,6 +89,11 @@
 			.filter((note): note is Note => !!note)
 	);
 	const queue = createSaveQueue<Task>(persistTask);
+	/** The window is universal: the badge names the task's own workspace. */
+	const taskWorkspace = $derived(workspaceLookup()(task?.workspaceId));
+	const foreignWorkspace = $derived(
+		!!task && (task.workspaceId ?? 'workspace-default') !== workspaceStore.activeId
+	);
 
 	/** Mirrors the loaded task into the form fields. */
 	$effect(() => {
@@ -147,20 +155,29 @@
 	}
 
 	async function load() {
-		const [tasks, storedNotes, storedFolders] = await Promise.all([
-			refreshTasks(),
-			listNotes(),
-			loadFolders(),
-			refreshDependencies()
+		// The window is universal: resolve the task across every workspace, then
+		// load the folders, notes and dependencies of that same workspace.
+		const all = await listAllTasks();
+		recordWorkspaceId = detailWorkspaceId(all, taskId);
+		const [allTasksInWorkspace, storedNotes, storedFolders] = await Promise.all([
+			listWorkspaceTasks(recordWorkspaceId),
+			listNotes(recordWorkspaceId),
+			loadFolders(recordWorkspaceId)
 		]);
 		notes = storedNotes;
 		customFolders = storedFolders;
-		allTasks = tasks;
-		task = tasks.find((item) => item.id === taskId) ?? null;
+		allTasks = allTasksInWorkspace;
+		task = allTasksInWorkspace.find((item) => item.id === taskId) ?? null;
+		await refreshDependencies(recordWorkspaceId);
+	}
+
+	/** Re-reads the dependency rows this window shows (its task's workspace). */
+	function reloadDependencies() {
+		void refreshDependencies(recordWorkspaceId);
 	}
 
 	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
-		return (await addDependency(taskId, dependsOnTaskId, await refreshTasks()))
+		return (await addDependency(taskId, dependsOnTaskId, allTasks))
 			? null
 			: 'Dependency is invalid or would create a cycle.';
 	}
@@ -256,6 +273,7 @@
 
 		void (async () => {
 			await hydrateWorkspaces();
+			await startWorkspaceSync();
 			await hydrateSettings();
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
@@ -274,7 +292,7 @@
 			if (!queue.state.dirty) void load();
 		}).then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
-		void listen(DEPENDENCIES_CHANGED, () => void refreshDependencies()).then((fn) =>
+		void listen(DEPENDENCIES_CHANGED, () => void reloadDependencies()).then((fn) =>
 			disposed ? fn() : unlisteners.push(fn)
 		);
 
@@ -358,7 +376,11 @@
 			<section class="flex flex-col gap-2 rounded-xl bg-surface-container-low/60 p-2.5">
 				<div class="flex items-center justify-between gap-2">
 					<h2 class="text-label-md font-label font-medium text-on-surface">Task dependencies</h2>
-					<WorkspaceBadge name={activeWorkspace().name} color={activeWorkspace().color} />
+					<WorkspaceBadge
+						name={taskWorkspace.name}
+						color={taskWorkspace.color}
+						foreign={foreignWorkspace}
+					/>
 					<BlockedIndicator
 						blocked={isTaskBlocked(current, allTasks, dependencyStore.items)}
 					/>
