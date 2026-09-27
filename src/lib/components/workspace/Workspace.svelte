@@ -60,7 +60,7 @@
 		clearTasks,
 	} from '$lib/stores/tasks.svelte';
 	import type { Task } from '$lib/stores/tasks';
-	import { isTauri, NAVIGATE_EVENT, toggleOverlay, type WorkspaceNavigate, type WorkspaceSection } from '$lib/windows';
+	import { isTauri, NAVIGATE_EVENT, openNoteWindow, toggleOverlay, type WorkspaceNavigate, type WorkspaceSection } from '$lib/windows';
 	import {
 		createWorkspace,
 		deleteWorkspace,
@@ -428,6 +428,28 @@
 		if (next && !pool.some((note) => note.id === selectedId)) selectedId = pool[0]?.id ?? '';
 	}
 
+	/**
+	 * Notes feed quick menu: `archived` mirrors `NoteEditor.toggleArchive`, and
+	 * the rest reuse the same handlers as `NoteToolbar` so both paths agree.
+	 */
+	const ARCHIVE_FOLDER = 'archive';
+	const RESTORE_FOLDER = 'personal';
+
+	function toggleArchive(id: string) {
+		const note = items.find((item) => item.id === id);
+		if (!note) return;
+		updateNote(id, { folder: note.folder === ARCHIVE_FOLDER ? RESTORE_FOLDER : ARCHIVE_FOLDER });
+	}
+
+	function openNoteInWindow(id: string) {
+		if (isTauri) void openNoteWindow(id);
+	}
+
+	function runNoteAction(id: string, action: (note: Note) => void) {
+		const note = items.find((item) => item.id === id);
+		if (note) action(note);
+	}
+
 	async function resetData() {
 		await clearNotes();
 		await resetStoredSettings();
@@ -629,6 +651,13 @@
 					onselecttag={selectTag}
 					oncleartag={() => selectTag(null)}
 					onselectfolder={selectFolder}
+					onopenwindow={openNoteInWindow}
+					ontoggledock={(id) => updateNote(id, { overlay: !items.find((n) => n.id === id)?.overlay })}
+					ontogglearchive={toggleArchive}
+					onprint={(id) => runNoteAction(id, noteActions.print)}
+					onexport={(id) => runNoteAction(id, (note) => void noteActions.export(note))}
+					oncopy={(id) => runNoteAction(id, (note) => void noteActions.copy(note))}
+					ondelete={deleteNote}
 				/>
 			{/if}
 
