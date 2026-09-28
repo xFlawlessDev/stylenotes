@@ -98,7 +98,7 @@
 		variant="well"
 		placeholder={ready ? 'Ask anything… use @ to add a note or task' : 'Enable AI in Settings first'}
 		aria-label="Message the assistant"
-		class="min-h-[40px] text-body-sm"
+		class="min-h-[40px] leading-6 text-body-sm"
 		disabled={!ready}
 		bind:value={input}
 		oninput={refresh}
@@ -116,6 +116,7 @@
 		shape="pill"
 		variant="primary"
 		aria-label="Send"
+		class="mt-2 self-start"
 		disabled={!ready || sending || !input.trim()}
 		onclick={submit}
 	>

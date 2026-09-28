@@ -287,6 +287,15 @@
 						>
 							{message.content}
 						</div>
+						<Button
+							size="xs"
+							variant="ghost"
+							class="text-outline"
+							onclick={() => void copyMessage(message.id, message.content)}
+						>
+							{#if copiedId === message.id}<Check size={12} />{:else}<Copy size={12} />{/if}
+							{copiedId === message.id ? 'Copied' : 'Copy'}
+						</Button>
 					{/if}
 				</div>
 			{/each}
