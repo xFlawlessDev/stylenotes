@@ -1,12 +1,19 @@
 <script lang="ts">
-	import { CalendarRange } from '@lucide/svelte';
-	import { Button, EmptyState } from '$lib/components/base';
-	import { GANTT_ROW_HEIGHT, ganttDayWidth, ganttDependencyLinks, ganttLinksForTask } from '$lib/stores/task-gantt';
+	import { Calendar, CalendarDays, CalendarRange } from '@lucide/svelte';
+	import { Button, EmptyState, SegmentedControl } from '$lib/components/base';
+	import TaskGanttHeader from '$lib/components/tasks/TaskGanttHeader.svelte';
 	import {
-		addDays,
+		GANTT_ROW_HEIGHT,
+		ganttDependencyLinks,
+		ganttLinksForTask,
+		ganttMonthGroups,
+		ganttScaleDayWidth,
+		ganttTimelineColumns,
+		ganttYearGroups,
+		type GanttTimelineScale
+	} from '$lib/stores/task-gantt';
+	import {
 		diffDays,
-		formatTimelineDay,
-		formatTimelineMonth,
 		isTaskOverdue,
 		priorityMeta,
 		taskBar,
@@ -45,6 +52,13 @@
 	// scroll horizontally.
 	let panelWidth = $state(0);
 	let labelWidth = $state(0);
+	let scale = $state<GanttTimelineScale>('date');
+
+	const scales: { id: GanttTimelineScale; label: string; icon: typeof Calendar }[] = [
+		{ id: 'date', label: 'Date', icon: CalendarDays },
+		{ id: 'week', label: 'Week', icon: CalendarRange },
+		{ id: 'month', label: 'Month', icon: Calendar }
+	];
 
 	const BAR_BASE =
 		'group absolute top-1/2 flex -translate-y-1/2 cursor-pointer items-center px-2 text-code-sm font-code transition-all hover:scale-[1.02]';
@@ -61,9 +75,6 @@
 	const OVERDUE_BAR = 'ring-2 ring-error/70';
 
 	const range = $derived(timelineRange(tasks, { padding: 2, minDays: 21 }));
-	const days = $derived(
-		Array.from({ length: range.days }, (_, index) => addDays(range.start, index))
-	);
 	const rows = $derived(
 		tasks.filter((task) => taskBar(task, range) !== null).sort((a, b) => {
 			const aStart = a.startAt ?? a.dueAt ?? '';
@@ -72,8 +83,16 @@
 		})
 	);
 	const todayIndex = $derived(diffDays(new Date(), range.start));
+	const columns = $derived(ganttTimelineColumns(range, scale));
+	const monthGroups = $derived(ganttMonthGroups(range));
+	const yearGroups = $derived(ganttYearGroups(range));
+	// The top strip names the enclosing period; the month scale names the year
+	// because the cells below already carry the month name.
+	const stripGroups = $derived(scale === 'month' ? yearGroups : monthGroups);
+	// Bars are positioned by day offsets, so pixel-per-day stays uniform; the scale
+	// only changes how tightly a day is compressed and how the header is bucketed.
 	const dayWidth = $derived(
-		ganttDayWidth(panelWidth && labelWidth ? panelWidth - labelWidth : Number.NaN, range.days)
+		ganttScaleDayWidth(scale, range.days, panelWidth && labelWidth ? panelWidth - labelWidth : Number.NaN)
 	);
 	const width = $derived(range.days * dayWidth);
 	const statusTasks = $derived(allTasks.length ? allTasks : tasks);
@@ -90,60 +109,42 @@
 			title="Add start or due dates to see tasks on the timeline."
 		/>
 	{:else}
-		{#if links.length}
-			<div class="flex shrink-0 flex-wrap items-center justify-end gap-3 text-code-sm font-code text-outline">
-				<span class="flex items-center gap-1.5">
-					<svg width="24" height="6" viewBox="0 0 24 6" aria-hidden="true"
-						><path
-							d="M0 3 H24"
-							fill="none"
-							stroke="var(--color-error)"
-							stroke-width="1.6"
-							stroke-dasharray="4 3"
-						/></svg
-					>
-					Waiting on dependency
-				</span>
-				<span class="flex items-center gap-1.5">
-					<svg width="24" height="6" viewBox="0 0 24 6" aria-hidden="true"
-						><path d="M0 3 H24" fill="none" stroke="var(--color-outline)" stroke-width="1.6" /></svg
-					>
-					Dependency met
-				</span>
-			</div>
-		{/if}
+		<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
+			<SegmentedControl
+				bind:value={scale}
+				items={scales}
+				ariaLabel="Timeline view"
+				class="w-auto"
+				itemClass="flex-none"
+			/>
+			{#if links.length}
+				<div class="flex flex-wrap items-center gap-3 text-code-sm font-code text-outline">
+					<span class="flex items-center gap-1.5">
+						<svg width="24" height="6" viewBox="0 0 24 6" aria-hidden="true"
+							><path
+								d="M0 3 H24"
+								fill="none"
+								stroke="var(--color-error)"
+								stroke-width="1.6"
+								stroke-dasharray="4 3"
+							/></svg
+						>
+						Waiting on dependency
+					</span>
+					<span class="flex items-center gap-1.5">
+						<svg width="24" height="6" viewBox="0 0 24 6" aria-hidden="true"
+							><path d="M0 3 H24" fill="none" stroke="var(--color-outline)" stroke-width="1.6" /></svg
+						>
+						Dependency met
+					</span>
+				</div>
+			{/if}
+		</div>
 
 		<div class="glass-panel min-h-0 w-full min-w-0 flex-1 overflow-hidden rounded-2xl">
 			<div class="scrollbar-none h-full w-full overflow-auto" bind:clientWidth={panelWidth}>
 				<div style="width: calc(var(--gantt-label) + {width}px)" class="min-w-full">
-					<!-- Header -->
-					<div class="sticky top-0 z-20 flex border-b border-hairline bg-surface-container/80 backdrop-blur">
-						<div
-							bind:offsetWidth={labelWidth}
-							class="sticky left-0 z-30 w-[var(--gantt-label)] shrink-0 border-r border-hairline bg-surface-container/80 px-3 py-2 text-label-sm font-label tracking-wider text-outline uppercase backdrop-blur"
-						>
-							Task
-						</div>
-						<div class="flex" style="width: {width}px">
-							{#each days as day, index (index)}
-								{#if index === 0 || day.getDate() === 1}
-									<div
-										class="border-l border-hairline px-1 py-2 text-label-sm font-label text-outline"
-										style="width: {dayWidth}px"
-									>
-										{formatTimelineMonth(day)}
-									</div>
-								{:else}
-									<div
-										class="flex items-center justify-center py-2 text-code-sm font-code text-outline/70"
-										style="width: {dayWidth}px"
-									>
-										{formatTimelineDay(day)}
-									</div>
-								{/if}
-							{/each}
-						</div>
-					</div>
+					<TaskGanttHeader {columns} {stripGroups} {dayWidth} {width} bind:labelWidth />
 
 					<div class="relative">
 						<!-- Dependency connections, painted behind the bars and grid overlays. -->
@@ -226,31 +227,41 @@
 								</button>
 
 								<div class="relative" style="width: {width}px">
-									<!-- Grid lines -->
-									<div class="absolute inset-0 flex">
-										{#each days as day, index (index)}
+									<!-- Column grid: a separator at each column boundary, weekend shading on the date scale. -->
+									<div class="absolute inset-0 flex overflow-hidden">
+										{#each columns as column (column.id)}
 											<div
-												class="h-full border-l border-hairline/40 {day.getDay() === 0 ||
-												day.getDay() === 6
-													? 'bg-surface-container/30'
-													: ''}"
-												style="width: {dayWidth}px"
+												class="h-full border-l border-hairline/40"
+												style="width: {column.span * dayWidth}px"
 											></div>
 										{/each}
 									</div>
+									{#if scale === 'date'}
+										<div class="pointer-events-none absolute inset-0">
+											{#each columns as column (column.id)}
+												{#if column.weekendStart}
+													<div
+														class="absolute top-0 bottom-0 bg-surface-container/30"
+														style="left: {column.offset * dayWidth}px; width: {2 * dayWidth}px"
+													></div>
+												{/if}
+											{/each}
+										</div>
+									{/if}
 
 									{#if todayIndex >= 0 && todayIndex < range.days}
 										<div
-											class="absolute top-0 bottom-0 w-px bg-primary/70"
+											class="absolute top-0 bottom-0 z-10 w-px bg-primary/70"
 											style="left: {todayIndex * dayWidth + dayWidth / 2}px"
 										></div>
 									{/if}
 
 									{#if bar}
+										{@const barWidth = bar.span * dayWidth - 2}
 										<Button
 											bare
 											class="{BAR_BASE} justify-start {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
-											style="left: {bar.offset * dayWidth + 1}px; width: {bar.span * dayWidth - 2}px"
+											style="left: {bar.offset * dayWidth + 1}px; width: {barWidth}px"
 											title="{task.title} · {statusMeta[status].label} · {priorityMeta[taskPriority(task)]
 												.label}{overdue ? ' · Overdue' : ''} (double-click to open)"
 											aria-label="{task.title}, {statusMeta[status].label}{overdue
@@ -259,7 +270,9 @@
 											onclick={() => onselect(task.id)}
 											ondblclick={() => onedit(task)}
 										>
-											<span class="truncate {status === 'done' ? 'line-through' : ''}">{task.title}</span>
+											{#if barWidth >= 36}
+												<span class="truncate {status === 'done' ? 'line-through' : ''}">{task.title}</span>
+											{/if}
 										</Button>
 									{/if}
 								</div>

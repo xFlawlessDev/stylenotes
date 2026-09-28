@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createTask, timelineRange, type Task, type TaskDependency } from '$lib/stores/tasks';
-import { ganttDayWidth, ganttDependencyLinks, ganttLinksForTask } from '$lib/stores/task-gantt';
+import {
+	ganttDayWidth,
+	ganttDependencyLinks,
+	ganttLinksForTask,
+	ganttMonthGroups,
+	ganttScaleContext,
+	ganttScaleDayWidth,
+	ganttTimelineColumns,
+	ganttYearGroups
+} from '$lib/stores/task-gantt';
 
 function task(id: string, startDay: number, span = 2, completed = false): Task {
 	return createTask({
@@ -106,5 +115,75 @@ describe('gantt dependency links', () => {
 		expect([...ganttLinksForTask(links, 'b')].sort()).toEqual(['a->b', 'b->c']);
 		expect(ganttLinksForTask(links, 'a').size).toBe(1);
 		expect(ganttLinksForTask(links, 'nope').size).toBe(0);
+	});
+});
+
+describe('gantt timeline scales', () => {
+	it('compresses the pixel-per-day more aggressively on week and month scales', () => {
+		// A 90-day range in 600px: date clamps to the readable day floor, while the
+		// wider scales are allowed to shrink further so the range still fits.
+		expect(ganttScaleDayWidth('date', 90, 600)).toBe(18);
+		expect(ganttScaleDayWidth('week', 90, 600)).toBe(6);
+		expect(ganttScaleDayWidth('month', 90, 600)).toBe(6);
+	});
+
+	it('falls back to the default day width before the panel is measured', () => {
+		expect(ganttScaleDayWidth('week', 90, Number.NaN)).toBe(30);
+		expect(ganttScaleDayWidth('month', 0, 600)).toBe(30);
+	});
+
+	it('buckets the range into day columns that start at range.start', () => {
+		const range = timelineRange([], { anchor: new Date(2026, 0, 1) });
+		const columns = ganttTimelineColumns(range, 'date');
+		expect(columns).toHaveLength(range.days);
+		expect(columns[0]?.offset).toBe(0);
+		expect(columns.every((column) => column.span === 1)).toBe(true);
+		// The padded start is Tue Dec 30, 2025, so the first Saturday (Jan 3) sits at offset 4.
+		expect(columns.find((column) => column.weekendStart)?.offset).toBe(4);
+	});
+
+	it('groups by ISO week, snapping every column after the first to Monday', () => {
+		const range = timelineRange([], { anchor: new Date(2026, 0, 1) });
+		const columns = ganttTimelineColumns(range, 'week');
+		expect(columns[0]?.offset).toBe(0);
+		// The range starts on Tuesday Dec 30, so the first column runs to the next Monday.
+		expect(columns[0]?.span).toBe(6);
+		expect(columns[0]?.label).toBe('W1');
+		expect(columns[1]?.start.getDay()).toBe(1);
+		expect(columns[1]?.offset).toBe(6);
+		expect(columns.every((column, index) => index === 0 || column.start.getDay() === 1)).toBe(true);
+		expect(columns.reduce((sum, column) => sum + column.span, 0)).toBe(range.days);
+	});
+
+	it('groups by calendar month and labels it with the month name', () => {
+		const columns = ganttTimelineColumns(timelineRange([], { anchor: new Date(2026, 0, 1) }), 'month');
+		expect(columns[0]?.label).toBe('Dec');
+		expect(columns[0]?.title).toBe('December 2025');
+		// The padded range runs Dec 30, 2025 → Jan 16, 2026, so it spans two month columns.
+		expect(columns).toHaveLength(2);
+		expect(columns[0]?.offset).toBe(0);
+		expect(columns[0]?.span).toBe(2);
+		expect(columns[1]?.start.getMonth()).toBe(0);
+	});
+
+	it('names the month/year context strip', () => {
+		expect(ganttScaleContext(new Date(2026, 0, 1))).toBe('January 2026');
+	});
+
+	it('labels each calendar month once, spanning all of its days', () => {
+		const range = timelineRange([], { anchor: new Date(2026, 0, 1) });
+		const groups = ganttMonthGroups(range);
+		// Dec 30, 2025 → Jan 16, 2026: a short December run then January.
+		expect(groups.map((group) => group.label)).toEqual(['December 2025', 'January 2026']);
+		expect(groups[0]?.offset).toBe(0);
+		expect(groups[0]?.span).toBe(2);
+		expect(groups[0]!.span + groups[1]!.span).toBe(range.days);
+	});
+
+	it('labels each calendar year once for the month scale strip', () => {
+		const groups = ganttYearGroups(timelineRange([], { anchor: new Date(2026, 0, 1) }));
+		expect(groups).toHaveLength(2);
+		expect(groups[0]?.label).toBe('2025');
+		expect(groups[1]?.label).toBe('2026');
 	});
 });
