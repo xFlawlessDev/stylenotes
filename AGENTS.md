@@ -118,7 +118,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - Extract before extracting is painful: pull repeated JSX/markup into a child component, and repeated non-UI logic into a helper function with a test.
 - `src/lib/components/ui/**` (shadcn-svelte) and generated files (`src-tauri/gen/**`, `build/**`, `Cargo.lock`, `bun.lock`) are exempt from the cap — do not edit or split them by hand.
 - Tests may exceed 300 LOC when they cover one module; split by `describe` block only past the 500 cap.
-- Current known offender: `workspace/Workspace.svelte` (~780 lines, over the hard cap — needs a split as part of the next change that touches it). The former offenders (`DockRail.svelte`, `NoteEditor.svelte`, `SettingsPanel.svelte`) are back under the cap after the component-base refactor.
+- The former offenders (`Workspace.svelte`, `DockRail.svelte`, `NoteEditor.svelte`, `SettingsPanel.svelte`) are back under the cap. `Workspace.svelte` is now a thin shell over `$lib/stores/workspace-controller.svelte.ts` (state + operations), `workspace-session.svelte.ts` (hydration + cross-window listeners), `workspace-folder-ops.ts` and `workspace-wiki.ts`.
 
 ## Skills
 
