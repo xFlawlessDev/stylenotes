@@ -2,6 +2,9 @@
 	import { Calendar, CalendarDays, CalendarRange } from '@lucide/svelte';
 	import { Button, EmptyState, SegmentedControl } from '$lib/components/base';
 	import TaskGanttHeader from '$lib/components/tasks/TaskGanttHeader.svelte';
+	import GanttTaskLabelCell from '$lib/components/tasks/GanttTaskLabelCell.svelte';
+	import GanttTaskTooltip from '$lib/components/tasks/GanttTaskTooltip.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import {
 		GANTT_ROW_HEIGHT,
 		ganttDependencyLinks,
@@ -15,10 +18,8 @@
 	import {
 		diffDays,
 		isTaskOverdue,
-		priorityMeta,
 		taskBar,
 		taskBlockers,
-		taskPriority,
 		timelineRange,
 		statusMeta,
 		taskStatus,
@@ -203,28 +204,15 @@
 										(item) => !item.completed
 									)}
 							<div class="flex border-b border-hairline/60 last:border-b-0" style="height: {ROW_HEIGHT}px">
-								<!-- Native button: this is a table-style cell with stacked block content. -->
-								<button
-									type="button"
-									class="sticky left-0 z-10 w-[var(--gantt-label)] shrink-0 cursor-pointer border-r border-hairline bg-surface/90 px-3 py-2 text-left backdrop-blur transition-colors hover:bg-surface-container/50 {selectedId ===
-									task.id
-										? 'glass-chip'
-										: ''}"
-									title="{task.title}{blockers.length
-										? ` · Blocked by ${blockers.map((item) => item.title).join(', ')}`
-										: ''}"
-									onclick={() => onselect(task.id)}
-									ondblclick={() => onedit(task)}
-								>
-									<span class="block truncate text-body-sm font-body text-on-surface">{task.title}</span>
-									<span class="block truncate text-code-sm font-code {statusMeta[status].tone}">
-										{statusMeta[status].label}{#if overdue}<span class="text-error"> · Overdue</span>{/if}{#if blockers.length}<span
-												class="text-error"
-											>
-												· Blocked by {blockers.length}</span
-											>{/if}
-									</span>
-								</button>
+								<GanttTaskLabelCell
+									{task}
+									rowHeight={ROW_HEIGHT}
+									selected={selectedId === task.id}
+									{overdue}
+									{blockers}
+									{onselect}
+									{onedit}
+								/>
 
 								<div class="relative" style="width: {width}px">
 									<!-- Column grid: a separator at each column boundary, weekend shading on the date scale. -->
@@ -258,22 +246,32 @@
 
 									{#if bar}
 										{@const barWidth = bar.span * dayWidth - 2}
-										<Button
-											bare
-											class="{BAR_BASE} justify-start {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
-											style="left: {bar.offset * dayWidth + 1}px; width: {barWidth}px"
-											title="{task.title} · {statusMeta[status].label} · {priorityMeta[taskPriority(task)]
-												.label}{overdue ? ' · Overdue' : ''} (double-click to open)"
-											aria-label="{task.title}, {statusMeta[status].label}{overdue
-												? ', overdue'
-												: ''}"
-											onclick={() => onselect(task.id)}
-											ondblclick={() => onedit(task)}
-										>
-											{#if barWidth >= 36}
-												<span class="truncate {status === 'done' ? 'line-through' : ''}">{task.title}</span>
-											{/if}
-										</Button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														bare
+														class="{BAR_BASE} justify-start {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
+														style="left: {bar.offset * dayWidth + 1}px; width: {barWidth}px"
+														aria-label="{task.title}, {statusMeta[status].label}{overdue
+															? ', overdue'
+															: ''}"
+														onclick={() => onselect(task.id)}
+														ondblclick={() => onedit(task)}
+													>
+														{#if barWidth >= 36}
+															<span class="truncate {status === 'done' ? 'line-through' : ''}"
+																>{task.title}</span
+															>
+														{/if}
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content>
+												<GanttTaskTooltip {task} {overdue} {blockers} />
+											</Tooltip.Content>
+										</Tooltip.Root>
 									{/if}
 								</div>
 							</div>

@@ -1,7 +1,7 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
-import TaskGantt from '$lib/components/tasks/TaskGantt.svelte';
+import GanttHost from '$lib/components/tasks/gantt-test-host.svelte';
 import type { Note } from '$lib/content/content';
 import { createTask, type Task, type TaskDependency } from '$lib/stores/tasks';
 
@@ -26,7 +26,7 @@ describe('task dependency UI', () => {
 		const target = document.createElement('div');
 		document.body.appendChild(target);
 
-		const app = mount(TaskGantt, {
+		const app = mount(GanttHost, {
 			target,
 			props: { tasks, dependencies, selectedId: '', onselect: noop, onedit: noop }
 		});
@@ -54,7 +54,7 @@ describe('task dependency UI', () => {
 		const target = document.createElement('div');
 		document.body.appendChild(target);
 
-		const app = mount(TaskGantt, {
+		const app = mount(GanttHost, {
 			target,
 			props: { tasks, dependencies, selectedId: 'b', onselect: noop, onedit: noop }
 		});
