@@ -3,12 +3,13 @@
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
+	import { handleExternalLink } from '$lib/content/external-links';
 
 	/**
 	 * Renders assistant text as sanitized Markdown, using the exact pipeline the
 	 * note preview uses (`renderNoteHtml` → `renderNotePreviewHtml`). Wiki links
 	 * the assistant writes are clickable, so a reply can route straight to a
-	 * note or task.
+	 * note or task, and external links open in the user's default browser.
 	 *
 	 * While `streaming` is true it shows the raw text so partial output does not
 	 * flicker through a re-render on every token; the finished reply is rendered
@@ -58,6 +59,7 @@
 	async function onBodyClick(event: MouseEvent) {
 		if (!bodyEl) return;
 		if (await handlePreviewAction(event, bodyEl)) return;
+		if (handleExternalLink(event, bodyEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, bodyEl);
 		if (wikiClick) {
 			event.preventDefault();

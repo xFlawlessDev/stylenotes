@@ -18,6 +18,7 @@
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
+	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { Button, EmptyState, Textarea } from '$lib/components/base';
 	import NoteHeader from '$lib/components/note/NoteHeader.svelte';
@@ -315,6 +316,7 @@
 	async function togglePreviewCheckbox(event: MouseEvent) {
 		if (!previewEl) return;
 		if (await handlePreviewAction(event, previewEl)) return;
+		if (handleExternalLink(event, previewEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, previewEl);
 		if (wikiClick) {
 			event.preventDefault();

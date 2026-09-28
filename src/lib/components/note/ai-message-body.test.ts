@@ -81,4 +81,25 @@ describe('AiMessageBody', () => {
 
 		unmount(app);
 	});
+
+	it('consumes an external link instead of routing it as a wiki link', async () => {
+		const noteActions = await import('$lib/content/note-actions');
+		vi.mocked(noteActions.renderNoteHtml).mockResolvedValueOnce(
+			'<p><a href="https://example.com">docs</a></p>'
+		);
+
+		const onwikilink = vi.fn();
+		const { target, app } = mountInto({ content: 'see [docs](https://example.com)', onwikilink });
+		await settle();
+
+		const anchor = target.querySelector<HTMLAnchorElement>('a');
+		const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+		anchor?.dispatchEvent(event);
+		await settle();
+
+		expect(event.defaultPrevented).toBe(true);
+		expect(onwikilink).not.toHaveBeenCalled();
+
+		unmount(app);
+	});
 });

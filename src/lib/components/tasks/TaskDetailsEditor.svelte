@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
+	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
@@ -140,6 +141,7 @@
 
 	function handlePreviewClick(event: MouseEvent) {
 		if (!previewEl) return;
+		if (handleExternalLink(event, previewEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, previewEl);
 		if (!wikiClick) return;
 		event.preventDefault();
