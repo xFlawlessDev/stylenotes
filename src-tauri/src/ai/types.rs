@@ -34,6 +34,7 @@ impl Role {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub role: Role,
     pub content: String,
@@ -164,5 +165,28 @@ mod tests {
             serde_json::from_str("\"anthropic-native\"").expect("anthropic");
         assert_eq!(openai, ProviderId::OpenaiCompatible);
         assert_eq!(anthropic, ProviderId::AnthropicNative);
+    }
+
+    /// The frontend sends `toolCalls`/`toolCallId` in camelCase. Missing the
+    /// rename made a `tool` turn lose its id and the provider rejected the
+    /// follow-up with "tool message requires tool_call_id".
+    #[test]
+    fn chat_message_round_trips_the_frontend_tool_shape() {
+        let json = serde_json::json!({
+            "role": "tool",
+            "content": "{\"ok\":true}",
+            "toolCallId": "call_1"
+        });
+        let message: ChatMessage = serde_json::from_value(json).expect("tool message");
+        assert_eq!(message.tool_call_id.as_deref(), Some("call_1"));
+
+        let assistant = serde_json::json!({
+            "role": "assistant",
+            "content": "",
+            "toolCalls": [{ "id": "call_1", "name": "list_notes", "arguments": "{}" }]
+        });
+        let message: ChatMessage = serde_json::from_value(assistant).expect("assistant message");
+        assert_eq!(message.tool_calls.len(), 1);
+        assert_eq!(message.tool_calls[0].name, "list_notes");
     }
 }

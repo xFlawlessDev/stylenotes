@@ -40,9 +40,10 @@ fn openai_messages(messages: &[ChatMessage]) -> Vec<serde_json::Value> {
                 "content": message.content,
             });
             if message.role == Role::Tool {
-                if let Some(id) = &message.tool_call_id {
-                    entry["tool_call_id"] = serde_json::json!(id);
-                }
+                // OpenAI rejects a `tool` turn without an id, so fall back to a
+                // stable placeholder rather than sending an invalid request.
+                let id = message.tool_call_id.as_deref().unwrap_or("call_unknown");
+                entry["tool_call_id"] = serde_json::json!(id);
             }
             if !message.tool_calls.is_empty() {
                 entry["tool_calls"] = serde_json::json!(message

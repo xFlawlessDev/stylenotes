@@ -72,11 +72,11 @@ export const AI_TOOLS: AiToolSpec[] = [
 			required: ['query']
 		}),
 	tool('get_note', 'Read note', 'notes', 'read',
-		'One note with its full body plus wiki backlinks and outlinks.',
+		'One note with its full body plus wiki backlinks and outlinks. Use an id from list_notes or search_notes; this does not accept a title.',
 		{
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: 'Note id, optionally <workspaceId>/<id>.' },
+				id: { type: 'string', description: 'Exact note id from list_notes/search_notes, optionally <workspaceId>/<id>.' },
 				workspace
 			},
 			required: ['id']
@@ -95,11 +95,11 @@ export const AI_TOOLS: AiToolSpec[] = [
 			}
 		}),
 	tool('get_task', 'Read task', 'tasks', 'read',
-		'One task with blockers, dependents and linked notes.',
+		'One task with blockers, dependents and linked notes. Use an id from list_tasks; this does not accept a title.',
 		{
 			type: 'object',
 			properties: {
-				id: { type: 'string', description: 'Task id, optionally <workspaceId>/<id>.' },
+				id: { type: 'string', description: 'Exact task id from list_tasks, optionally <workspaceId>/<id>.' },
 				workspace
 			},
 			required: ['id']

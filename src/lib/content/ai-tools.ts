@@ -105,6 +105,17 @@ function findTask(ctx: ToolContext, raw: string, workspace?: string): McpSnapsho
 	return matches.length === 1 ? matches[0] : null;
 }
 
+/**
+ * Falls back to a case-insensitive title match, so a model that passes a title
+ * instead of an id still gets a useful result rather than a dead end. Only an
+ * unambiguous match resolves.
+ */
+function findByTitle<T extends { title: string }>(items: T[], raw: string): T | null {
+	const wanted = raw.trim().toLowerCase();
+	const matches = items.filter((item) => item.title.trim().toLowerCase() === wanted);
+	return matches.length === 1 ? matches[0] : null;
+}
+
 /** A compact note view — bodies are only included for `get_note`. */
 function noteSummary(note: McpSnapshotNote) {
 	return {
@@ -180,8 +191,10 @@ function searchNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResul
 function getNote(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const raw = str(args, 'id');
 	if (!raw) return { ok: false, error: '`id` is required.' };
-	const note = findNote(ctx, raw, str(args, 'workspace'));
-	if (!note) return { ok: false, error: `No note with id \`${raw}\`.` };
+	const note = findNote(ctx, raw, str(args, 'workspace')) ?? findByTitle(notesOf(ctx), raw);
+	if (!note) {
+		return { ok: false, error: `No note with id \`${raw}\`. Use list_notes or search_notes first.` };
+	}
 
 	const nodeId = `note:${note.id}`;
 	const neighbors = ctx.snapshot.graph.edges
@@ -220,8 +233,10 @@ function listTasks(ctx: ToolContext, args: Record<string, unknown>): ToolResult 
 function getTask(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const raw = str(args, 'id');
 	if (!raw) return { ok: false, error: '`id` is required.' };
-	const task = findTask(ctx, raw, str(args, 'workspace'));
-	if (!task) return { ok: false, error: `No task with id \`${raw}\`.` };
+	const task = findTask(ctx, raw, str(args, 'workspace')) ?? findByTitle(tasksOf(ctx), raw);
+	if (!task) {
+		return { ok: false, error: `No task with id \`${raw}\`. Use list_tasks first.` };
+	}
 	return {
 		ok: true,
 		data: {

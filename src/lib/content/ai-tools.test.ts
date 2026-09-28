@@ -124,6 +124,20 @@ describe('read tools', () => {
 		expect(result.ok).toBe(false);
 	});
 
+	it('falls back to a title when given one instead of an id', async () => {
+		const result = await executeToolCall(context(), 'get_note', '{"id":"Roadmap"}', { confirmed: false });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect((result.data as { title: string }).title).toBe('Roadmap');
+	});
+
+	it('errors on an unknown task id', async () => {
+		const result = await executeToolCall(context(), 'get_task', '{"id":"nope"}', { confirmed: false });
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toContain('list_tasks');
+	});
+
 	it('sorts tasks priority-first', async () => {
 		const result = await executeToolCall(context(), 'list_tasks', '{}', { confirmed: false });
 		expect(result.ok).toBe(true);
