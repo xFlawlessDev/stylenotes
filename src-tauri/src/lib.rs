@@ -1,10 +1,13 @@
+use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[cfg(desktop)]
 mod tray;
 
 mod ai;
+mod db_tx;
 mod mcp_host;
+mod quit;
 
 const DB_URL: &str = "sqlite:stylenotes.db";
 const WORKSPACE_LABEL: &str = "workspace";
@@ -484,6 +487,28 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Local version history for notes and tasks (auto-save safety net).
+        // Deliberately not foreign-keyed to `notes`/`tasks`: notes and tasks
+        // share one table, and this stays device-local when cloud sync lands.
+        Migration {
+            version: 15,
+            description: "create_entity_versions",
+            sql: "
+                CREATE TABLE IF NOT EXISTS entity_versions (
+                    id         TEXT PRIMARY KEY,
+                    entity     TEXT NOT NULL,
+                    entity_id  TEXT NOT NULL,
+                    payload    TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    reason     TEXT NOT NULL DEFAULT 'auto',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_entity_versions_lookup
+                    ON entity_versions (entity, entity_id, updated_at DESC);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -511,6 +536,9 @@ pub fn run() {
             mcp_poll_job,
             mcp_write_result,
             mcp_backup_note,
+            db_tx::note_upsert_tx,
+            db_tx::note_remove_tx,
+            quit::app_quit_ready,
             ai::commands::ai_encrypt_key,
             ai::commands::ai_decrypt_key,
             ai::commands::ai_stream,
@@ -520,10 +548,22 @@ pub fn run() {
             // Lays down `mcp/`, clears stale jobs, and writes the first
             // `app-info.json`. Failure is not fatal: MCP just stays unavailable.
             mcp_host::prepare(app.handle());
+            // Tracks which detail windows still owe a pre-quit flush.
+            app.manage(quit::QuitState::default());
+            // The atomic note-write pool must exist before any window can call
+            // `note_upsert_tx`. A failed open is not fatal: the frontend falls
+            // back to the non-transactional path (see `db/index.ts`).
+            match tauri::async_runtime::block_on(db_tx::open(app.handle())) {
+                Ok(pool) => {
+                    app.manage(db_tx::WritePool(pool));
+                }
+                Err(error) => {
+                    eprintln!("write pool unavailable, atomic note writes disabled: {error}");
+                }
+            }
             #[cfg(desktop)]
             {
                 use tauri::Emitter;
-                use tauri::Manager;
                 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
                 use tauri_plugin_positioner::{Position, WindowExt};
                 app.handle().plugin(tauri_plugin_positioner::init())?;

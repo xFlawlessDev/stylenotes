@@ -14,6 +14,7 @@
 		Printer,
 		FileDown,
 		Copy,
+		History,
 	} from '@lucide/svelte';
 	import type { EditorView } from '$lib/stores/settings.svelte';
 	import { Button } from '$lib/components/base';
@@ -35,6 +36,7 @@
 		oncopy,
 		ondelete,
 		onfullpreview,
+		onhistory,
 	}: {
 		view: EditorView;
 		pinned: boolean;
@@ -50,6 +52,7 @@
 		oncopy: () => void;
 		ondelete: () => void;
 		onfullpreview: () => void;
+		onhistory?: () => void;
 	} = $props();
 
 	const views: { id: EditorView; icon: typeof Eye; title: string }[] = [
@@ -174,6 +177,25 @@
 		</Tooltip.Trigger>
 		<Tooltip.Content>{archived ? 'Unarchive note' : 'Archive note'}</Tooltip.Content>
 	</Tooltip.Root>
+	{#if onhistory}
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="secondary"
+						size="icon"
+						class="text-on-surface-variant"
+						aria-label="Version history"
+						onclick={onhistory}
+					>
+						<History size={16} />
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Version history</Tooltip.Content>
+		</Tooltip.Root>
+	{/if}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}

@@ -30,6 +30,8 @@ export type Settings = {
 	/** Kanban board layout: one workspace id per board, left to right. */
 	kanbanBoards: string[];
 	detailAlwaysOnTop: boolean;
+	/** Keeps a local version history of note and task edits (Phase B). */
+	versioningEnabled: boolean;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -57,6 +59,7 @@ const defaults: Settings = {
 	kanbanPinned: false,
 	kanbanBoards: [],
 	detailAlwaysOnTop: true,
+	versioningEnabled: true,
 };
 
 export function defaultSettings(): Settings {

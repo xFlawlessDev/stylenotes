@@ -4,7 +4,7 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 
-use crate::{KANBAN_LABEL, WORKSPACE_LABEL};
+use crate::{quit, KANBAN_LABEL, WORKSPACE_LABEL};
 
 const TRAY_ID: &str = "stylenotes-tray";
 const MENU_SHOW: &str = "tray-show";
@@ -32,7 +32,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             MENU_SHOW => show_workspace(app),
             MENU_KANBAN => show_kanban(app),
             MENU_HIDE => hide_workspace(app),
-            MENU_QUIT => app.exit(0),
+            MENU_QUIT => quit::request_quit(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

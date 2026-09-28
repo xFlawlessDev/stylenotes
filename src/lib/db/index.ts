@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
+import { invoke } from '@tauri-apps/api/core';
 import type { Note } from '$lib/content/content';
 import type { CustomFolder } from '$lib/stores/notes';
 import type { AppNotification } from '$lib/stores/notifications';
@@ -11,12 +12,46 @@ export const DB_URL = 'sqlite:stylenotes.db';
 
 let connection: Promise<Database> | null = null;
 
+/**
+ * Pragmas applied once per connection, before any query runs.
+ *
+ * WAL lets readers and writers coexist (the app opens one connection per
+ * window against the same file), `busy_timeout` turns a lock collision into a
+ * short wait instead of an instant `SQLITE_BUSY`, and `synchronous=NORMAL` is
+ * the safe companion to WAL for a desktop app. `foreign_keys=ON` activates the
+ * `ON DELETE CASCADE` clauses declared in the schema (off by default in
+ * SQLite); the repos still delete children explicitly, so this only enforces
+ * what is already intended.
+ */
+const CONNECTION_PRAGMAS = [
+	'PRAGMA journal_mode = WAL',
+	'PRAGMA synchronous = NORMAL',
+	'PRAGMA busy_timeout = 5000',
+	'PRAGMA foreign_keys = ON',
+];
+
+async function configureConnection(db: Database): Promise<Database> {
+	for (const pragma of CONNECTION_PRAGMAS) {
+		try {
+			await db.execute(pragma);
+		} catch {
+			// A pragma the platform refuses must not take the whole DB down.
+		}
+	}
+	return db;
+}
+
 export function getDb(): Promise<Database> {
 	if (!isTauri) {
 		return Promise.reject(new Error('SQLite is only available inside the Tauri runtime'));
 	}
 	if (!connection) {
-		connection = Database.load(DB_URL);
+		connection = Database.load(DB_URL).then(configureConnection);
+		// A failed load must not be cached as a permanently broken connection.
+		connection = connection.catch((error) => {
+			connection = null;
+			throw error;
+		});
 	}
 	return connection;
 }
@@ -71,6 +106,16 @@ async function tagsByNote(): Promise<Map<string, string[]>> {
 
 async function writeTags(noteId: string, tags: string[]) {
 	const db = await getDb();
+	// Typing usually leaves tags untouched, so compare before rewriting: the
+	// old delete + insert per tag was the bulk of every auto-save write.
+	const rows = await db.select<{ tag: string }[]>(
+		'SELECT tag FROM tags WHERE note_id = $1 ORDER BY rowid ASC',
+		[noteId]
+	);
+	const current = rows.map((row) => row.tag);
+	if (current.length === tags.length && current.every((tag, index) => tag === tags[index])) {
+		return;
+	}
 	await db.execute('DELETE FROM tags WHERE note_id = $1', [noteId]);
 	for (const tag of tags) {
 		await db.execute('INSERT OR IGNORE INTO tags (note_id, tag) VALUES ($1, $2)', [noteId, tag]);
@@ -98,8 +143,33 @@ export const notesRepo = {
 	},
 
 	async upsert(note: Note): Promise<void> {
-		const db = await getDb();
 		const updatedAt = note.updatedAt ?? Date.now();
+		// Notes written by older builds may have no workspace; the transaction
+		// command always sets one, so those keep the direct path.
+		if (note.workspaceId) {
+			try {
+				await invoke('note_upsert_tx', {
+					id: note.id,
+					workspaceId: note.workspaceId,
+					title: note.title,
+					folder: note.folder,
+					body: note.body,
+					excerpt: note.excerpt,
+					words: note.words,
+					chars: note.chars,
+					pinned: note.pinned,
+					overlay: note.overlay,
+					updated: note.updated,
+					updatedAt,
+					tags: note.tags,
+				});
+				return;
+			} catch {
+				// Write pool unavailable (e.g. older build): fall through to the
+				// multi-statement path so saving still works.
+			}
+		}
+		const db = await getDb();
 		if (!note.workspaceId) {
 			await db.execute(
 				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
@@ -146,6 +216,12 @@ export const notesRepo = {
 	},
 
 	async remove(id: string): Promise<void> {
+		try {
+			await invoke('note_remove_tx', { id });
+			return;
+		} catch {
+			// Fall through to the direct path when the write pool is unavailable.
+		}
 		const db = await getDb();
 		await db.execute('DELETE FROM tags WHERE note_id = $1', [id]);
 		await db.execute('DELETE FROM notes WHERE id = $1', [id]);

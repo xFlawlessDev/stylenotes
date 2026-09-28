@@ -24,7 +24,8 @@
 		onexport,
 		oncopy,
 		ondelete,
-		onfullpreview
+		onfullpreview,
+		onhistory
 	}: {
 		note: Note;
 		view: EditorView;
@@ -39,6 +40,7 @@
 		oncopy: () => void;
 		ondelete: () => void;
 		onfullpreview: () => void;
+		onhistory?: () => void;
 	} = $props();
 </script>
 
@@ -79,6 +81,7 @@
 			oncopy={oncopy}
 			ondelete={ondelete}
 			onfullpreview={onfullpreview}
+			{onhistory}
 		/>
 	</div>
 {/if}

@@ -9,6 +9,7 @@ import {
 	type Note
 } from '$lib/content/content';
 import { foldersRepo, metaRepo, notesRepo } from '$lib/db';
+import { versionsRepo } from '$lib/db/versions';
 import { isTauri } from '$lib/windows';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
@@ -216,6 +217,8 @@ export async function removeNote(id: string): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await notesRepo.remove(id);
+		// Version history is not foreign-keyed, so drop it explicitly.
+		await versionsRepo.removeAll('note', id).catch(() => false);
 		notifyNotesChanged();
 		return true;
 	} catch {

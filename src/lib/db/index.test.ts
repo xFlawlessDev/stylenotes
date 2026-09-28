@@ -2,19 +2,40 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const execute = vi.fn();
 const select = vi.fn();
+const invoke = vi.fn();
 
 vi.mock('@tauri-apps/plugin-sql', () => ({
 	default: { load: vi.fn(async () => ({ execute, select })) },
 }));
 
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+
 vi.mock('$lib/windows', () => ({ isTauri: true }));
 
-import { notesRepo, foldersRepo, notificationsRepo, settingsRepo, metaRepo, tasksRepo } from '$lib/db';
+import { notesRepo, foldersRepo, notificationsRepo, settingsRepo, metaRepo, tasksRepo, getDb } from '$lib/db';
 import { createTask } from '$lib/stores/tasks';
 
 beforeEach(() => {
 	execute.mockReset().mockResolvedValue({ rowsAffected: 1 });
 	select.mockReset().mockResolvedValue([]);
+	invoke.mockReset().mockResolvedValue(undefined);
+});
+
+describe('getDb connection setup', () => {
+	it('enables WAL, a busy timeout and foreign keys before any query', async () => {
+		await getDb();
+
+		const configured = execute.mock.calls.map(([sql]) => String(sql));
+		expect(configured).toContain('PRAGMA journal_mode = WAL');
+		expect(configured).toContain('PRAGMA synchronous = NORMAL');
+		expect(configured).toContain('PRAGMA busy_timeout = 5000');
+		expect(configured).toContain('PRAGMA foreign_keys = ON');
+	});
+
+	it('still resolves when a pragma is rejected', async () => {
+		execute.mockRejectedValueOnce(new Error('pragma unsupported'));
+		await expect(getDb()).resolves.toBeDefined();
+	});
 });
 
 describe('notesRepo.list', () => {
@@ -59,7 +80,8 @@ describe('notesRepo.list', () => {
 });
 
 describe('notesRepo.upsert', () => {
-	it('binds values and rewrites tags', async () => {
+	it('binds values and rewrites tags when they changed', async () => {
+		select.mockResolvedValueOnce([]); // no existing tags for n1
 		await notesRepo.upsert({
 			id: 'n1',
 			title: 'Alpha',
@@ -92,15 +114,81 @@ describe('notesRepo.upsert', () => {
 			'b',
 		]);
 	});
+
+	it('leaves tags untouched when the stored list already matches', async () => {
+		select.mockResolvedValueOnce([{ tag: 'a' }, { tag: 'b' }]);
+		await notesRepo.upsert({
+			id: 'n1',
+			title: 'Alpha',
+			folder: 'work',
+			body: 'body',
+			excerpt: 'body',
+			words: 1,
+			chars: 4,
+			pinned: true,
+			overlay: true,
+			updated: 'Just now',
+			tags: ['a', 'b'],
+		});
+
+		const tagWrites = execute.mock.calls.filter(([sql]) => String(sql).includes('tags'));
+		expect(tagWrites).toEqual([]);
+	});
 });
 
 describe('notesRepo.remove', () => {
-	it('deletes tags before the note', async () => {
+	it('prefers the transactional delete', async () => {
+		await notesRepo.remove('n1');
+		expect(invoke).toHaveBeenCalledWith('note_remove_tx', { id: 'n1' });
+		expect(execute).not.toHaveBeenCalled();
+	});
+
+	it('falls back to deleting tags before the note', async () => {
+		invoke.mockRejectedValueOnce(new Error('no write pool'));
 		await notesRepo.remove('n1');
 		expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
 			'DELETE FROM tags WHERE note_id = $1',
 			'DELETE FROM notes WHERE id = $1',
 		]);
+	});
+});
+
+describe('notesRepo.upsert transaction path', () => {
+	const note = {
+		id: 'n1',
+		workspaceId: 'workspace-default',
+		title: 'Alpha',
+		folder: 'work',
+		body: 'body',
+		excerpt: 'body',
+		words: 1,
+		chars: 4,
+		pinned: false,
+		overlay: false,
+		updated: 'Just now',
+		tags: ['a'],
+	};
+
+	it('routes a workspace note through note_upsert_tx', async () => {
+		await notesRepo.upsert(note);
+
+		expect(invoke).toHaveBeenCalledWith('note_upsert_tx', expect.objectContaining({
+			id: 'n1',
+			workspaceId: 'workspace-default',
+			body: 'body',
+			tags: ['a'],
+		}));
+		const [, payload] = invoke.mock.calls[0] as [string, { updatedAt: number }];
+		expect(typeof payload.updatedAt).toBe('number');
+		expect(execute).not.toHaveBeenCalled();
+	});
+
+	it('falls back to direct writes when the pool is unavailable', async () => {
+		invoke.mockRejectedValueOnce(new Error('no write pool'));
+		select.mockResolvedValueOnce([]);
+		await notesRepo.upsert(note);
+
+		expect(execute.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO notes'))).toBe(true);
 	});
 });
 
@@ -186,6 +274,7 @@ describe('settingsRepo', () => {
 			kanbanPinned: false,
 			kanbanBoards: [],
 			detailAlwaysOnTop: true,
+			versioningEnabled: true,
 		});
 		expect(execute.mock.calls[0][0]).toContain('ON CONFLICT(id) DO UPDATE');
 		expect(JSON.parse(execute.mock.calls[0][1][0])).toMatchObject({ mode: 'dark' });

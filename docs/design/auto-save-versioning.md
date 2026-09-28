@@ -164,15 +164,34 @@ Implementasi: satu fungsi `pruneVersions(entity, entityId)` yang menghitung id y
 
 ### B4. UI
 
-- **Tombol "History"** di `DetailWindowHeader` atau `NoteEditorBar` → buka dialog riwayat (komponen baru `note/NoteHistoryDialog.svelte`, task menyesuaikan).
-- Daftar versi: waktu (`updated_at` + label relatif), ukuran, `reason`.
-- Aksi: **Preview** (read-only), **Restore** (mengisi ulang body/title saat ini dan menyimpannya sebagai edit baru — tidak menimpa histori), **Diff** opsional (line-diff sederhana, bukan RFC 6902).
-- Restore harus lewat `applyNotePatch` + `queue.enqueue`, bukan tulis langsung, supaya konsisten dengan alur auto-save dan event `notes:changed`.
-- Komponen baru mengikuti aturan LOC (≤300, hard cap 500) dan pakai primitives `base/` (`Button`, `Dialog` dari `ui/`).
+- **Tombol History** di dua tempat: `actions` snippet `DetailWindowHeader` (window note/task) **dan** `NoteToolbar.svelte` (editor workspace). Awalnya hanya yang pertama, sehingga di workspace tidak ada entry point.
+- Dialog: `src/lib/components/dialogs/RecordHistoryDialog.svelte` (satu komponen untuk note & task), lebar `min(22rem, 100vw-2rem)` dan daftar `max-h-[min(18rem,45vh)]` agar pas di window kecil.
+- Daftar versi: waktu relatif (`formatRelative`), label `reason`, preview satu baris.
+- Aksi: **Restore** — mengisi ulang record lewat jalur save normal (`update()` note / field form task), sehingga restore itu sendiri ikut di-version.
+- Glue note dipakai bersama lewat `src/lib/content/note-versioning.ts` (workspace editor + note window), helper format di `src/lib/content/version-format.ts`.
+- `NoteEditor.svelte` dipecah: permukaan editor (write/split/preview + popover) pindah ke `workspace/NoteEditorBody.svelte` agar tetap di bawah hard cap 500 LOC (460 + 127).
 
 ### B5. Preferensi
 
-Tambahkan ke `Settings` (`settings.svelte.ts`): `versioningEnabled: boolean` (default `true`) dan opsional `versioningMax: number` (default 50). Ini ikut tersimpan di row `settings` yang **disinkronkan** nanti — pertanyaannya apakah preferensi ini device-local atau synced. Saya usul **synced** (perilaku user, bukan kapabilitas device), lihat §7 Q3.
+`versioningEnabled: boolean` (default `true`) ditambahkan ke `Settings` (`settings.svelte.ts`), jadi ikut row `settings` yang **synced** (keputusan Q3). Toggle di `SettingsPanel.svelte` seksi editor.
+
+### B6. Implementasi (selesai)
+
+| Bagian | File |
+|---|---|
+| Migration 15 (`entity_versions`) | `src-tauri/src/lib.rs` |
+| Tipe payload | `src/lib/content/version-types.ts` |
+| Logika snapshot + retensi (pure, tested) | `src/lib/content/version-retention.ts` |
+| Format relatif & preview | `src/lib/content/version-format.ts` |
+| Repo | `src/lib/db/versions.ts` |
+| Orkestrasi store | `src/lib/stores/versioning.ts` |
+| Dialog | `src/lib/components/dialogs/RecordHistoryDialog.svelte` |
+| Wiring note/task | `NoteWindow.svelte`, `TaskWindow.svelte` |
+| Cleanup saat delete | `notes.ts` (`removeNote`), `tasks.svelte.ts` (`removeTask`) |
+
+**Catatan MCP:** jalur tulis MCP **tidak** menambah versi `pre-mcp` — ia sudah menulis backup body sendiri via `mcp_host::backup_note_body` (#13a). Menambah sistem histori kedua hanya akan menduplikasi intent; dibiarkan begitu.
+
+**Verifikasi:** `bun run check:all` hijau; `bun run test` **647** lulus (+17 tes baru).
 
 ---
 
@@ -225,10 +244,12 @@ Urutan **versi dulu, baru note** penting: kalau write note gagal, versi pre-imag
 ### Urutan kerja Phase A
 
 1. Q2 — ✅ **selesai**: plugin memakai sqlx pool per-statement; transaksi frontend tidak aman → Rust command.
-2. A1 — pragmas di `getDb()` + tes regresi delete (Q5).
-3. A2 — `save-queue` dua-tier dengan `minGap = 2500`.
-4. A3 — Rust command transaksional untuk upsert note+tags, plus skip rewrite tags bila tidak berubah.
-5. A4 — flush semua window dirty sebelum quit dari tray.
+2. A1 — ✅ **selesai**: pragmas di `getDb()` (`WAL`, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=ON`) + tes regresi delete.
+3. A2 — ✅ **selesai**: `save-queue` dua-tier (`delay` 300 + `minGap` 2500); write pertama sesi tidak ditunda.
+4. A3 — ✅ **selesai**: `src-tauri/src/db_tx.rs` (pool sqlx sendiri, `max_connections(1)`) dengan `note_upsert_tx` + `note_remove_tx`; frontend memakai invoker dengan fallback ke jalur lama. Optimasi skip-rewrite tags juga diterapkan di kedua jalur.
+5. A4 — ✅ **selesai**: `src-tauri/src/quit.rs` + `src/lib/stores/quit-flush.ts`; tray "Quit" meminta flush, menunggu ack 2 detik, lalu keluar.
+
+**Verifikasi:** `bun run check:all` hijau (svelte-check 0/0, fmt ok, clippy `-D warnings` ok); `bun run test` 630 lulus.
 
 ### 7.1 Detail verifikasi Q2 (bukti)
 

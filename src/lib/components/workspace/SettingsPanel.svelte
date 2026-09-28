@@ -147,7 +147,7 @@
 						</div>
 
 						<div class="flex flex-col gap-2">
-							{#each [{ k: 'spellcheck' as const, t: 'Check spelling', d: 'Underline misspelled words while writing' }, { k: 'showWordCount' as const, t: 'Show word count', d: 'Display live counts in the editor header' }, { k: 'confirmDelete' as const, t: 'Confirm before deleting', d: 'Ask before a note is permanently removed' }] as row (row.k)}
+							{#each [{ k: 'spellcheck' as const, t: 'Check spelling', d: 'Underline misspelled words while writing' }, { k: 'showWordCount' as const, t: 'Show word count', d: 'Display live counts in the editor header' }, { k: 'confirmDelete' as const, t: 'Confirm before deleting', d: 'Ask before a note is permanently removed' }, { k: 'versioningEnabled' as const, t: 'Keep version history', d: 'Save local snapshots so edits can be restored' }] as row (row.k)}
 								<div
 									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 								>

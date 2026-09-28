@@ -13,6 +13,9 @@
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { toggleChecklistItem } from '$lib/stores/notes';
+	import { captureNoteVersion, notePatchFromVersion } from '$lib/content/note-versioning';
+	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
+	import type { EntityVersion } from '$lib/content/version-types';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
@@ -20,13 +23,13 @@
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
-	import { Button, EmptyState, Textarea } from '$lib/components/base';
+	import { Button, EmptyState } from '$lib/components/base';
 	import NoteHeader from '$lib/components/note/NoteHeader.svelte';
 	import NoteEditorBar from '$lib/components/note/NoteEditorBar.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
-	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import NoteEditorBody from '$lib/components/workspace/NoteEditorBody.svelte';
 	import {
 		applyWikilink,
 		moveSuggestion,
@@ -80,6 +83,7 @@
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
 	let guideOpen = $state(false);
+	let historyOpen = $state(false);
 	let moveFolder = $state('');
 	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
 	let suggestions = $state<WikiSuggestionSet | null>(null);
@@ -92,8 +96,6 @@
 		tasks: tasks.filter(scopeToNote),
 		folders: customFolders
 	});
-
-	const open = $derived(!!suggestions?.items.length);
 
 	function scopeToNote(item: { workspaceId?: string }): boolean {
 		const id = note?.workspaceId ?? 'workspace-default';
@@ -225,7 +227,17 @@
 	function commitBody(value: string) {
 		if (!note) return;
 		draft = value;
+		// History is best-effort; the pre-image is the current note state.
+		if (settings.versioningEnabled) captureNoteVersion(note);
 		onupdate(note.id, { body: value });
+	}
+
+	/** Applies a saved version through the normal save path (so it is versioned). */
+	function restoreVersion(version: EntityVersion) {
+		if (!note) return;
+		const patch = notePatchFromVersion(version);
+		if (patch.body !== undefined) draft = patch.body;
+		onupdate(note.id, patch);
 	}
 
 	function editorState(): EditState | null {
@@ -377,6 +389,7 @@
 				oncopy={() => oncopy?.(note)}
 				ondelete={() => ondelete(note.id)}
 				onfullpreview={() => ontogglefullpreview?.()}
+				onhistory={settings.versioningEnabled ? () => (historyOpen = true) : undefined}
 			/>
 
 			{#if !fullPreview}
@@ -400,85 +413,29 @@
 				<EditorFormatBar oncommand={runCommand} onguide={() => (guideOpen = true)} />
 			{/if}
 
-			<div class="relative grid min-h-0 flex-1 overflow-hidden">
-				{#if view === 'write'}
-					<Textarea
-						bind:ref={textareaEl}
-						value={draft}
-						oninput={(event) => {
-							commitBody((event.currentTarget as HTMLTextAreaElement).value);
-							refreshSuggestions();
-						}}
-						onkeydown={onEditorKeydown}
-						onkeyup={refreshFromKeyup}
-						onclick={refreshSuggestions}
-						onblur={() => (suggestions = null)}
-						spellcheck={settings.spellcheck}
-						variant="bare"
-						size="lg"
-						placeholder="Start writing. Use the toolbar or shortcuts to format..."
-						class="scrollbar-none h-full w-full px-6 py-4 text-on-surface-variant"
-					></Textarea>
-				{:else if view === 'split'}
-					<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
-						<Textarea
-							bind:ref={textareaEl}
-							value={draft}
-							oninput={(event) => {
-								commitBody((event.currentTarget as HTMLTextAreaElement).value);
-								refreshSuggestions();
-							}}
-							onkeydown={onEditorKeydown}
-							onkeyup={refreshFromKeyup}
-							onclick={refreshSuggestions}
-							onblur={() => (suggestions = null)}
-							spellcheck={settings.spellcheck}
-							variant="bare"
-							size="md"
-							placeholder="Write here..."
-							class="scrollbar-none h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
-							onscroll={onEditorScroll}
-						></Textarea>
-						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-						<div
-							bind:this={previewEl}
-							class="scrollbar-none h-full overflow-y-auto px-5 py-4"
-							onscroll={onPreviewScroll}
-							onclick={togglePreviewCheckbox}
-						>
-							{#if html}
-								<div class="markdown-body">{@html html}</div>
-							{:else}
-								<p class="text-body-sm font-body text-outline">Preview appears here.</p>
-							{/if}
-						</div>
-					</div>
-				{:else}
-					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-					<div
-						bind:this={previewEl}
-						class="scrollbar-none h-full overflow-y-auto px-6 py-4"
-						onclick={togglePreviewCheckbox}
-					>
-						{#if html}
-							<div class="markdown-body mx-auto max-w-2xl">{@html html}</div>
-						{:else}
-							<p class="text-body-lg font-body text-outline">
-								This note is empty. Switch to Write to start composing.
-							</p>
-						{/if}
-					</div>
-				{/if}
-
-				<WikiLinkPopover
-					{open}
-					target={textareaEl}
-					items={suggestions?.items ?? []}
-					index={activeIndex}
-					onselect={choose}
-					onhover={(position) => (activeIndex = position)}
-				/>
-			</div>
+			<NoteEditorBody
+				{view}
+				{draft}
+				{html}
+				spellcheck={settings.spellcheck}
+				{suggestions}
+				{activeIndex}
+				bind:textareaEl
+				bind:previewEl
+				oninput={(value) => {
+					commitBody(value);
+					refreshSuggestions();
+				}}
+				onkeydown={onEditorKeydown}
+				onkeyup={refreshFromKeyup}
+				onclickeditor={refreshSuggestions}
+				onblur={() => (suggestions = null)}
+				oneditorscroll={onEditorScroll}
+				onpreviewscroll={onPreviewScroll}
+				onpreviewclick={togglePreviewCheckbox}
+				onchoose={choose}
+				onhover={(position) => (activeIndex = position)}
+			/>
 		{:else}
 			<EmptyState
 				size="lg"
@@ -492,4 +449,12 @@
 	</FileDropZone>
 
 	<MarkdownGuideDialog bind:open={guideOpen} />
+	{#if note}
+		<RecordHistoryDialog
+			bind:open={historyOpen}
+			entity="note"
+			entityId={note.id}
+			onrestore={restoreVersion}
+		/>
+	{/if}
 </main>

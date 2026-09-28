@@ -34,6 +34,9 @@ tauri-plugin-prevent-default = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }
+# Direct sqlx access for the note+tag write transaction. The plugin keeps its
+# own pool private, so atomic multi-statement writes need our own connection.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 # AI assistant gateway (BYOK): streaming HTTP client + credential encryption.

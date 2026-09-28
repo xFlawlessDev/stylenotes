@@ -2,10 +2,12 @@
 	import { onMount, untrack } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { emitTo, listen } from '@tauri-apps/api/event';
-	import { ListTodo, NotebookPen } from '@lucide/svelte';
+	import { ListTodo, NotebookPen, History } from '@lucide/svelte';
 	import { createNote, type Note } from '$lib/content/content';
 	import { foldersFor, listNotes, loadFolders, persistNote, type CustomFolder } from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
+	import { registerQuitFlush } from '$lib/stores/quit-flush';
+	import { versioning } from '$lib/stores/versioning';
 	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
 	import {
 		applySettingsSnapshot,
@@ -55,6 +57,8 @@
 	import DependencyEditor from '$lib/components/tasks/DependencyEditor.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
+	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
+	import type { EntityVersion } from '$lib/content/version-types';
 	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -75,6 +79,7 @@
 	let dueDate = $state('');
 	let revealed = $state(false);
 	let closing = false;
+	let historyOpen = $state(false);
 	let allTasks = $state<Task[]>([]);
 	let candidateEntities = $state<WikiEntity[]>([]);
 	let candidatesOpen = $state(false);
@@ -127,6 +132,8 @@
 			if (!current || dateError) return;
 			const next = applyTaskPatch(current, patch);
 			if (sameTask(current, next)) return;
+			// History is best-effort; the pre-image is `current`.
+			if (settings.versioningEnabled) void versioning.captureTask(current);
 			queue.enqueue(next);
 		});
 	});
@@ -177,6 +184,19 @@
 		allTasks = allTasksInWorkspace;
 		task = allTasksInWorkspace.find((item) => item.id === taskId) ?? null;
 		await refreshDependencies(recordWorkspaceId);
+	}
+
+	/** Applies a saved version to the form; the save effect persists the result. */
+	function restoreVersion(version: EntityVersion) {
+		const payload = version.payload as Partial<Task>;
+		if (payload.title !== undefined) title = payload.title;
+		if (payload.notes !== undefined) detail = payload.notes;
+		if (payload.status) status = payload.status;
+		if (payload.priority) priority = payload.priority;
+		if (payload.folder !== undefined) folder = payload.folder;
+		if (payload.noteIds) noteIds = [...payload.noteIds];
+		if (payload.startAt !== undefined) startDate = toDateInput(payload.startAt);
+		if (payload.dueAt !== undefined) dueDate = toDateInput(payload.dueAt);
 	}
 
 	/** Re-reads the dependency rows this window shows (its task's workspace). */
@@ -317,6 +337,11 @@
 			})
 			.then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
+		// Flush before the tray's Quit exits, so the last edit is not lost.
+		void registerQuitFlush(() => queue.flush()).then((fn) =>
+			disposed ? fn() : unlisteners.push(fn)
+		);
+
 		return () => {
 			disposed = true;
 			for (const off of unlisteners) off();
@@ -339,6 +364,16 @@
 		onclose={closeWindow}
 	>
 		{#snippet actions()}
+			{#if task && settings.versioningEnabled}
+				<Button
+					bare
+					class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
+					aria-label="Version history"
+					onclick={() => (historyOpen = true)}
+				>
+					<History size={13} />
+				</Button>
+			{/if}
 			{#each linkedNotes as note (note.id)}
 				<Tooltip.Root>
 					<Tooltip.Trigger>
@@ -426,4 +461,12 @@
 		heading={pendingHeading}
 		onselect={(entity, heading) => void openWikiTarget(entity, heading)}
 	/>
+	{#if task}
+		<RecordHistoryDialog
+			bind:open={historyOpen}
+			entity="task"
+			entityId={task.id}
+			onrestore={restoreVersion}
+		/>
+	{/if}
 </div>

@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { emit } from '@tauri-apps/api/event';
 import { tasksRepo } from '$lib/db';
+import { versionsRepo } from '$lib/db/versions';
 import type { Task } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
@@ -118,6 +119,8 @@ export async function removeTask(id: string): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await tasksRepo.remove(id);
+		// Version history is not foreign-keyed, so drop it explicitly.
+		await versionsRepo.removeAll('task', id).catch(() => false);
 		notifyTasksChanged();
 		return true;
 	} catch {

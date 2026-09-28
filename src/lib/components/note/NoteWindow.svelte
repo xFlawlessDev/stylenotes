@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { emitTo, listen } from '@tauri-apps/api/event';
-	import { NotebookPen } from '@lucide/svelte';
+	import { NotebookPen, History } from '@lucide/svelte';
 	import { createNote, type Note } from '$lib/content/content';
 	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
 	import { planWikiClick } from '$lib/content/wiki-navigation';
@@ -10,6 +10,8 @@
 	import type { Task } from '$lib/stores/tasks';
 	import { listAllTasks } from '$lib/stores/tasks.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
+	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
+	import type { EntityVersion } from '$lib/content/version-types';
 	import {
 		applyNotePatch,
 		foldersFor,
@@ -23,6 +25,8 @@
 		type NotesChangedPayload
 	} from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
+	import { registerQuitFlush } from '$lib/stores/quit-flush';
+	import { captureNoteVersion, notePatchFromVersion } from '$lib/content/note-versioning';
 	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
 	import {
 		applySettingsSnapshot,
@@ -55,6 +59,7 @@
 	let folder = $state('personal');
 	let view = $state<EditorView>('write');
 	let closing = false;
+	let historyOpen = $state(false);
 	let candidateEntities = $state<WikiEntity[]>([]);
 	let candidatesOpen = $state(false);
 	let pendingHeading = $state<string | null>(null);
@@ -117,11 +122,18 @@
 		if (!current) return;
 		const next = applyNotePatch(current, patch);
 		note = next;
+		// History is best-effort and must never block or fail the actual save;
+		// the pre-image is `current` (the state before this edit).
+		if (settings.versioningEnabled) captureNoteVersion(current);
 		queue.enqueue(next);
 	}
 
-	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
-		candidateEntities = entities;
+	/** Restores a saved version through the normal save path, so it is itself versioned. */
+	function restoreVersion(version: EntityVersion) {
+		update(notePatchFromVersion(version));
+	}
+
+	function showAmbiguous(entities: WikiEntity[], heading: string | null) {		candidateEntities = entities;
 		pendingHeading = heading;
 		candidatesOpen = entities.length > 0;
 	}
@@ -238,6 +250,11 @@
 			requestedHeading = event.payload.heading;
 		}).then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
+		// Flush before the tray's Quit exits, so the last edit is not lost.
+		void registerQuitFlush(() => queue.flush()).then((fn) =>
+			disposed ? fn() : unlisteners.push(fn)
+		);
+
 		void getCurrentWindow()
 			.onCloseRequested((event) => {
 				if (closing) return;
@@ -269,6 +286,16 @@
 	>
 		{#snippet actions()}
 			<NoteViewSwitcher {view} onview={(next) => (view = next)} />
+			{#if note && settings.versioningEnabled}
+				<Button
+					bare
+					class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
+					aria-label="Version history"
+					onclick={() => (historyOpen = true)}
+				>
+					<History size={13} />
+				</Button>
+			{/if}
 		{/snippet}
 	</DetailWindowHeader>
 
@@ -340,4 +367,12 @@
 		heading={pendingHeading}
 		onselect={(entity, heading) => void openWikiTarget(entity, heading)}
 	/>
+	{#if note}
+		<RecordHistoryDialog
+			bind:open={historyOpen}
+			entity="note"
+			entityId={note.id}
+			onrestore={restoreVersion}
+		/>
+	{/if}
 </div>
