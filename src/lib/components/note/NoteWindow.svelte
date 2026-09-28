@@ -23,6 +23,7 @@
 		type NotesChangedPayload
 	} from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
+	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
 	import {
 		applySettingsSnapshot,
 		hydrateSettings,
@@ -74,6 +75,13 @@
 	$effect(() => {
 		title = note?.title ?? '';
 		folder = note?.folder ?? 'personal';
+	});
+
+	// Publish the unsaved-edit state so the MCP host can refuse to overwrite it (#D4).
+	$effect(() => {
+		if (!noteId) return;
+		setPendingEdit('note', noteId, queue.state.dirty);
+		return () => setPendingEdit('note', noteId, false);
 	});
 
 	$effect(() => {

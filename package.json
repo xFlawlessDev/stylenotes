@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",
+    "mcp:sidecar": "node scripts/mcp-sidecar.cjs",
     "fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
     "clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",

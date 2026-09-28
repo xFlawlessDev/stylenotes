@@ -33,6 +33,7 @@ type NoteRow = {
 	pinned: number;
 	overlay: number;
 	updated: string;
+	updated_at: number | null;
 };
 
 type TagRow = { note_id: string; tag: string };
@@ -52,6 +53,7 @@ function toNote(row: NoteRow, tags: string[]): Note {
 		chars: Number(row.chars) || 0,
 	};
 	if (row.workspace_id) note.workspaceId = row.workspace_id;
+	if (row.updated_at != null) note.updatedAt = Number(row.updated_at);
 	return note;
 }
 
@@ -97,21 +99,22 @@ export const notesRepo = {
 
 	async upsert(note: Note): Promise<void> {
 		const db = await getDb();
+		const updatedAt = note.updatedAt ?? Date.now();
 		if (!note.workspaceId) {
 			await db.execute(
-				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 				 ON CONFLICT(id) DO UPDATE SET title = excluded.title, folder = excluded.folder, body = excluded.body,
 				 excerpt = excluded.excerpt, words = excluded.words, chars = excluded.chars, pinned = excluded.pinned,
-				 overlay = excluded.overlay, updated = excluded.updated`,
-				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated]
+				 overlay = excluded.overlay, updated = excluded.updated, updated_at = excluded.updated_at`,
+				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated, updatedAt]
 			);
 			await writeTags(note.id, note.tags);
 			return;
 		}
 		await db.execute(
-			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			 ON CONFLICT(id) DO UPDATE SET
 				workspace_id = excluded.workspace_id,
 				title = excluded.title,
@@ -122,7 +125,8 @@ export const notesRepo = {
 				chars = excluded.chars,
 				pinned = excluded.pinned,
 				overlay = excluded.overlay,
-				updated = excluded.updated`,
+				updated = excluded.updated,
+				updated_at = excluded.updated_at`,
 			[
 				note.id,
 				note.workspaceId ?? 'workspace-default',
@@ -135,6 +139,7 @@ export const notesRepo = {
 				note.pinned ? 1 : 0,
 				note.overlay ? 1 : 0,
 				note.updated,
+				updatedAt,
 			]
 		);
 		await writeTags(note.id, note.tags);
@@ -152,8 +157,8 @@ export const notesRepo = {
 		await db.execute('DELETE FROM notes');
 		for (const note of notes) {
 			await db.execute(
-				`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated)
-					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
+					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 				[
 					note.id,
 					note.workspaceId ?? 'workspace-default',
@@ -166,6 +171,7 @@ export const notesRepo = {
 					note.pinned ? 1 : 0,
 					note.overlay ? 1 : 0,
 					note.updated,
+					note.updatedAt ?? Date.now(),
 				]
 			);
 			await writeTags(note.id, note.tags);

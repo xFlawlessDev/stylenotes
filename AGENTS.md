@@ -6,6 +6,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 - `bun run dev` — Vite dev server only (frontend in browser; SQLite is stubbed, see below)
 - `bun run tauri dev` — full desktop app (required for DB, windows, plugins)
+- `bun run mcp:sidecar` — builds the `stylenotes-mcp` shim and copies it beside `src-tauri/` under the target-triple name (`beforeDevCommand`/`beforeBuildCommand` run this automatically)
 - `bun run build` — frontend build to `build/` (adapter-static SPA)
 - `bun run tauri build` — production bundle
 - `bun run check` — svelte-check + sync (typecheck frontend)
@@ -34,11 +35,21 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - **Fixed dev port 1420** with `strictPort`; Vite ignores `src-tauri/**`.
 - **Windows start invisible** (`visible: false`) and are revealed client-side: `revealCurrentWindow()` for the declared windows, `revealAndFocusCurrentWindow()` for note/task windows (they reveal themselves once the record is loaded). Don't remove that.
 
+## Local MCP (stdio)
+
+- **Binary + build.** The shim is `src-tauri/src/mcp/` (bin target `stylenotes-mcp`, `[[bin]]` in `Cargo.toml`) and is bundled via `bundle.externalBin` in `tauri.conf.json`. Tauri resolves that to `src-tauri/stylenotes-mcp-<target-triple>.exe`, so `scripts/mcp-sidecar.cjs` builds and copies it; it runs from `beforeDevCommand`/`beforeBuildCommand` and is **gitignored** (never commit the binary).
+- **No port, no auth (#D11).** Transport is stdio, one process per client, spawned by the MCP client itself. The trust boundary is "can run a local process", so there is no token to configure.
+- **Writes always go through the app (#D2).** The shim never opens SQLite: reads answer from `mcp/snapshot.json`, writes become job files in `mcp/jobs/` that the always-alive `workspace` window executes. `src-tauri/src/mcp_host.rs` owns the file bridge; `src/lib/stores/mcp-host.svelte.ts` runs in the workspace window and executes jobs through `src/lib/content/mcp-write-actions.ts` (validators + repos + `*-changed` events). Never add a second write path that bypasses the store.
+- **Reads are a snapshot (#D3).** `src/lib/content/mcp-snapshot.ts` builds it with the same `buildWorkspaceGraph`/`isTaskBlocked` the UI uses; the shim only filters. Default is **read-only**; write needs an explicit grant (`mcp_settings`, `meta:mcp/enabled`) and is audited (`mcp_audit`). MCP settings are **device-local** — keep them out of the synced `settings` row.
+- **Settings page** is `src/lib/components/workspace/McpSettings.svelte` (nav `AI & MCP` in `SettingsPanel.svelte`). `app-info.json`/`snapshot.json`/`backups/` live under `app_data_dir()/mcp/` and are **not** app data to commit.
+- Design + decisions: `docs/design/mcp-local-free.md` (#D1–#D16).
+
 ## Database / migrations
 
 - SQLite via `tauri-plugin-sql`; URL `sqlite:stylenotes.db` is defined in **two places that must stay in sync**: `src-tauri/src/lib.rs` (`DB_URL`) and `tauri.conf.json` `plugins.sql.preload`.
 - Schema/migrations live **only** in `src-tauri/src/lib.rs`. Add a new `Migration` entry with an incremented `version`; never edit an applied migration.
-- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `tasksRepo`, `metaRepo`). Stores in `src/lib/stores/` wrap these and call them.
+- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `tasksRepo`, `metaRepo`), `src/lib/db/ui-plugins.ts`, and `src/lib/db/mcp.ts` (`mcpRepo`). Stores in `src/lib/stores/` wrap these and call them.
+- **`notes.updated_at`** (migration 12) is the machine-readable timestamp; `notes.updated` stays a display string. Any new note write must set `updatedAt` (`notesRepo.upsert` stamps it when absent). Cloud-sync Phase 0 must **backfill**, not re-add the column.
 - Outside Tauri, `getDb()` rejects and stores fall back to seed data (`src/lib/content/content.ts`, markdown in `src/lib/content/notes/`). Guard new DB work with `browser`/`isTauri` and swallow errors like existing stores do.
 
 ## Tauri / capabilities
@@ -92,7 +103,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - Extract before extracting is painful: pull repeated JSX/markup into a child component, and repeated non-UI logic into a helper function with a test.
 - `src/lib/components/ui/**` (shadcn-svelte) and generated files (`src-tauri/gen/**`, `build/**`, `Cargo.lock`, `bun.lock`) are exempt from the cap — do not edit or split them by hand.
 - Tests may exceed 300 LOC when they cover one module; split by `describe` block only past the 500 cap.
-- Current known offender: `workspace/Workspace.svelte` (~540 lines). The former offenders (`DockRail.svelte`, `NoteEditor.svelte`, `SettingsPanel.svelte`) are back under the cap after the component-base refactor.
+- Current known offender: `workspace/Workspace.svelte` (~780 lines, over the hard cap — needs a split as part of the next change that touches it). The former offenders (`DockRail.svelte`, `NoteEditor.svelte`, `SettingsPanel.svelte`) are back under the cap after the component-base refactor.
 
 ## Skills
 

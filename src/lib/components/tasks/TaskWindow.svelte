@@ -6,6 +6,7 @@
 	import { createNote, type Note } from '$lib/content/content';
 	import { foldersFor, listNotes, loadFolders, persistNote, type CustomFolder } from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
+	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
 	import {
 		applySettingsSnapshot,
 		hydrateSettings,
@@ -108,6 +109,13 @@
 		startDate = toDateInput(current.startAt);
 		dueDate = toDateInput(current.dueAt);
 		loaded = true;
+	});
+
+	// Publish the unsaved-edit state so the MCP host refuses to overwrite it (#D4).
+	$effect(() => {
+		if (!taskId) return;
+		setPendingEdit('task', taskId, queue.state.dirty);
+		return () => setPendingEdit('task', taskId, false);
 	});
 
 	/** Persists form edits, debounced through the save queue. */

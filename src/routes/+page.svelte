@@ -5,6 +5,7 @@
 	import KanbanWindow from '$lib/components/tasks/KanbanWindow.svelte';
 	import NoteWindow from '$lib/components/note/NoteWindow.svelte';
 	import TaskWindow from '$lib/components/tasks/TaskWindow.svelte';
+	import McpHostWatch from '$lib/components/workspace/McpHostWatch.svelte';
 	import { refreshSettings, settings } from '$lib/stores/settings.svelte';
 	import { restoreKanbanLock } from '$lib/stores/kanban.svelte';
 	import { currentWindowRole, isTauri, revealCurrentWindow, type WindowRole } from '$lib/windows';
@@ -48,5 +49,6 @@
 {:else if role === 'task'}
 	<TaskWindow />
 {:else}
+	<McpHostWatch />
 	<Workspace />
 {/if}

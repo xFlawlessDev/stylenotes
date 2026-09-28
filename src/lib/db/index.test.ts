@@ -76,7 +76,11 @@ describe('notesRepo.upsert', () => {
 
 		const insert = execute.mock.calls.find(([sql]) => sql.includes('INSERT INTO notes'));
 		expect(insert).toBeDefined();
-		expect(insert![1]).toEqual(['n1', 'Alpha', 'work', 'body', 'body', 1, 4, 1, 1, 'Just now']);
+		// The last binding is the machine-readable `updated_at`, taken from the
+		// record or stamped with the current time (#D13).
+		const bound = insert![1] as unknown[];
+		expect(bound.slice(0, 10)).toEqual(['n1', 'Alpha', 'work', 'body', 'body', 1, 4, 1, 1, 'Just now']);
+		expect(typeof bound[10]).toBe('number');
 
 		expect(execute).toHaveBeenCalledWith('DELETE FROM tags WHERE note_id = $1', ['n1']);
 		expect(execute).toHaveBeenCalledWith('INSERT OR IGNORE INTO tags (note_id, tag) VALUES ($1, $2)', [

@@ -7,6 +7,8 @@ export type Note = {
   folder: string;
   tags: string[];
   updated: string;
+  /** Epoch milliseconds of the last write; the machine-readable `updated` (#D13). */
+  updatedAt?: number;
   pinned: boolean;
   overlay: boolean;
   excerpt: string;
@@ -40,6 +42,7 @@ export function createNote(seed: Partial<Note> = {}): Note {
     body,
     words: seed.words ?? countWords(body),
     chars: seed.chars ?? body.length,
+    updatedAt: seed.updatedAt,
   };
 }
 

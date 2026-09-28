@@ -247,7 +247,7 @@ export type NotePatch = Partial<
 
 /** Applies a patch and keeps the derived preview fields in sync. */
 export function applyNotePatch(note: Note, patch: NotePatch): Note {
-	const next: Note = { ...note, ...patch, updated: 'Just now' };
+	const next: Note = { ...note, ...patch, updated: 'Just now', updatedAt: Date.now() };
 	if (patch.body !== undefined) {
 		next.words = countWords(patch.body);
 		next.chars = patch.body.length;

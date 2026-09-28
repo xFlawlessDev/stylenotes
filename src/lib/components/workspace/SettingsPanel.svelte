@@ -14,6 +14,7 @@
 		HardDrive,
 		ShieldCheck,
 		PictureInPicture2,
+		Plug,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import {
@@ -25,6 +26,7 @@
 	import { appInfo } from '$lib/app-info';
 	import AppearanceSettings from '$lib/components/workspace/AppearanceSettings.svelte';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
+	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
 
 	let {
 		open = false,
@@ -40,13 +42,14 @@
 		notecount: number;
 	} = $props();
 
-	type Section = 'appearance' | 'editor' | 'dock' | 'data' | 'about';
+	type Section = 'appearance' | 'editor' | 'dock' | 'mcp' | 'data' | 'about';
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
 		{ id: 'appearance', label: 'Appearance', icon: Sun },
 		{ id: 'editor', label: 'Editor', icon: Type },
 		{ id: 'dock', label: 'Overlay', icon: PictureInPicture2 },
+		{ id: 'mcp', label: 'AI & MCP', icon: Plug },
 		{ id: 'data', label: 'Data', icon: HardDrive },
 		{ id: 'about', label: 'About', icon: Sparkles },
 	];
@@ -180,6 +183,10 @@
 
 					{#if section === 'dock'}
 						<DockSettings />
+					{/if}
+
+					{#if section === 'mcp'}
+						<McpSettings />
 					{/if}
 
 					{#if section === 'data'}

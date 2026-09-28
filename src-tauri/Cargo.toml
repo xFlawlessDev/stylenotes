@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+# The crate has two binaries (the app and the MCP shim), so `cargo run` — which
+# `tauri dev` invokes — must be told which one is the app. Without this it fails
+# with "could not determine which binary to run".
+default-run = "stylenotes"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,6 +17,12 @@ edition = "2021"
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "stylenotes_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# The local MCP server: a plain stdin/stdout JSON-RPC shim, bundled beside the
+# app via `bundle.externalBin` (docs/design/mcp-local-free.md #D1, #D12).
+[[bin]]
+name = "stylenotes-mcp"
+path = "src/mcp/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
