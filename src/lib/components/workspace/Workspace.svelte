@@ -43,9 +43,7 @@
 		type AppNotification,
 	} from '$lib/stores/notifications';
 	import TitleBar from '$lib/components/workspace/TitleBar.svelte';
-	import VaultRail from '$lib/components/workspace/VaultRail.svelte';
-	import NotesFeed from '$lib/components/workspace/NotesFeed.svelte';
-	import NoteEditor from '$lib/components/workspace/NoteEditor.svelte';
+	import NotesWorkspace from '$lib/components/workspace/NotesWorkspace.svelte';
 	import NotificationPanel from '$lib/components/workspace/NotificationPanel.svelte';
 	import WorkspaceOverlays from '$lib/components/workspace/WorkspaceOverlays.svelte';
 	import TaskBoard, { type TaskView } from '$lib/components/tasks/TaskBoard.svelte';
@@ -108,6 +106,7 @@
 	let taskFocusToken = $state(0);
 	let railOpen = $state(false);
 	let feedOpen = $state(false);
+	let assistantOpen = $state(false);
 	let workspaceLoading = false;
 
 	const folders = $derived(foldersFor(items, customFolders));
@@ -479,11 +478,6 @@
 		if (isTauri) void openNoteWindow(id);
 	}
 
-	function runNoteAction(id: string, action: (note: Note) => void) {
-		const note = items.find((item) => item.id === id);
-		if (note) action(note);
-	}
-
 	async function resetData() {
 		await clearNotes();
 		await resetStoredSettings();
@@ -519,6 +513,10 @@
 		if (event.defaultPrevented) return;
 		if (event.key === 'Escape' && fullPreview) {
 			fullPreview = false;
+			return;
+		}
+		if (event.key === 'Escape' && assistantOpen) {
+			assistantOpen = false;
 			return;
 		}
 		const mod = event.ctrlKey || event.metaKey;
@@ -603,6 +601,7 @@
 		}}
 		ontogglemode={toggleMode}
 		ontoggledock={toggleOverlay}
+		onassistant={() => (assistantOpen = !assistantOpen)}
 		notifications={notificationsSlot}
 	/>
 
@@ -630,89 +629,49 @@
 			/>
 		</div>
 	{:else}
-		<div class="ws-grid relative flex min-h-0 flex-1">
-			{#if railOpen}
-				<button
-					class="fixed inset-0 z-30 cursor-default bg-scrim/40 lg:hidden"
-					aria-label="Close folders"
-					onclick={() => (railOpen = false)}
-				></button>
-			{/if}
-			{#if feedOpen}
-				<button
-					class="fixed inset-0 z-30 cursor-default bg-scrim/40 md:hidden"
-					aria-label="Close notes list"
-					onclick={() => (feedOpen = false)}
-				></button>
-			{/if}
-			{#if !fullPreview}
-				<VaultRail
-					{folders}
-					{tags}
-					active={activeFolder}
-					{activeTag}
-					open={railOpen}
-					onclose={() => (railOpen = false)}
-					onselect={(id) => {
-						selectFolder(id);
-						feedOpen = true;
-					}}
-					oncreate={createNote}
-					onaddfolder={openAddFolder}
-					onrenamefolder={renameFolder}
-					onfoldericon={setFolderIcon}
-					ondeletedfolder={deleteFolder}
-					onreorder={reorderFolder}
-					onselecttag={selectTag}
-				/>
-
-				<NotesFeed
-					notes={visible}
-					{selectedId}
-					total={items.length}
-					folderLabel={activeFolder === 'all' ? 'All Notes' : (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)}
-					resetToken={newNoteToken}
-					showFolder={activeFolder === 'all'}
-					folderLabels={folderLabelMap}
-					{activeTag}
-					open={feedOpen}
-					onclose={() => (feedOpen = false)}
-					onselect={(id) => {
-						selectedId = id;
-						feedOpen = false;
-					}}
-					onpin={(id) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned })}
-					onselecttag={selectTag}
-					oncleartag={() => selectTag(null)}
-					onselectfolder={selectFolder}
-					onopenwindow={openNoteInWindow}
-					ontoggledock={(id) => updateNote(id, { overlay: !items.find((n) => n.id === id)?.overlay })}
-					ontogglearchive={toggleArchive}
-					onprint={(id) => runNoteAction(id, noteActions.print)}
-					onexport={(id) => runNoteAction(id, (note) => void noteActions.export(note))}
-					oncopy={(id) => runNoteAction(id, (note) => void noteActions.copy(note))}
-					ondelete={deleteNote}
-				/>
-			{/if}
-
-			<NoteEditor
-				note={selected}
-				notes={items}
-				tasks={tasks}
-				customFolders={customFolders}
-				onwikilink={handleWikiClick}
-				{folders}
-				focusToken={newNoteToken}
-				{fullPreview}
-				ontogglefullpreview={() => (fullPreview = !fullPreview)}
-				onupdate={updateNote}
-				ondelete={deleteNote}
-				onprint={noteActions.print}
-				onexport={noteActions.export}
-				oncopy={noteActions.copy}
-				onselectfolder={selectFolder}
-			/>
-		</div>
+		<NotesWorkspace
+			{items}
+			{visible}
+			{folders}
+			{customFolders}
+			{folderLabelMap}
+			{tags}
+			{selected}
+			bind:selectedId
+			activeFolder={activeFolder}
+			{activeTag}
+			{tasks}
+			{fullPreview}
+			newNoteToken={newNoteToken}
+			onwikilink={handleWikiClick}
+			bind:railOpen
+			bind:feedOpen
+			bind:assistantOpen
+			actions={{
+				selectfolder: selectFolder,
+				selecttag: selectTag,
+				newnote: createNote,
+				addfolder: openAddFolder,
+				renamefolder: renameFolder,
+				foldericon: setFolderIcon,
+				deletefolder: deleteFolder,
+				reorderfolder: reorderFolder,
+				selectnote: (id: string) => {
+					selectedId = id;
+				},
+				pin: (id: string) => updateNote(id, { pinned: !items.find((n) => n.id === id)?.pinned }),
+				openwindow: openNoteInWindow,
+				toggledock: (id: string) =>
+					updateNote(id, { overlay: !items.find((n) => n.id === id)?.overlay }),
+				togglearchive: toggleArchive,
+				printnote: (note: Note) => void noteActions.print(note),
+				exportnote: (note: Note) => void noteActions.export(note),
+				copynote: (note: Note) => void noteActions.copy(note),
+				deletenote: deleteNote,
+				updatenote: updateNote,
+				togglefullpreview: () => (fullPreview = !fullPreview)
+			}}
+		/>
 	{/if}
 
 	<WorkspaceOverlays

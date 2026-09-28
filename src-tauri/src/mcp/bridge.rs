@@ -268,7 +268,7 @@ pub fn app_not_running() -> Value {
 pub fn disabled() -> Value {
     protocol::tool_error(
         "mcp_disabled",
-        "The local MCP server is off. Turn it on in Settings → AI & MCP.",
+        "The local MCP server is off. Turn it on in Settings → MCP.",
     )
 }
 

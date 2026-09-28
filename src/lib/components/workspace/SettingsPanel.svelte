@@ -14,6 +14,7 @@
 		HardDrive,
 		ShieldCheck,
 		PictureInPicture2,
+		Bot,
 		Plug,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
@@ -26,6 +27,7 @@
 	import { appInfo } from '$lib/app-info';
 	import AppearanceSettings from '$lib/components/workspace/AppearanceSettings.svelte';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
+	import AiSettings from '$lib/components/workspace/AiSettings.svelte';
 	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
 
 	let {
@@ -42,14 +44,15 @@
 		notecount: number;
 	} = $props();
 
-	type Section = 'appearance' | 'editor' | 'dock' | 'mcp' | 'data' | 'about';
+	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'data' | 'about';
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
 		{ id: 'appearance', label: 'Appearance', icon: Sun },
 		{ id: 'editor', label: 'Editor', icon: Type },
 		{ id: 'dock', label: 'Overlay', icon: PictureInPicture2 },
-		{ id: 'mcp', label: 'AI & MCP', icon: Plug },
+		{ id: 'ai', label: 'AI', icon: Bot },
+		{ id: 'mcp', label: 'MCP', icon: Plug },
 		{ id: 'data', label: 'Data', icon: HardDrive },
 		{ id: 'about', label: 'About', icon: Sparkles },
 	];
@@ -183,6 +186,10 @@
 
 					{#if section === 'dock'}
 						<DockSettings />
+					{/if}
+
+					{#if section === 'ai'}
+						<AiSettings />
 					{/if}
 
 					{#if section === 'mcp'}

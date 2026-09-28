@@ -1013,3 +1013,49 @@ html.dark .markdown-body .shiki span {
 	color: var(--color-on-surface);
 	font-weight: 600;
 }
+
+/* Compact variant for embedded surfaces (AI chat bubbles, the assistant
+   popover): the base preview scale is tuned for a full-width page. */
+.markdown-body--compact {
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.markdown-body--compact h1,
+.markdown-body--compact h2,
+.markdown-body--compact h3,
+.markdown-body--compact h4 {
+	margin: 0.9rem 0 0.4rem;
+}
+
+.markdown-body--compact h1 {
+	font-size: 1.25rem;
+}
+
+.markdown-body--compact h2 {
+	font-size: 1.1rem;
+}
+
+.markdown-body--compact h3 {
+	font-size: 1rem;
+}
+
+.markdown-body--compact p {
+	margin: 0.5rem 0;
+}
+
+.markdown-body--compact ul,
+.markdown-body--compact ol {
+	margin: 0.5rem 0;
+	gap: 0.25rem;
+}
+
+.markdown-body--compact pre {
+	margin: 0.6rem 0;
+}
+
+.markdown-body--compact img,
+.markdown-body--compact .mermaid-diagram {
+	margin: 0.6rem 0;
+}
+

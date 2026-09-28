@@ -24,7 +24,7 @@ pub fn call(bridge: &Bridge, tool: &str, args: &Value, grant: &Grant, instance: 
         return protocol::tool_error(
             "write_not_granted",
             format!(
-                "Write access for `{}` is off. Enable it in Settings → AI & MCP.",
+                "Write access for `{}` is off. Enable it in Settings → MCP.",
                 descriptor.scope
             ),
         );

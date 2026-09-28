@@ -8,6 +8,7 @@ import {
 	toolsByKind,
 	toolsForScope,
 } from '$lib/content/mcp-tools';
+import { AI_TOOLS } from '$lib/content/ai-tool-schema';
 
 describe('MCP tool registry', () => {
 	it('has unique names', () => {
@@ -46,5 +47,26 @@ describe('MCP tool registry', () => {
 		for (const name of ['delete_note', 'delete_task']) {
 			expect(findTool(name)?.description.toLowerCase()).toContain('confirm');
 		}
+	});
+});
+
+describe('AI chat tool surface', () => {
+	it('only exposes tools that exist in the MCP registry', () => {
+		for (const spec of AI_TOOLS) {
+			expect(findTool(spec.name), `unknown tool ${spec.name}`).toBeDefined();
+		}
+	});
+
+	it('agrees with the registry on kind and scope', () => {
+		for (const spec of AI_TOOLS) {
+			const registry = findTool(spec.name)!;
+			expect(spec.kind, spec.name).toBe(registry.kind);
+			expect(spec.scope, spec.name).toBe(registry.scope);
+		}
+	});
+
+	it('has unique tool names', () => {
+		const names = AI_TOOLS.map((tool) => tool.name);
+		expect(new Set(names).size).toBe(names.length);
 	});
 });

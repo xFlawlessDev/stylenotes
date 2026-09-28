@@ -3,6 +3,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 #[cfg(desktop)]
 mod tray;
 
+mod ai;
 mod mcp_host;
 
 const DB_URL: &str = "sqlite:stylenotes.db";
@@ -435,6 +436,54 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // AI assistant (BYOK, device-local). The settings row stores only the
+        // encrypted key marker, never plaintext; chat history is local-only and
+        // is intentionally kept out of any future sync scope.
+        Migration {
+            version: 13,
+            description: "add_ai_assistant",
+            sql: "
+                CREATE TABLE IF NOT EXISTS ai_settings (
+                    id          INTEGER PRIMARY KEY CHECK (id = 1),
+                    enabled     INTEGER NOT NULL DEFAULT 0,
+                    provider    TEXT NOT NULL DEFAULT 'openai-compatible',
+                    base_url    TEXT NOT NULL DEFAULT '',
+                    model       TEXT NOT NULL DEFAULT '',
+                    temperature REAL NOT NULL DEFAULT 0.7,
+                    max_tokens  INTEGER NOT NULL DEFAULT 1024,
+                    api_key     TEXT NOT NULL DEFAULT '',
+                    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS ai_threads (
+                    id         TEXT PRIMARY KEY,
+                    title      TEXT NOT NULL DEFAULT '',
+                    note_id    TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS ai_messages (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    thread_id  TEXT NOT NULL,
+                    role       TEXT NOT NULL,
+                    content    TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_ai_messages_thread ON ai_messages (thread_id, id);
+            ",
+            kind: MigrationKind::Up,
+        },
+        // The AI assistant's own tool grant, independent of whether the MCP
+        // server is switched on. Read tools need no grant; write tools need
+        // `access = 'write'` plus the matching scope.
+        Migration {
+            version: 14,
+            description: "add_ai_tool_grant",
+            sql: "
+                ALTER TABLE ai_settings ADD COLUMN access TEXT NOT NULL DEFAULT 'read';
+                ALTER TABLE ai_settings ADD COLUMN scopes TEXT NOT NULL DEFAULT '[]';
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -461,7 +510,11 @@ pub fn run() {
             mcp_clear_snapshot,
             mcp_poll_job,
             mcp_write_result,
-            mcp_backup_note
+            mcp_backup_note,
+            ai::commands::ai_encrypt_key,
+            ai::commands::ai_decrypt_key,
+            ai::commands::ai_stream,
+            ai::commands::ai_test_connection
         ])
         .setup(|app| {
             // Lays down `mcp/`, clears stale jobs, and writes the first

@@ -10,6 +10,7 @@
 		Network,
 		FolderTree,
 		Rows3,
+		Sparkles,
 		Settings as SettingsIcon,
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
@@ -28,6 +29,7 @@
 		onsettings,
 		ontogglemode,
 		ontoggledock,
+		onassistant,
 		onsection,
 		onopenfolders,
 		onopennotes,
@@ -47,6 +49,7 @@
 		onsettings?: () => void;
 		ontogglemode?: () => void;
 		ontoggledock?: () => void;
+		onassistant?: () => void;
 		onsection?: (section: WorkspaceSection) => void;
 		onopenfolders?: () => void;
 		onopennotes?: () => void;
@@ -185,6 +188,25 @@
 		</Button>
 
 		<div class="glass-divider mx-0.5 hidden h-5 w-px sm:block"></div>
+
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="secondary"
+						size="icon"
+						shape="pill"
+						class="text-on-surface-variant"
+						aria-label="Toggle AI assistant"
+						onclick={onassistant}
+					>
+						<Sparkles size={16} />
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>AI assistant</Tooltip.Content>
+		</Tooltip.Root>
 
 		<Tooltip.Root>
 			<Tooltip.Trigger>

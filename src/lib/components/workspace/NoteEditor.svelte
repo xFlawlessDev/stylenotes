@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { Minimize2, PenLine, X } from '@lucide/svelte';
+	import { PenLine } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { type EditState, type EditorCommand } from '$lib/content/markdown-editor';
 	import { continueList, indentLines } from '$lib/content/markdown-lines';
@@ -19,12 +19,10 @@
 	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
-	import { openNoteWindow } from '$lib/windows';
-	import { Button, EmptyState, Input, Select, Textarea } from '$lib/components/base';
-	import NoteTags from '$lib/components/note/NoteTags.svelte';
+	import { Button, EmptyState, Textarea } from '$lib/components/base';
+	import NoteHeader from '$lib/components/note/NoteHeader.svelte';
+	import NoteEditorBar from '$lib/components/note/NoteEditorBar.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
-	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
-	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
@@ -250,6 +248,11 @@
 		if (next) applyEdit(next);
 	}
 
+	/** Applies AI-generated text to the body and restores the caret. */
+	function applyAi(nextBody: string, caret: number) {
+		applyEdit({ value: nextBody, start: caret, end: caret });
+	}
+
 	function onEditorKeydown(event: KeyboardEvent) {
 		if (suggestions?.items.length && handlePopoverKey(event)) return;
 
@@ -358,96 +361,37 @@
 			{/if}
 			<div class="relative flex min-h-0 flex-1 flex-col">
 				{#if note}
-			{#if fullPreview}
-				<div class="flex h-11 shrink-0 items-center justify-between px-4">
-					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-						>Full preview</span
-					>
-					<Button
-						variant="secondary"
-						size="xs"
-						shape="pill"
-						class="gap-1.5"
-						onclick={() => ontogglefullpreview?.()}
-					>
-						<Minimize2 size={13} /> Exit
-					</Button>
-				</div>
-			{:else if settings.focusMode}
-				<div class="flex h-11 shrink-0 items-center justify-between px-4">
-					<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-						>Focus mode</span
-					>
-					<Button
-						variant="secondary"
-						size="xs"
-						shape="pill"
-						class="gap-1.5"
-						onclick={() => updateSettings({ focusMode: false })}
-					>
-						<X size={13} /> Exit
-					</Button>
-				</div>
-			{:else}
-				<div class="flex h-10 shrink-0 items-center justify-end px-4">
-					<NoteToolbar
-						{view}
-						pinned={note.pinned}
-						docked={note.overlay}
-						{archived}
-						onview={changeView}
-						ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
-						ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
-						ontogglearchive={toggleArchive}
-						onopenwindow={() => void openNoteWindow(note.id)}
-						onprint={() => onprint?.(note)}
-						onexport={() => onexport?.(note)}
-						oncopy={() => oncopy?.(note)}
-						ondelete={() => ondelete(note.id)}
-						onfullpreview={() => ontogglefullpreview?.()}
-					/>
-				</div>
-			{/if}
+			<NoteEditorBar
+				{note}
+				{view}
+				{fullPreview}
+				{archived}
+				onview={changeView}
+				ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
+				ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
+				ontogglearchive={toggleArchive}
+				onprint={() => onprint?.(note)}
+				onexport={() => onexport?.(note)}
+				oncopy={() => oncopy?.(note)}
+				ondelete={() => ondelete(note.id)}
+				onfullpreview={() => ontogglefullpreview?.()}
+			/>
 
 			{#if !fullPreview}
-				<div class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
-					<div class="flex flex-wrap items-center gap-2">
-						<Button
-							bare
-							class="w-fit max-w-full truncate text-label-sm tracking-wide text-primary capitalize hover:brightness-110"
-							onclick={() => onselectfolder?.(note.folder)}
-						>
-							{folderLabel}
-						</Button>
-						{#if folderOptions.length}
-							<Select
-								bind:value={moveFolder}
-								placeholder="Move to…"
-								label="Move note to folder"
-								size="sm"
-								variant="chip"
-								class="max-w-full"
-								options={folderOptions}
-								onchange={moveToFolder}
-							/>
-						{/if}
-					</div>
-					<Input
-						variant="bare"
-						size="none"
-						class="w-full font-headline text-headline-xl font-bold tracking-tight placeholder:text-outline/60"
-						placeholder="Untitled note"
-						bind:value={title}
-						oninput={() => onupdate(note.id, { title })}
-					/>
-					<div class="flex flex-wrap items-center gap-1.5">
-						<NoteTags tags={note.tags} onchange={(tags) => onupdate(note.id, { tags })} />
-						<span class="text-code-sm font-code text-outline">{note.updated}</span>
-						<span class="ml-auto">
-							<EditorStatus {note} />
-						</span>
-					</div>
-				</div>
+				<NoteHeader
+					{note}
+					bind:title
+					draft={draft}
+					textarea={textareaEl}
+					{folderLabel}
+					{folderOptions}
+					bind:moveFolder
+					onmovefolder={moveToFolder}
+					{onselectfolder}
+					onupdatetitle={(value) => onupdate(note.id, { title: value })}
+					onupdatetags={(tags) => onupdate(note.id, { tags })}
+					onapplyai={applyAi}
+				/>
 			{/if}
 
 			{#if view !== 'preview'}

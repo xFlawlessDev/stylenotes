@@ -9,7 +9,8 @@
 		label,
 		disabled = false,
 		class: className,
-		oninput
+		oninput,
+		onchange
 	}: {
 		value?: number;
 		min?: number;
@@ -19,7 +20,10 @@
 		label?: string;
 		disabled?: boolean;
 		class?: string;
+		/** Fires continuously while dragging. */
 		oninput?: (value: number) => void;
+		/** Fires once when the user releases the thumb; use for persistence. */
+		onchange?: (value: number) => void;
 	} = $props();
 </script>
 
@@ -33,4 +37,5 @@
 	bind:value
 	class={cn('range-glass', className)}
 	oninput={(event) => oninput?.(Number(event.currentTarget.value))}
+	onchange={(event) => onchange?.(Number(event.currentTarget.value))}
 />
