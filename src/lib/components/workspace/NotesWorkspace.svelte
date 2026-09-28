@@ -32,6 +32,7 @@
 		fullPreview = false,
 		newNoteToken = 0,
 		onwikilink,
+		onchatwikilink,
 		railOpen = $bindable(false),
 		feedOpen = $bindable(false),
 		assistantOpen = $bindable(false),
@@ -51,6 +52,8 @@
 		fullPreview?: boolean;
 		newNoteToken?: number;
 		onwikilink?: (click: WikiClick) => void;
+		/** Wiki click from the AI chat, which has no source note. */
+		onchatwikilink?: (click: WikiClick) => void;
 		railOpen?: boolean;
 		feedOpen?: boolean;
 		assistantOpen?: boolean;
@@ -164,6 +167,7 @@
 				body: task.notes
 			}))}
 			workspaceId={selected?.workspaceId}
+			onwikilink={onchatwikilink}
 			onclose={() => (assistantOpen = false)}
 		/>
 	{/if}

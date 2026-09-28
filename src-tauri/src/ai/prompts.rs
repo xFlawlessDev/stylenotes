@@ -11,9 +11,11 @@ pub fn system_prompt(task: Task, instruction: Option<&str>) -> String {
         Task::Chat => {
             "You are the StyleNotes assistant, working across all of the user's notes and \
              tasks. Use the provided tools to find and read what you need before answering; \
-             never guess at their contents. When the user asks you to change something, call \
-             the matching tool — the app asks them to confirm before it runs. Answer clearly \
-             and briefly, using Markdown when it helps."
+             never guess at their contents. When you refer to an existing note or task, write \
+             it as a wiki link — [[Exact Title]] — so the user can click through to it. When \
+             the user asks you to change something, call the matching tool — the app asks \
+             them to confirm before it runs. Answer clearly and briefly, using Markdown when \
+             it helps."
         }
         Task::Summarize => {
             "Summarize the note the user provides. Lead with a one-sentence summary, \

@@ -5,7 +5,7 @@
 	import AiMessageBody from '$lib/components/note/AiMessageBody.svelte';
 	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import type { AiMessage, AiToolCall } from '$lib/content/ai-types';
-	import type { WikiSource } from '$lib/content/wiki-links';
+	import type { WikiSource, WikiClick } from '$lib/content/wiki-links';
 	import { mentionPool, mentionedIds } from '$lib/content/ai-mentions';
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
 	import { AI_TOOLS, toolDefinitions, toolLabel } from '$lib/content/ai-tool-schema';
@@ -29,12 +29,15 @@
 		notes = [],
 		tasks = [],
 		workspaceId,
+		onwikilink,
 		onclose
 	}: {
 		open?: boolean;
 		notes?: WikiSource[];
 		tasks?: WikiSource[];
 		workspaceId?: string;
+		/** Routes a `[[wiki link]]` clicked in a reply, like the note preview. */
+		onwikilink?: (click: WikiClick) => void;
 		onclose: () => void;
 	} = $props();
 
@@ -65,6 +68,12 @@
 		const el = scrollEl;
 		if (el) void tick().then(() => (el.scrollTop = el.scrollHeight));
 	});
+
+	/** Wiki link clicked in a reply: navigate, then close so the target shows. */
+	function followWikiLink(click: WikiClick) {
+		onwikilink?.(click);
+		onclose();
+	}
 
 	/** Asks the user to allow a write; resolves false if they decline. */
 	function requestWriteConsent(call: AiToolCall): Promise<boolean> {
@@ -257,7 +266,11 @@
 						<div
 							class="max-w-[92%] rounded-2xl bg-surface-container-lowest/40 px-3.5 py-2.5 text-body-sm font-body text-on-surface"
 						>
-							<AiMessageBody content={message.content} class="markdown-body markdown-body--compact" />
+							<AiMessageBody
+								content={message.content}
+								onwikilink={followWikiLink}
+								class="markdown-body markdown-body--compact"
+							/>
 						</div>
 						<Button
 							size="xs"

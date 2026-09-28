@@ -8,6 +8,9 @@ vi.mock('$lib/content/note-actions', () => ({
 vi.mock('$lib/content/mermaid-preview', () => ({
 	renderNotePreviewHtml: vi.fn(async (html: string) => html)
 }));
+vi.mock('$lib/content/preview-actions', () => ({
+	handlePreviewAction: vi.fn(async () => false)
+}));
 
 import AiMessageBody from './AiMessageBody.svelte';
 
@@ -55,6 +58,26 @@ describe('AiMessageBody', () => {
 		await settle();
 
 		expect(target.textContent).toContain('# Heading');
+
+		unmount(app);
+	});
+
+	it('forwards a wiki-link click', async () => {
+		const noteActions = await import('$lib/content/note-actions');
+		vi.mocked(noteActions.renderNoteHtml).mockResolvedValueOnce(
+			'<p><a class="wiki-link" href="#n1" data-wiki-target="n1" data-wiki-kind="note">Roadmap</a></p>'
+		);
+
+		const onwikilink = vi.fn();
+		const { target, app } = mountInto({ content: 'see [[Roadmap]]', onwikilink });
+		await settle();
+
+		target.querySelector<HTMLAnchorElement>('a.wiki-link')?.click();
+		await settle();
+
+		expect(onwikilink).toHaveBeenCalledWith(
+			expect.objectContaining({ target: { id: 'n1', kind: 'note' } })
+		);
 
 		unmount(app);
 	});

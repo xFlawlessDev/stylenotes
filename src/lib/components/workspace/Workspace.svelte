@@ -49,7 +49,7 @@
 	import TaskBoard, { type TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 	import GraphPage from '$lib/components/graph/GraphPage.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
-	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
+	import type { WikiClick, WikiEntity, WikiSource } from '$lib/content/wiki-links';
 	import { planWikiClick, wikiEntityFor } from '$lib/content/wiki-navigation';
 	import type { GraphNode } from '$lib/content/workspace-graph';
 	import {
@@ -329,6 +329,27 @@
 	async function handleWikiClick(click: WikiClick) {
 		const source = items.find((item) => item.id === selectedId);
 		if (!source) return;
+		await runWikiClick(click, source);
+	}
+
+	/**
+	 * Wiki click from the AI chat. The chat is global, so there is no open note
+	 * to resolve against: a rendered `[[link]]` already carries its target, and
+	 * an unresolved one creates the note in the active workspace.
+	 */
+	async function handleChatWikiClick(click: WikiClick) {
+		const source: WikiSource | undefined =
+			items.find((item) => item.id === selectedId) ?? items[0] ?? {
+				id: '',
+				title: '',
+				folder: 'personal',
+				workspaceId: workspaceStore.activeId
+			};
+		await runWikiClick(click, source);
+	}
+
+	/** Shared wiki-click outcome handling (open / choose / create). */
+	async function runWikiClick(click: WikiClick, source: WikiSource) {
 		const plan = planWikiClick(click, source, items, customFolders, tasks);
 		if (!plan) return;
 		if (plan.status === 'open') {
@@ -644,6 +665,7 @@
 			{fullPreview}
 			newNoteToken={newNoteToken}
 			onwikilink={handleWikiClick}
+			onchatwikilink={handleChatWikiClick}
 			bind:railOpen
 			bind:feedOpen
 			bind:assistantOpen
