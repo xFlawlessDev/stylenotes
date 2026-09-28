@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PencilLine, FolderPlus, Boxes, X } from '@lucide/svelte';
+	import { PencilLine, FolderPlus, Boxes, X, NotebookPen } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { defaultFolderIcons, resolveFolderIcon } from '$lib/content/folder-icons';
 	import { isCustomFolder } from '$lib/stores/notes';
@@ -91,14 +91,10 @@
 			<div
 				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-hairline"
 			>
-				<img
-				src="/icon-128.png"
-				alt="StyleNotes"
-				class="size-6 object-cover"
-				/>
+				<NotebookPen size={16} />
 			</div>
 			<div class="flex min-w-0 flex-col">
-				<span class="text-headline-sm font-headline leading-tight text-on-surface">StyleNotes</span>
+				<span class="text-headline-sm font-headline leading-tight text-on-surface">Notes</span>
 				<span class="text-label-sm font-label truncate text-outline">Your private notebook</span>
 			</div>
 			<Button
