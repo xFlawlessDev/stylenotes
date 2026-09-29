@@ -20,6 +20,8 @@
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { annotatePreviewLines } from '$lib/content/preview-lines';
 	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
+	import { outlineFor, scrollPreviewToHeading, trackPreviewHeadings } from '$lib/content/preview-toc-sync';
+	import type { TocEntry } from '$lib/content/preview-toc';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
@@ -91,7 +93,7 @@
 	let viewOverride = $state<{ id: string; view: EditorView } | null>(null);
 	let suggestions = $state<WikiSuggestionSet | null>(null);
 	let activeIndex = $state(0);
-
+	let tocEntries = $state<TocEntry[]>([]), tocActive = $state(-1);
 	/** Workspace-scoped pools, so the popover offers what a link can reach. */
 	const wikiContext = $derived({
 		source: note ?? { id: '', title: '', folder: '' },
@@ -232,6 +234,20 @@
 		};
 	});
 
+	/** Outline of the rendered preview, with the reading position from its scroll. */
+	$effect(() => {
+		const root = previewEl;
+		tocEntries = root ? outlineFor(root, html) : [];
+		tocActive = -1;
+		if (!root) return;
+		return trackPreviewHeadings(root, (index) => {
+			tocActive = index;
+		});
+	});
+	/** Jumps the preview to the heading the reader picked in the outline. */
+	function scrollToHeading(slug: string) {
+		if (previewEl) scrollPreviewToHeading(previewEl, slug);
+	}
 	function commitBody(value: string) {
 		if (!note) return;
 		draft = value;
@@ -441,6 +457,8 @@
 				spellcheck={settings.spellcheck}
 				{suggestions}
 				{activeIndex}
+				{tocEntries}
+				{tocActive}
 				bind:textareaEl
 				bind:previewEl
 				oninput={(value) => {
@@ -456,6 +474,7 @@
 				onpreviewclick={togglePreviewCheckbox}
 				onchoose={choose}
 				onhover={(position) => (activeIndex = position)}
+				ontocselect={scrollToHeading}
 			/>
 		{:else}
 			<EmptyState

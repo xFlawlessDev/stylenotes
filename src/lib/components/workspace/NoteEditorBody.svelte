@@ -2,7 +2,8 @@
 	import type { EditorView } from '$lib/stores/settings.svelte';
 	import { Textarea } from '$lib/components/base';
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
-	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
+	import PreviewSurface from '$lib/components/note/PreviewSurface.svelte';
+	import type { TocEntry } from '$lib/content/preview-toc';
 	import type { WikiSuggestion, WikiSuggestionSet } from '$lib/content/wiki-autocomplete';
 	import { t } from '$lib/i18n/index.svelte';
 
@@ -18,6 +19,8 @@
 		spellcheck,
 		suggestions,
 		activeIndex,
+		tocEntries = [],
+		tocActive = -1,
 		textareaEl = $bindable(),
 		previewEl = $bindable(),
 		oninput,
@@ -29,7 +32,8 @@
 		onpreviewscroll,
 		onpreviewclick,
 		onchoose,
-		onhover
+		onhover,
+		ontocselect
 	}: {
 		view: EditorView;
 		draft: string;
@@ -37,6 +41,8 @@
 		spellcheck: boolean;
 		suggestions: WikiSuggestionSet | null;
 		activeIndex: number;
+		tocEntries?: TocEntry[];
+		tocActive?: number;
 		textareaEl?: HTMLTextAreaElement | null;
 		previewEl?: HTMLDivElement | undefined;
 		oninput: (value: string) => void;
@@ -49,6 +55,7 @@
 		onpreviewclick: (event: MouseEvent) => void;
 		onchoose: (item: WikiSuggestion) => void;
 		onhover: (position: number) => void;
+		ontocselect: (slug: string) => void;
 	} = $props();
 
 	const open = $derived(!!suggestions?.items.length);
@@ -87,37 +94,30 @@
 				class="scrollbar-none h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
 				onscroll={oneditorscroll}
 			></Textarea>
-			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-			<div
-				bind:this={previewEl}
-				class="scrollbar-none h-full overflow-y-auto px-5 py-4"
+			<PreviewSurface
+				{html}
+				entries={tocEntries}
+				active={tocActive}
+				placeholder={t('notes.editor.previewHere')}
+				paneClass="px-5 py-4"
+				bind:previewEl
 				onscroll={onpreviewscroll}
 				onclick={onpreviewclick}
-			>
-				{#if html}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
-				{:else}
-					<p class="text-body-sm font-body text-outline">{t('notes.editor.previewHere')}</p>
-				{/if}
-			</div>
+				{ontocselect}
+			/>
 		</div>
 	{:else}
-		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-		<div
-			bind:this={previewEl}
-			class="scrollbar-none h-full overflow-y-auto px-6 py-4"
+		<PreviewSurface
+			{html}
+			entries={tocEntries}
+			active={tocActive}
+			bodyClass="mx-auto max-w-2xl"
+			paneClass="px-6 py-4"
+			placeholder={t('notes.editor.emptyPreview')}
+			bind:previewEl
 			onclick={onpreviewclick}
-		>
-			{#if html}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="markdown-body mx-auto max-w-2xl" use:hydrateMermaid>{@html html}</div>
-			{:else}
-				<p class="text-body-lg font-body text-outline">
-					{t('notes.editor.emptyPreview')}
-				</p>
-			{/if}
-		</div>
+			{ontocselect}
+		/>
 	{/if}
 
 	<WikiLinkPopover

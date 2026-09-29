@@ -53,6 +53,13 @@ export const notes = {
 		previewHere: 'Preview appears here.',
 		writePlaceholder: 'Start writing. Use the toolbar or shortcuts to format...',
 		splitPlaceholder: 'Write here...',
+		toc: {
+			title: 'On this page',
+			show: 'Show table of contents',
+			hide: 'Hide table of contents',
+			empty: 'No headings in this note.',
+			close: 'Close table of contents',
+		},
 		dropFiles: 'Drop files to attach',
 		titlePlaceholder: 'Untitled note',
 		titleLabel: 'Note title',

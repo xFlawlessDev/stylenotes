@@ -55,6 +55,13 @@ export const notes: NotesMessages = {
 		previewHere: 'Pratinjau muncul di sini.',
 		writePlaceholder: 'Mulai menulis. Gunakan toolbar atau pintasan untuk memformat...',
 		splitPlaceholder: 'Tulis di sini...',
+		toc: {
+			title: 'Di halaman ini',
+			show: 'Tampilkan daftar isi',
+			hide: 'Sembunyikan daftar isi',
+			empty: 'Tidak ada judul di catatan ini.',
+			close: 'Tutup daftar isi',
+		},
 		dropFiles: 'Lepaskan berkas untuk dilampirkan',
 		titlePlaceholder: 'Catatan tanpa judul',
 		titleLabel: 'Judul catatan',

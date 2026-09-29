@@ -7,6 +7,8 @@
 	import { clickedCheckboxIndex, enableTaskCheckboxes } from '$lib/content/markdown-preview';
 	import { annotatePreviewLines } from '$lib/content/preview-lines';
 	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
+	import type { TocEntry } from '$lib/content/preview-toc';
+	import { outlineFor, scrollPreviewToHeading, trackPreviewHeadings } from '$lib/content/preview-toc-sync';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
@@ -19,11 +21,12 @@
 	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { settings, type EditorView } from '$lib/stores/settings.svelte';
-	import { Textarea } from '$lib/components/base';
+	import Textarea from '$lib/components/base/textarea.svelte';
 	import EditorFormatBar from '$lib/components/workspace/EditorFormatBar.svelte';
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import PreviewSurface from '$lib/components/note/PreviewSurface.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import {
 		applyWikilink,
@@ -59,6 +62,8 @@
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
 	let guideOpen = $state(false);
+	let tocEntries = $state<TocEntry[]>([]);
+	let tocActive = $state(-1);
 	let focusedOnce = false;
 	let suggestions = $state<WikiSuggestionSet | null>(null);
 	let activeIndex = $state(0);
@@ -149,6 +154,32 @@
 			cancelled = true;
 		};
 	});
+
+	/**
+	 * The outline reflects every heading in the rendered preview, and the reading
+	 * position tracks the preview's scroll. Prerendered Mermaid diagrams are kept
+	 * out of both, so their labels cannot win the active highlight.
+	 */
+	$effect(() => {
+		const root = previewEl;
+		if (!root) {
+			tocEntries = [];
+			tocActive = -1;
+			return;
+		}
+
+		tocEntries = outlineFor(root, html);
+		tocActive = -1;
+
+		return trackPreviewHeadings(root, (index) => {
+			tocActive = index;
+		});
+	});
+
+	/** Jumps the preview to the heading the reader picked in the outline. */
+	function scrollToHeading(slug: string) {
+		if (previewEl) scrollPreviewToHeading(previewEl, slug);
+	}
 
 	function focusEnd() {
 		void tick().then(() => {
@@ -365,37 +396,29 @@
 						class="scrollbar-none h-full w-full overflow-y-auto px-3 py-3 leading-relaxed text-on-surface-variant"
 						onscroll={onEditorScroll}
 					></Textarea>
-					<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-					<div
-						bind:this={previewEl}
-						class="scrollbar-none h-full overflow-y-auto px-3 py-3"
+					<PreviewSurface
+						{html}
+						entries={tocEntries}
+						active={tocActive}
+						placeholder={t('notes.editor.previewHere')}
+						paneClass="px-3 py-3"
+						bind:previewEl
 						onscroll={onPreviewScroll}
 						onclick={togglePreviewCheckbox}
-					>
-						{#if html}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
-						{:else}
-							<p class="text-body-sm font-body text-outline">{t('notes.editor.previewHere')}</p>
-						{/if}
-					</div>
+						ontocselect={scrollToHeading}
+					/>
 				</div>
 			{:else}
-				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-				<div
-					bind:this={previewEl}
-					class="scrollbar-none h-full overflow-y-auto px-4 py-3"
+				<PreviewSurface
+					{html}
+					entries={tocEntries}
+					active={tocActive}
+					paneClass="px-4 py-3"
+					placeholder={t('notes.editor.emptyPreview')}
+					bind:previewEl
 					onclick={togglePreviewCheckbox}
-				>
-					{#if html}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
-					{:else}
-						<p class="text-body-md font-body text-outline">
-							{t('notes.editor.emptyPreview')}
-						</p>
-					{/if}
-				</div>
+					ontocselect={scrollToHeading}
+				/>
 			{/if}
 
 			<WikiLinkPopover

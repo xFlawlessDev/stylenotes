@@ -10,6 +10,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { noteMarkdown, type Note } from '$lib/content/content';
 import { preserveBlankLines } from '$lib/content/markdown-preview';
 import { repairLocalImageLinks, resolveLocalImages } from '$lib/content/attachments';
+import { TOC_DIGEST_ATTR } from '$lib/content/preview-toc';
 import { slugifyFolder } from '$lib/stores/notes';
 import { isTauri } from '$lib/windows';
 import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
@@ -34,7 +35,19 @@ function createMarkdownParser() {
 		renderWikiToken(parser, tokens, index, (env as { wiki?: WikiRenderContext }).wiki);
 	parser.renderer.rules.heading_open = (tokens, index, options, env, renderer) => {
 		const inline = tokens[index + 1];
-		if (inline?.type === 'inline') tokens[index].attrSet('id', slugifyHeading(inline.content));
+		if (inline?.type === 'inline') {
+			// Anchors from wiki links (`[[Note#Heading]]`) and the table of
+			// contents both target these ids, so they must be unique per note.
+			const base = slugifyHeading(inline.content);
+			const seen = (env as { headingIds?: Map<string, number> }).headingIds ?? new Map();
+			const count = seen.get(base) ?? 0;
+			seen.set(base, count + 1);
+			(env as { headingIds?: Map<string, number> }).headingIds = seen;
+			tokens[index].attrSet('id', count === 0 ? base : `${base}-${count + 1}`);
+			// Read back by the outline sync: toggling this changes the table of
+			// contents without changing the rendered body.
+			tokens[index].attrSet(TOC_DIGEST_ATTR, '');
+		}
 		return renderer.renderToken(tokens, index, options);
 	};
 	parser.use(taskLists, { enabled: true, label: false });
