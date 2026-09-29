@@ -5,13 +5,16 @@
 	import { workspaceColorClass } from '$lib/workspace';
 	import ManageWorkspacesDialog from '$lib/components/workspace/ManageWorkspacesDialog.svelte';
 
-	let { activeId, workspaces, onchange, oncreate, onrename, ondelete }: {
+	let { activeId, workspaces, onchange, oncreate, onrename, ondelete, unsaved }: {
 		activeId: string;
 		workspaces: { id: string; name: string; color: string }[];
 		onchange?: (id: string) => void;
 		oncreate?: (name: string) => boolean | Promise<boolean>;
 		onrename?: (id: string, name: string) => boolean | Promise<boolean>;
 		ondelete?: (id: string) => boolean | Promise<boolean>;
+		unsaved?: (
+			id: string
+		) => { notes: string[]; tasks: string[] } | Promise<{ notes: string[]; tasks: string[] }>;
 	} = $props();
 
 	/** Dropdown state, bound to the select so the footer can close it first. */
@@ -62,5 +65,6 @@
 		{oncreate}
 		{onrename}
 		{ondelete}
+		{unsaved}
 	/>
 </div>

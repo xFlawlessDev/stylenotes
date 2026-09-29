@@ -621,6 +621,7 @@ pub fn run() {
             mcp_backup_note,
             db_tx::note_upsert_tx,
             db_tx::note_remove_tx,
+            db_tx::workspace_remove_tx,
             quit::app_quit_ready,
             ai::commands::ai_encrypt_key,
             ai::commands::ai_decrypt_key,

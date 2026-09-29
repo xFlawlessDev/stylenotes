@@ -1,6 +1,6 @@
 ---
 name: stylenotes-mcp
-description: Query and edit a StyleNotes workspace through its local MCP server — search notes, trace wiki-link graphs, inspect task dependencies, and create or update notes, tasks, workspaces. Use when the user mentions StyleNotes, a StyleNotes vault or workspace, notes and tasks backed by StyleNotes, wiki links between notes, blocked tasks or a dependency chain, or asks to read or change data in StyleNotes. Do not use for generic markdown notes unrelated to StyleNotes.
+description: Query and edit a StyleNotes workspace through its local MCP server — search notes, trace wiki-link graphs, inspect task dependencies, and create or update notes, tasks, workspaces. Use when the user mentions StyleNotes, a StyleNotes vault or workspace, notes and tasks backed by StyleNotes, wiki links between notes, blocked tasks or a dependency chain, or asks to read or change data in StyleNotes. Also use when the user treats StyleNotes as their second brain or knowledge base and wants an answer recalled from, connected across, or filed back into their own notes. Do not use for generic markdown notes unrelated to StyleNotes.
 license: MIT
 compatibility: Requires a running StyleNotes desktop app on the same machine with its local MCP server enabled in Settings. Tools are reached over stdio; no network access is needed.
 metadata:
@@ -10,12 +10,34 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes a **local** MCP server: 24 tools (11 read, 13 write) over stdio.
+StyleNotes exposes a **local** MCP server: 27 tools (14 read, 13 write) over stdio.
 A thin shim process talks to the running desktop app through a file bridge, so
 every write goes through the same validation the UI uses.
 
 This skill tells you which tool to reach for, the order to call them in, and the
 traps that make results look wrong when you ignore them.
+
+## What StyleNotes is for
+
+StyleNotes is a **second brain** — a local-first home for personal knowledge.
+Treat a workspace as a vault, not as a table of records:
+
+- **Notes are thoughts.** A note holds prose, tags and a folder, and reaches the
+  rest of the vault through `[[wiki links]]`. Those links form a graph.
+- **Tasks are commitments** hanging off that knowledge, with statuses,
+  priorities, due dates and dependency edges.
+- **Folders, tags and wiki links are three ways into the same corpus.** Folders
+  are for filing, tags for cross-cutting themes, wiki links for meaning. The
+  graph is what makes it a brain rather than a filing cabinet.
+
+So the useful work here is not "list my rows". It is answering a question from
+the user's own notes, connecting two things they never linked by hand, and
+filing a new thought back where they will find it again. Lean on `context`,
+`search_notes` and `graph_query` for recall, `get_note` for the text and its
+links, and `daily_summary` for the human view of a day.
+
+The vault belongs to the user. Prefer the wording and structure they already
+use; do not re-file, re-tag or rewrite a note that was not part of the request.
 
 ## Core mental model
 
@@ -65,6 +87,7 @@ Pick the narrowest tool that answers the question:
 | "Find my note about X" | `search_notes { query, workspace }` |
 | "Show that note" | `get_note { id }` |
 | "What links to / from this note?" | `get_note` — its `backlinks` / `outlinks` |
+| "What folders / tags do I have?" | `list_folders` / `list_tags` |
 | "How is the board?" | `task_board { workspace }` |
 | "What is due / in progress?" | `daily_summary { workspace }` |
 | "Why is this task stuck?" | `get_task { id }` — `blockedBy`, `blockedByTasks` |
@@ -111,6 +134,14 @@ These are the mistakes that make a correct server look broken:
 - **Trusting `dueAt` strings as dates.** They are `YYYY-MM-DD`. `overdueOnly`
   compares them against the snapshot's own day, so a task due in the future is
   never overdue, and a `done` task never is.
+- **Filing with a label instead of an id.** `folder` is an exact folder id in
+  `list_notes` and in `update_note`; a display name silently matches nothing.
+  Call `list_folders` first.
+- **Tagging with invented tags.** Nothing deduplicates them for you. Run
+  `list_tags` and reuse what is there, or the vault grows `spec`, `Spec` and
+  `specs` as three unrelated themes.
+- **Editing a note's title or tags with `update_note_body`.** It replaces the
+  body and leaves metadata alone. Metadata is `update_note`.
 - **Deleting without `confirm`.** `delete_note`, `delete_task` and
   `delete_workspace` return `bad_arguments` unless the call includes
   `confirm: true`. This is deliberate; confirm with the user first.
@@ -118,6 +149,12 @@ These are the mistakes that make a correct server look broken:
   `workspace-default` and the last remaining workspace with `last_workspace`.
 - **Reading a stale snapshot as truth.** Check `appRunning` in the response
   metadata; when false, the data is the last known state and writes will fail.
+- **Answering from the snapshot field you saw first.** A note's `body` may be
+  truncated in index-only mode and a `list_notes` hit carries only an excerpt.
+  Read the full note with `get_note` before quoting it back to the user.
+- **Reporting graph edges as prose.** `degree` counts both directions;
+  `orphan: true` means no wiki link at all. A note with a high `degree` is a hub,
+  not necessarily an authority — say what it links to, not how important it is.
 
 ## Minimal examples
 
@@ -145,6 +182,6 @@ Trace a dependency chain:
 
 ## Reference
 
-- [references/tool-reference.md](references/tool-reference.md) — all 24 tools, arguments, response fields.
+- [references/tool-reference.md](references/tool-reference.md) — all 27 tools, arguments, response fields.
 - [references/errors.md](references/errors.md) — error codes, causes, and fixes.
-- [references/workflows.md](references/workflows.md) — longer end-to-end recipes.
+- [references/workflows.md](references/workflows.md) — longer end-to-end recipes, including second-brain recall and capture.

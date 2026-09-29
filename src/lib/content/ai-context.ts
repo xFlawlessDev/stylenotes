@@ -37,7 +37,8 @@ export async function loadToolContext(): Promise<ToolContext> {
 		notes,
 		tasks,
 		dependencies,
-		workspaceIds: new Set(workspaceStore.items.map((workspace) => workspace.id))
+		workspaceIds: new Set(workspaceStore.items.map((workspace) => workspace.id)),
+		workspaces: workspaceStore.items.map((workspace) => ({ ...workspace }))
 	};
 
 	const snapshot = buildMcpSnapshot({

@@ -9,11 +9,20 @@
  * listens for, so every open window refreshes without a restart.
  */
 
-import { browser } from '$app/environment';
-import { emit } from '@tauri-apps/api/event';
 import { buildExcerpt, countWords, createNote, type Note } from '$lib/content/content';
 import { formatRelative } from '$lib/content/version-format';
-import type { McpErrorCode } from '$lib/content/mcp-types';
+import {
+	fail,
+	findNote,
+	noteOrError,
+	notify,
+	parseEntityRef,
+	resolveWorkspace,
+	taskOrError,
+	workspaceGone,
+	type WriteContext,
+	type WriteOutcome
+} from '$lib/content/mcp-write-context';
 import { dependenciesRepo, foldersRepo, notesRepo, tasksRepo } from '$lib/db';
 import { NOTES_CHANGED } from '$lib/stores/notes';
 import { DEPENDENCIES_CHANGED } from '$lib/stores/dependencies.svelte';
@@ -30,97 +39,10 @@ import {
 	type TaskDependency,
 	type TaskPatch,
 } from '$lib/stores/tasks';
-import { isTauri } from '$lib/windows';
 
-/** Outcome of a write: either data for the shim, or a coded error. */
-export type WriteOutcome =
-	| { ok: true; data: unknown }
-	| { ok: false; error: McpErrorCode; message: string };
-
-/** Everything a write action may read and mutate. */
-export type WriteContext = {
-	notes: Note[];
-	tasks: Task[];
-	dependencies: TaskDependency[];
-	workspaceIds: Set<string>;
-	/** Full workspace records: workspace tools need ids, names and colours. */
-	workspaces?: { id: string; name: string; color: string; createdAt: string }[];
-};
-
-export function fail(error: McpErrorCode, message: string): WriteOutcome {
-	return { ok: false, error, message };
-}
-
-/** Resolves a workspace argument, rejecting an unknown id instead of guessing. */
-export function resolveWorkspace(
-	context: WriteContext,
-	workspace: string | undefined
-): { ok: true; id: string } | { ok: false; error: McpErrorCode; message: string } {
-	if (!workspace) return { ok: true, id: 'workspace-default' };
-	if (!context.workspaceIds.has(workspace)) {
-		return { ok: false, error: 'unknown_workspace', message: `Unknown workspace \`${workspace}\`.` };
-	}
-	return { ok: true, id: workspace };
-}
-
-async function notify(channel: string): Promise<void> {
-	if (!browser || !isTauri) return;
-	await emit(channel).catch(() => undefined);
-}
-
-/**
- * Splits a `<workspaceId>/<entityId>` reference into its parts, or returns the
- * bare id. Every id in an MCP response is prefixed (§13b), so an agent will
- * usually echo one back and the write path must accept it just like reads do.
- */
-export function parseEntityRef(raw: string): { workspaceId: string | null; id: string } {
-	const slash = raw.indexOf('/');
-	if (slash <= 0 || slash === raw.length - 1) return { workspaceId: null, id: raw };
-	return { workspaceId: raw.slice(0, slash), id: raw.slice(slash + 1) };
-}
-
-type RecordLike = { id: string; workspaceId?: string };
-
-/**
- * Resolves a record by bare id or prefixed ref. Returns an error when a bare id
- * matches more than one workspace, so an ambiguous call never edits the wrong
- * record (§13b).
- */
-function resolveRecord<T extends RecordLike>(
-	records: T[],
-	raw: string
-): { found: T } | WriteOutcome {
-	const { workspaceId, id } = parseEntityRef(raw);
-	const matches = records.filter(
-		(record) =>
-			record.id === id &&
-			(workspaceId === null || (record.workspaceId || 'workspace-default') === workspaceId)
-	);
-	if (matches.length === 0) return { ok: false, error: 'not_found', message: `No record with id \`${raw}\`.` };
-	if (matches.length > 1) {
-		return {
-			ok: false,
-			error: 'ambiguous_id',
-			message: `\`${id}\` exists in more than one workspace; use a <workspaceId>/<id> prefix.`,
-		};
-	}
-	return { found: matches[0] };
-}
-
-function findNote(context: WriteContext, id: string): Note | undefined {
-	const resolved = resolveRecord(context.notes, id);
-	return 'found' in resolved ? resolved.found : undefined;
-}
-
-/** Resolves a task id for a tool call, surfacing `ambiguous_id`/`not_found`. */
-function taskOrError(context: WriteContext, raw: string): { found: Task } | WriteOutcome {
-	return resolveRecord(context.tasks, raw);
-}
-
-/** Resolves a note id for a tool call, surfacing `ambiguous_id`/`not_found`. */
-function noteOrError(context: WriteContext, raw: string): { found: Note } | WriteOutcome {
-	return resolveRecord(context.notes, raw);
-}
+/** Re-exported so existing importers keep working; the source is the context module. */
+export type { WriteContext, WriteOutcome } from '$lib/content/mcp-write-context';
+export { parseEntityRef, resolveWorkspace, unsavedInWorkspace } from '$lib/content/mcp-write-context';
 
 // --- notes ------------------------------------------------------------------
 
@@ -171,6 +93,8 @@ export async function updateNoteBodyAction(
 	const found = noteOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const note = found.found;
+	const gone = workspaceGone(context, note.workspaceId);
+	if (gone) return gone;
 	const updatedAt = Date.now();
 	const next = {
 		...note,
@@ -192,6 +116,91 @@ export async function updateNoteBodyAction(
 
 export type DeleteNoteArgs = { id?: unknown; workspace?: string };
 
+/**
+ * Metadata-only patch for a note: title, folder, tags, pinned.
+ *
+ * `update_note_body` owns the prose; this owns everything around it, so an
+ * agent that captured a note into the wrong folder or without tags can fix it
+ * afterwards (#D17). An absent key means "leave it"; `null` is ignored too,
+ * because there is no meaningful null for a title or a folder.
+ */
+export type NotePatch = {
+	title?: string;
+	folder?: string;
+	tags?: string[];
+	pinned?: boolean;
+};
+
+export type UpdateNoteArgs = { id?: unknown; patch?: unknown; workspace?: string };
+
+export function sanitizeNotePatch(raw: Record<string, unknown>): NotePatch {
+	const patch: NotePatch = {};
+	if (typeof raw.title === 'string' && raw.title.trim()) patch.title = raw.title.trim();
+	if (typeof raw.folder === 'string' && raw.folder.trim()) patch.folder = raw.folder.trim();
+	if (Array.isArray(raw.tags)) {
+		patch.tags = [
+			...new Set(raw.tags.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean))
+		];
+	}
+	if (typeof raw.pinned === 'boolean') patch.pinned = raw.pinned;
+	return patch;
+}
+
+/**
+ * True when the patch asks for a title that is blank.
+ *
+ * A blank title is rejected rather than dropped: dropping it would turn the call
+ * into a silent no-op that still reports success, and a model that meant to
+ * rename a note has no way to notice.
+ */
+export function hasBlankTitle(raw: unknown): boolean {
+	if (!raw || typeof raw !== 'object') return false;
+	const title = (raw as Record<string, unknown>).title;
+	return typeof title === 'string' && !title.trim();
+}
+
+export async function updateNoteAction(
+	context: WriteContext,
+	args: UpdateNoteArgs
+): Promise<WriteOutcome> {
+	if (typeof args.id !== 'string') return fail('bad_arguments', '`id` is required.');
+	const found = noteOrError(context, args.id);
+	if (!('found' in found)) return found;
+	const note = found.found;
+	const gone = workspaceGone(context, note.workspaceId);
+	if (gone) return gone;
+	if (!args.patch || typeof args.patch !== 'object') {
+		return fail('bad_arguments', '`patch` is required.');
+	}
+	if (hasBlankTitle(args.patch)) {
+		return fail('bad_arguments', '`title` must not be empty.');
+	}
+	const patch = sanitizeNotePatch(args.patch as Record<string, unknown>);
+	const next = { ...note, ...patch };
+	// A note cannot be without a title, and an empty patch would otherwise
+	// report success while changing nothing.
+	if (!next.title.trim()) return fail('bad_arguments', '`title` must not be empty.');
+	try {
+		await notesRepo.upsert(next);
+	} catch {
+		return fail('write_failed', 'The note could not be saved.');
+	}
+	await notify(NOTES_CHANGED);
+	return {
+		ok: true,
+		data: {
+			note: {
+				id: next.id,
+				workspaceId: next.workspaceId,
+				title: next.title,
+				folder: next.folder,
+				tags: next.tags,
+				pinned: next.pinned
+			}
+		}
+	};
+}
+
 export async function deleteNoteAction(
 	context: WriteContext,
 	args: DeleteNoteArgs
@@ -200,6 +209,8 @@ export async function deleteNoteAction(
 	const found = noteOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const note = found.found;
+	const gone = workspaceGone(context, note.workspaceId);
+	if (gone) return gone;
 	try {
 		await notesRepo.remove(note.id);
 	} catch {
@@ -279,6 +290,8 @@ export async function updateTaskAction(
 	const found = taskOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const task = found.found;
+	const gone = workspaceGone(context, task.workspaceId);
+	if (gone) return gone;
 	const rawPatch = args.patch;
 	if (!rawPatch || typeof rawPatch !== 'object') return fail('bad_arguments', '`patch` is required.');
 	const patch = sanitizeTaskPatch(rawPatch as Record<string, unknown>);
@@ -319,6 +332,8 @@ export async function completeTaskAction(
 	const found = taskOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const task = found.found;
+	const gone = workspaceGone(context, task.workspaceId);
+	if (gone) return gone;
 	const next = applyTaskPatch(task, { status: 'done' });
 	try {
 		await tasksRepo.upsert(next);
@@ -337,6 +352,8 @@ export async function deleteTaskAction(
 	const found = taskOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const task = found.found;
+	const gone = workspaceGone(context, task.workspaceId);
+	if (gone) return gone;
 	try {
 		await tasksRepo.remove(task.id);
 	} catch {

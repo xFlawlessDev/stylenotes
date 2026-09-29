@@ -66,6 +66,77 @@ is blocked, and the longest chain. Do not dump raw JSON at the user.
 `graph_query` with `kind: ["wiki"]` excludes dependency edges, so a note graph
 stays readable. Use `kind: ["dependency"]` to explore task chains instead.
 
+## "What do my notes say about X?"
+
+The recall loop: search, read the text, walk one hop, answer with sources.
+
+```
+1. list_workspaces { }                 -> pick the vault the user means
+2. context         { query, workspace }         -> scored hits + neighbours
+   (fall back to search_notes when context returns nothing)
+3. get_note        { id }                        -> the full body, not the excerpt
+4. graph_query     { id, depth: 2, kind: ["wiki"] } -> what the hits connect to
+5. Answer in prose, citing note titles, and say plainly when the vault is silent
+```
+
+Rules for a recall answer:
+
+- Answer **from the notes**, not from your own knowledge; the user is asking what
+  *they* wrote. If the notes only touch the topic, say so.
+- Cite the note titles you used so the user can open them.
+- Never invent a note or a link. If `context` and `search_notes` both come back
+  empty, report that the vault has nothing on the topic.
+- One hop is usually enough; `depth` above 2 drags in loosely related notes.
+
+## Capture a thought into the vault
+
+Second-brain writes are **additive**: file the thought, link it, leave the rest
+alone.
+
+```
+1. list_workspaces { }                   -> confirm the target vault
+2. search_notes    { query, workspace }  -> is there already a note for this?
+3. list_folders    { workspace }         -> pick a real folder id
+   list_tags       { workspace }         -> reuse the vocabulary that exists
+4. create_note     { title, body, folder, tags, workspace }
+5. get_note        { id }                -> verify the body and its links landed
+```
+
+- Search before creating. A second brain rots when the same idea gets three
+  notes; extend the existing one with `update_note_body` instead.
+- Write the body in `[[wiki links]]` to any related note so the new thought
+  joins the graph instead of landing in it as an orphan.
+- `update_note_body` replaces the **whole** body. Read it first and carry the
+  user's existing prose forward — never overwrite a note with a summary of it.
+- When the thought implies an action, `create_task` with `noteIds: [<note id>]`
+  so the commitment stays attached to the reasoning behind it.
+
+## Tidy a note that was captured badly
+
+Capture is fast and often wrong: a title of "Untitled note", no tags, filed in
+the wrong folder. Repairing that is metadata work, so it is `update_note`, not
+`update_note_body`.
+
+```
+1. search_notes { query, workspace }         -> find the note ref
+2. get_note     { id }                       -> read it, so the new title matches the content
+3. list_folders { workspace }                -> a real folder id
+   list_tags    { workspace }                -> the tags that already exist
+4. update_note  { id, patch: { title, folder, tags } }
+5. get_note     { id }                       -> verify
+```
+
+- Send only the fields that change; everything omitted is left alone.
+- Never pass `body` here — that is `update_note_body`'s job, and mixing the two
+  in one intention is how prose gets lost.
+- Tags are replaced wholesale, so send the full intended list. Check `list_tags`
+  first: `spec` and `Spec` are two different tags to the vault.
+- Confirm the new title with the user when you are inventing one. The vault is
+  theirs, and a tidy note with a title they would not have chosen is still a
+  note they have to fix.
+
+## Add work to the vault
+
 ## Create a workspace and seed it
 
 ```
@@ -98,6 +169,15 @@ user still wants; do not summarise it away.
 
 ## Rules of thumb
 
+- **A workspace is a vault.** StyleNotes is the user's second brain, kept local.
+  Notes are thoughts, tasks are commitments, and the wiki links between notes are
+  the point of the thing.
+- **Recall beats invention.** When the user asks a question about their own
+  world, answer from the vault and cite the note titles; never fill a gap from
+  your own knowledge without saying so.
+- **Add, don't rearrange.** File new thoughts where they will be found, link
+  them, and leave notes the user did not ask you to touch alone. Repairing a
+  note you were pointed at is fine; sweeping the vault is not.
 - One write, then verify. Do not chain several writes and report at the end.
 - Prefer `get_task` / `get_note` over guessing a field from a list response.
 - When a call is refused, explain the code and the fix — never invent a cause.

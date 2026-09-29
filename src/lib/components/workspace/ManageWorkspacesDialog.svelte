@@ -12,6 +12,7 @@
 		oncreate,
 		onrename,
 		ondelete,
+		unsaved,
 	}: {
 		open?: boolean;
 		workspaces: { id: string; name: string; color: string }[];
@@ -19,6 +20,14 @@
 		oncreate?: (name: string) => boolean | Promise<boolean>;
 		onrename?: (id: string, name: string) => boolean | Promise<boolean>;
 		ondelete?: (id: string) => boolean | Promise<boolean>;
+		/**
+		 * Notes and tasks of the workspace that a detail window is still
+		 * editing. Their debounced save can land after the cascade, so the
+		 * dialog warns before deleting. Empty/absent means nothing pending.
+		 */
+		unsaved?: (
+			id: string
+		) => { notes: string[]; tasks: string[] } | Promise<{ notes: string[]; tasks: string[] }>;
 	} = $props();
 
 	let createName = $state('');
@@ -28,11 +37,18 @@
 	let editTouched = $state(false);
 	/** Workspace whose delete is waiting for confirmation. */
 	let confirmId = $state<string | null>(null);
+	/** Dirty notes/tasks found when the confirm was opened, if any. */
+	let unsavedWarning = $state<{ notes: string[]; tasks: string[] } | null>(null);
 	let actionError = $state('');
 	let busy = $state(false);
 
 	const trimmedCreate = $derived(createName.trim());
 	const trimmedEdit = $derived(editName.trim());
+
+	/** True when the workspace about to be removed has unsaved local edits. */
+	const hasUnsavedWarning = $derived(
+		!!unsavedWarning && (unsavedWarning.notes.length > 0 || unsavedWarning.tasks.length > 0)
+	);
 
 	const createError = $derived.by(() => {
 		if (!createTouched) return '';
@@ -68,6 +84,7 @@
 			editName = '';
 			editTouched = false;
 			confirmId = null;
+			unsavedWarning = null;
 			actionError = '';
 			busy = false;
 		}
@@ -91,10 +108,32 @@
 
 	function startRename(id: string, name: string) {
 		confirmId = null;
+		unsavedWarning = null;
 		editingId = id;
 		editName = name;
 		editTouched = false;
 		actionError = '';
+	}
+
+	/**
+	 * Opens the delete confirmation. The dirty check runs here, when the user
+	 * asks to delete: the warning must reflect the edits pending at that moment,
+	 * not the state from when the dialog was opened.
+	 */
+	async function askDelete(id: string) {
+		editingId = null;
+		actionError = '';
+		unsavedWarning = null;
+		confirmId = id;
+		const found = await unsaved?.(id);
+		// The user may have dismissed the confirm (or deleted another row) while
+		// the check was reading; only apply it to the row still being confirmed.
+		if (found && confirmId === id) unsavedWarning = found;
+	}
+
+	function cancelDelete() {
+		confirmId = null;
+		unsavedWarning = null;
 	}
 
 	async function rename(event: SubmitEvent) {
@@ -120,10 +159,17 @@
 		busy = false;
 		if (ok) {
 			confirmId = null;
+			unsavedWarning = null;
 			editingId = editingId === id ? null : editingId;
 		} else {
 			actionError = t('shell.workspace.error.delete');
 		}
+	}
+
+	/** Titles shown in the unsaved-edits warning, capped so the row stays short. */
+	function unsavedTitles(list: string[]): string {
+		const shown = list.slice(0, 3).join(', ');
+		return list.length > 3 ? `${shown}, +${list.length - 3}` : shown;
 	}
 </script>
 
@@ -202,14 +248,38 @@
 							{/if}
 						</div>
 					{:else if confirmId === workspace.id}
-						<div class="flex min-w-0 flex-1 items-center gap-2">
-							<p class="min-w-0 flex-1 truncate text-body-sm font-body text-on-surface-variant">
-								{t('shell.workspace.deleteQuestion', { name: workspace.name })}
-							</p>
-							<Button size="xs" variant="outline" onclick={() => (confirmId = null)}>{t('common.cancel')}</Button>
-							<Button size="xs" variant="danger" disabled={busy} onclick={() => remove(workspace.id)}>
-								{t('common.delete')}
-							</Button>
+						<div class="flex min-w-0 flex-1 flex-col gap-1.5">
+							{#if hasUnsavedWarning}
+								<p class="text-body-sm font-body text-error">
+									{t('shell.workspace.unsavedWarning')}
+								</p>
+								{#if unsavedWarning?.notes.length}
+									<p class="truncate text-label-sm font-label text-on-surface-variant">
+										{t('shell.workspace.unsavedNotes', {
+											titles: unsavedTitles(unsavedWarning.notes)
+										})}
+									</p>
+								{/if}
+								{#if unsavedWarning?.tasks.length}
+									<p class="truncate text-label-sm font-label text-on-surface-variant">
+										{t('shell.workspace.unsavedTasks', {
+											titles: unsavedTitles(unsavedWarning.tasks)
+										})}
+									</p>
+								{/if}
+							{:else}
+								<p class="min-w-0 flex-1 truncate text-body-sm font-body text-on-surface-variant">
+									{t('shell.workspace.deleteQuestion', { name: workspace.name })}
+								</p>
+							{/if}
+							<div class="flex items-center justify-end gap-2">
+								<Button size="xs" variant="outline" onclick={cancelDelete}>
+									{t('common.cancel')}
+								</Button>
+								<Button size="xs" variant="danger" disabled={busy} onclick={() => remove(workspace.id)}>
+									{t('common.delete')}
+								</Button>
+							</div>
 						</div>
 					{:else}
 						<span class="flex size-7 shrink-0 items-center justify-center rounded-lg {tint}">
@@ -233,7 +303,7 @@
 							variant="danger-ghost"
 							aria-label={t('shell.workspace.delete', { name: workspace.name })}
 							disabled={workspaces.length < 2 || busy}
-							onclick={() => (confirmId = workspace.id)}
+							onclick={() => askDelete(workspace.id)}
 						>
 							<Trash2 size={14} />
 						</Button>

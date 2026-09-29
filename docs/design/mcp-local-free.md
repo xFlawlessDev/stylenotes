@@ -254,8 +254,12 @@ Nama tool = verba + objek, semua di `mcp-tools.ts` (satu sumber untuk handshake 
 | Dependency | `list_dependencies` | read | Seluruh relasi task→task |
 | | `critical_path` | read | Rantai dependency terpanjang (Gantt-lite) |
 | Graph | `graph_query` | read | Node + edge + degree, untuk `neighborsOf`/`depth`/`kind` (§5) |
+| Baca organisasi | `list_workspaces` | read | Semua workspace + jumlah note/task |
+| | `list_folders` | read | **#D17** — id folder + jumlah note, supaya note bisa difilekan |
+| | `list_tags` | read | **#D17** — kosakata tag + frekuensi, sebelum menandai apa pun |
 | Tulis | `create_note` | write | Note baru (title, body, folder, tags, `overlay`) |
 | | `update_note_body` | write | Ubah body note — **V1** (#D16). Hanya mode `write`; ditolak bila ada edit lokal yang belum ter-persist (#D4) |
+| | `update_note` | write | **#D17** — patch metadata note (`title`, `folder`, `tags`, `pinned`). Tidak menyentuh body |
 | | `delete_note` | write | Hapus note — **V1** (#D16) + butuh `confirm: true`. Hard delete, tanpa tombstone (#13a) |
 | | `create_task` | write | Task baru (title, status, priority, folder, `startAt`, `dueAt`, `noteIds`) |
 | | `update_task` | write | Patch field task |
@@ -740,6 +744,63 @@ Menambah kolom ini di luar Fase 0 sync berarti **Fase 0 dan MCP menyentuh tabel 
 4. Kolom display lama `notes.updated` (`"Just now"`, `"Baru saja"`) **tetap** dipakai UI sampai ada pekerjaan terpisah menggantinya dengan derivasi dari `updated_at`. Snapshot MCP **tidak** memakai kolom display itu.
 5. `updated_at` ikut di `Note` → `notesRepo` → `persistNote`; ini perubahan tipe yang menyentuh file di luar MCP (lihat §8).
 
+### 13d. Second brain: menutup lubang metadata (#D17)
+
+Snapshot dan tool yang ada cukup untuk **membaca** vault sebagai basis pengetahuan,
+tapi tidak untuk **merawatnya**. Tiga lubang yang ditutup:
+
+1. **`update_note_body` hanya menyentuh body.** Metadata note (`title`, `folder`,
+   `tags`, `pinned`) sebelumnya hanya bisa di-set sekali, saat `create_note`.
+   Akibatnya note yang salah judul, salah folder, atau tanpa tag **tidak akan
+   pernah bisa diperbaiki oleh agent** — dan tag adalah sumbu yang dipakai
+   `search_notes`/`context` untuk scoring. `update_note` menutup ini dengan
+   bentuk yang sama seperti `update_task`: argumen `patch`, key yang tidak
+   dikenal diabaikan, dan patch kosong tidak menghapus apa pun.
+
+   Bedanya dari `update_task`: judul note **tidak boleh kosong** (task punya
+   `title` wajib, note punya fallback `'Untitled note'`). Patch dengan `title`
+   kosong ditolak `bad_arguments`, bukan diam-diam diabaikan, karena
+   "berhasil" tanpa perubahan lebih menyesatkan daripada error.
+
+2. **Tidak ada cara menemukan folder atau tag.** `list_notes { folder }`
+   mencocokkan **id** folder persis, dan `list_folders` tidak pernah dijawab —
+   jadi agent harus menebak. `list_tags` sebelumnya tidak ada sama sekali,
+   padahal tag adalah cara utama recall. Keduanya murni agregasi atas snapshot
+   yang sudah dikirim, jadi tidak ada jalur baca kedua dan tidak ada query DB
+   baru.
+
+3. **`createdAt` selalu 0.** Snapshot meng-hardcode `createdAt: 0`
+   (`mcp-snapshot.ts`), sementara `createNote` tidak menerima `createdAt`.
+   Akibatnya `list_notes { order: "created" }` — **urutan default** — tidak
+   berarti apa-apa, dan agent tidak bisa menyusun timeline. Perbaikan memakai
+   kolom `notes.created_at` yang **sudah ada** sejak migrasi 1: tidak ada
+   migrasi baru, hanya pembacaan kolom.
+
+Aturan yang mengikat untuk ketiganya:
+
+- **Tidak ada tool baru yang menyentuh DB.** Ketiga tool baru berjalan lewat
+  registry yang sama, validasi yang sama, dan event `*-changed` yang sama; tidak
+  ada jalur tulis kedua.
+- **`list_folders`/`list_tags` adalah scope `workspace`/`notes`.** Keduanya
+  menerima `workspace` opsional dan menghitung per `(workspaceId, id)` — folder
+  atau tag yang sama di dua workspace adalah dua baris, bukan satu baris
+  gabungan, karena kedua workspace memang punya catatan sendiri.
+- **`update_note` tidak menulis body.** Ia memakai `notesRepo.upsert` dengan
+  `body` yang sudah ada, jadi `excerpt`/`words`/`chars` tetap konsisten dan
+  backup pra-ubah (§13a) hanya relevan untuk `update_note_body`.
+- **`update_note` juga ditolak saat ada edit lokal tertunda** (`busy_local_edit`),
+  lewat guard #D4 yang sama.
+- **`created_at` hanya ditulis saat INSERT.** `note_upsert_tx` dan `notesRepo.upsert`
+  mengirim `created_at` tapi `ON CONFLICT` **tidak** menyentuhnya; kalau
+  ikut di-update, setiap auto-save akan mereset tanggal lahir note itu.
+  Backfill untuk baris lama **tidak** ditambahkan: `created_at` sudah terisi
+  sejak migrasi 1 (`datetime('now')`), jadi tidak ada baris NULL di produksi.
+
+**Lubang yang sengaja tidak ditutup:** tidak ada `append_to_note`. Pola "tambahkan
+baris ke daily note hari ini" tetap harus lewat baca penuh → `update_note_body`,
+karena append butuh format pemisah yang tidak boleh ditebak app. Menambah tool
+baru untuk itu = menebak struktur user.
+
 ---
 
 ## 13. Keputusan tercatat
@@ -762,3 +823,4 @@ Menambah kolom ini di luar Fase 0 sync berarti **Fase 0 dan MCP menyentuh tabel 
 | D14 | Path DB | Tambah perintah Rust **`db_path`** sekarang; nilainya masuk `app-info.json` | Fase 0 sync memakai perintah yang sama; `DB_URL` di 3 tempat tetap, tapi kebenarannya diverifikasi sekali di startup |
 | D15 | Capability | Binary MCP **tidak** butuh permission di `capabilities/default.json` (bukan webview, tidak lewat IPC) | Diverifikasi empiris di M1 dengan **build bundle**, karena permission Tauri gagal secara silent. Buka config client otomatis **bukan** scope V1 (#D8) |
 | D16 | Scope tool note | V1 **menyertakan** `update_note_body` + `delete_note` (bukan hanya task) | Hanya berjalan di mode `write`; `delete_note` butuh `confirm: true`; keduanya diaudit. Mitigasi & batasnya: §13a |
+| D17 | Second brain | **Tambah 3 tool**: `list_folders`, `list_tags` (read) dan `update_note` (write, patch `title`/`folder`/`tags`/`pinned`). Plus kolom `notes.created_at` diisi sungguhan | Tanpa ini agent bisa membuat note tapi tidak pernah bisa merapikannya: tidak ada cara menemukan folder/tag, dan `update_note_body` hanya menyentuh body. Lihat §13d |

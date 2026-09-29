@@ -136,10 +136,11 @@ export type McpSnapshotNote = {
 	overlay: boolean;
 	excerpt: string;
 	body?: string;
-	/** Epoch milliseconds; never the display `updated` column (#D13). */
+	/** Epoch milliseconds. Both come from the DB columns, never the display `updated` (#D13, #D17). */
 	createdAt: number;
 	updatedAt: number;
 };
+
 
 export type McpSnapshotTask = {
 	id: string;

@@ -101,6 +101,18 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Every workspace with its note and task counts.",
     },
     ToolDescriptor {
+        name: "list_folders",
+        kind: ToolKind::Read,
+        scope: "workspace",
+        description: "Folder ids, labels and note counts, so a note can be filed.",
+    },
+    ToolDescriptor {
+        name: "list_tags",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description: "Every tag in use, with how many notes carry it.",
+    },
+    ToolDescriptor {
         name: "create_note",
         kind: ToolKind::Write,
         scope: "notes",
@@ -111,6 +123,12 @@ pub const TOOLS: &[ToolDescriptor] = &[
         kind: ToolKind::Write,
         scope: "notes",
         description: "Replace a note body (a backup copy is kept first).",
+    },
+    ToolDescriptor {
+        name: "update_note",
+        kind: ToolKind::Write,
+        scope: "notes",
+        description: "Patch note metadata: title, folder, tags and pinned.",
     },
     ToolDescriptor {
         name: "delete_note",
@@ -211,7 +229,8 @@ fn schema_for(name: &str) -> Value {
             required.push("id");
         }
         "list_notes" | "search_notes" | "list_tasks" | "task_board" | "list_dependencies"
-        | "critical_path" | "graph_query" | "context" | "daily_summary" => {}
+        | "critical_path" | "graph_query" | "context" | "daily_summary" | "list_folders"
+        | "list_tags" => {}
         "create_note" => {
             properties["title"] = json!({ "type": "string" });
             properties["body"] = json!({ "type": "string" });
@@ -223,6 +242,12 @@ fn schema_for(name: &str) -> Value {
             properties["body"] = json!({ "type": "string" });
             required.push("id");
             required.push("body");
+        }
+        "update_note" => {
+            properties["id"] = json!({ "type": "string" });
+            properties["patch"] = json!({ "type": "object" });
+            required.push("id");
+            required.push("patch");
         }
         "create_task" => {
             properties["title"] = json!({ "type": "string" });

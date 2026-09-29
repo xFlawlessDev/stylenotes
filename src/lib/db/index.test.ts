@@ -13,6 +13,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invoke(
 vi.mock('$lib/windows', () => ({ isTauri: true }));
 
 import { notesRepo, foldersRepo, notificationsRepo, settingsRepo, metaRepo, tasksRepo, getDb } from '$lib/db';
+import { workspacesRepo } from '$lib/db/workspaces';
 import { createTask } from '$lib/stores/tasks';
 
 beforeEach(() => {
@@ -192,6 +193,39 @@ describe('notesRepo.upsert transaction path', () => {
 	});
 });
 
+describe('workspacesRepo.remove', () => {
+	it('prefers the single transactional delete', async () => {
+		await workspacesRepo.remove('ws-two');
+
+		expect(invoke).toHaveBeenCalledWith('workspace_remove_tx', { id: 'ws-two' });
+		// The individual DELETEs are the non-atomic fallback; the transaction
+		// must be used whenever the write pool is available.
+		expect(execute).not.toHaveBeenCalled();
+	});
+
+	it('falls back to deleting children before the workspace', async () => {
+		invoke.mockRejectedValueOnce(new Error('no write pool'));
+		await workspacesRepo.remove('ws-two');
+
+		const statements = execute.mock.calls.map(([sql]) => String(sql));
+		expect(statements[0]).toContain('DELETE FROM tags');
+		// Titles/links must go before the rows they point at.
+		expect(statements.findIndex((sql) => sql.includes('DELETE FROM task_notes'))).toBeLessThan(
+			statements.findIndex((sql) => sql.includes('DELETE FROM tasks WHERE workspace_id'))
+		);
+		expect(statements.findIndex((sql) => sql.includes('DELETE FROM notes WHERE workspace_id'))).toBeLessThan(
+			statements.findIndex((sql) => sql.includes('DELETE FROM folders'))
+		);
+		expect(statements).toContain('DELETE FROM workspaces WHERE id = $1');
+	});
+
+	it('reports failure when both paths fail', async () => {
+		invoke.mockRejectedValueOnce(new Error('no write pool'));
+		execute.mockRejectedValueOnce(new Error('locked'));
+		await expect(workspacesRepo.remove('ws-two')).resolves.toBe(false);
+	});
+});
+
 describe('foldersRepo', () => {
 	it('lists folders ordered by position and maps a null icon to undefined', async () => {
 		select.mockResolvedValueOnce([
@@ -278,6 +312,7 @@ describe('settingsRepo', () => {
 			kanbanBoards: [],
 			detailAlwaysOnTop: true,
 			versioningEnabled: true,
+			timezone: '',
 		});
 		expect(execute.mock.calls[0][0]).toContain('ON CONFLICT(id) DO UPDATE');
 		expect(JSON.parse(execute.mock.calls[0][1][0])).toMatchObject({ mode: 'dark' });

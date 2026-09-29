@@ -33,6 +33,7 @@
 	onworkspacecreate={controller.createWorkspaceByName}
 	onworkspacerename={controller.renameWorkspaceById}
 	onworkspacedelete={controller.deleteWorkspaceById}
+	onworkspaceunsaved={controller.unsavedWorkspaceRecords}
 	onpalette={controller.openPalette}
 	onsettings={controller.openSettings}
 	{mode}

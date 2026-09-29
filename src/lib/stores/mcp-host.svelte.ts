@@ -24,6 +24,7 @@ import {
 	deleteTaskAction,
 	linkTasksAction,
 	unlinkTasksAction,
+	updateNoteAction,
 	updateNoteBodyAction,
 	updateTaskAction,
 	type WriteContext,
@@ -261,6 +262,13 @@ async function runAction(job: McpJob): Promise<WriteOutcome> {
 				await invoke('mcp_backup_note', { noteId: id, body: before.body, keep: MCP_NOTE_BACKUPS }).catch(() => undefined);
 			}
 			return updateNoteBodyAction(context, job.args);
+		}
+		case 'update_note': {
+			const id = typeof job.args.id === 'string' ? job.args.id : '';
+			if (localNoteEditPending(id)) {
+				return { ok: false, error: 'busy_local_edit', message: 'That note has unsaved edits in this app.' };
+			}
+			return updateNoteAction(context, job.args);
 		}
 		case 'delete_note': {
 			const id = typeof job.args.id === 'string' ? job.args.id : '';

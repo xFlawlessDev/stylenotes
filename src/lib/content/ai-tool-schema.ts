@@ -129,6 +129,18 @@ export const AI_TOOLS: AiToolSpec[] = [
 			type: 'object',
 			properties: { workspace }
 		}),
+	tool('list_folders', 'List folders', 'workspace', 'read',
+		'Folder ids with note counts. Use these ids for the folder filter in list_notes and for update_note; a label is not accepted anywhere.',
+		{
+			type: 'object',
+			properties: { workspace }
+		}),
+	tool('list_tags', 'List tags', 'notes', 'read',
+		'Every tag in use, with how many notes carry it. Call this before tagging a note so you reuse the vocabulary the vault already has.',
+		{
+			type: 'object',
+			properties: { workspace }
+		}),
 	tool('graph_query', 'Query graph', 'notes', 'read',
 		'Graph nodes and edges around a node, by depth and edge kind.',
 		{
@@ -163,6 +175,26 @@ export const AI_TOOLS: AiToolSpec[] = [
 				workspace
 			},
 			required: ['id', 'body']
+		}),
+	tool('update_note', 'Update note', 'notes', 'write',
+		'Patch a note’s metadata: title, folder, tags and pinned. Use it to fix a bad title, re-file a note, or add the tags the recall tools rank by. It never touches the body.',
+		{
+			type: 'object',
+			properties: {
+				id: { type: 'string' },
+				patch: {
+					type: 'object',
+					description: 'Fields to change: title, folder, tags, pinned. Omit a field to leave it alone.',
+					properties: {
+						title: { type: 'string' },
+						folder: { type: 'string', description: 'Folder id from list_folders.' },
+						tags: { type: 'array', items: { type: 'string' }, description: 'Replaces the tag list.' },
+						pinned: { type: 'boolean' }
+					}
+				},
+				workspace
+			},
+			required: ['id', 'patch']
 		}),
 	tool('create_task', 'Create task', 'tasks', 'write',
 		'Create a task, optionally linked to notes.',

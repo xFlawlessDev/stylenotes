@@ -32,6 +32,10 @@ export const shell: ShellMessages = {
 		rename: 'Ganti nama {name}',
 		delete: 'Hapus {name}',
 		deleteQuestion: 'Hapus “{name}” dan semua isinya?',
+		unsavedWarning:
+			'Workspace ini punya perubahan yang belum tersimpan. Menghapusnya sekarang akan membuang perubahan itu.',
+		unsavedNotes: 'Catatan: {titles}',
+		unsavedTasks: 'Tugas: {titles}',
 		close: 'Tutup',
 		activeBadge: 'Ruang kerja: {name}',
 		foreignBadge: 'Ruang kerja: {name} (bukan ruang kerja yang diikuti jendela ini)',

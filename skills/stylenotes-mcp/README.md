@@ -6,14 +6,20 @@ Cursor, Codex, Zed, …) that can reach a local `stdio` server.
 
 ## What it gives an agent
 
-- **Which tool for which question** — a short routing table instead of 24
+- **What the app is for** — a workspace is a vault and StyleNotes is the user's
+  second brain — a local-first home for personal knowledge, where a workspace is
+  a vault — so an agent recalls from their notes instead of answering from its
+  own memory.
+- **Which tool for which question** — a short routing table instead of 27
   undifferentiated tools.
 - **The correct call order** — locate the workspace, then the entity, then read,
   then write, then verify.
 - **The traps** — missing `workspace` silently targeting `workspace-default`,
   ignoring `blocked`, misreading `dependency_cycle`, trusting `dueAt` strings,
-  deleting without `confirm`, stale snapshots.
+  deleting without `confirm`, stale snapshots, quoting an excerpt as the body.
 - **Error recovery** — every code mapped to its cause and fix.
+- **Recipes** — recall a topic across the vault, capture a thought into it, and
+  the task/dependency workflows.
 
 ## Install
 
@@ -33,7 +39,7 @@ Cursor, Codex, Zed, …) that can reach a local `stdio` server.
 stylenotes-mcp/
 ├── SKILL.md                          # entry point: model, workflow, traps
 ├── references/
-│   ├── tool-reference.md             # all 24 tools, args, response fields
+│   ├── tool-reference.md             # all 27 tools, args, response fields
 │   ├── errors.md                     # error codes -> cause -> fix
 │   └── workflows.md                  # longer end-to-end recipes
 ├── scripts/

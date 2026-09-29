@@ -18,6 +18,7 @@ import {
 	createTaskAction,
 	deleteNoteAction,
 	deleteTaskAction,
+	updateNoteAction,
 	updateNoteBodyAction,
 	updateTaskAction,
 	type WriteContext,
@@ -195,6 +196,38 @@ function dailySummary(ctx: ToolContext, args: Record<string, unknown>): ToolResu
 	};
 }
 
+/** Folder ids with note counts, so a note can be filed by id (not label). */
+function listFolders(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
+	const workspace = str(args, 'workspace');
+	const counts = new Map<string, { id: string; workspaceId: string; noteCount: number }>();
+	for (const note of notesOf(ctx.snapshot, workspace)) {
+		const key = `${note.workspaceId}\0${note.folder}`;
+		const entry = counts.get(key);
+		if (entry) entry.noteCount += 1;
+		else counts.set(key, { id: note.folder, workspaceId: note.workspaceId, noteCount: 1 });
+	}
+	const folders = [...counts.values()].sort((a, b) => a.id.localeCompare(b.id));
+	return { ok: true, data: { total: folders.length, folders } };
+}
+
+/** Every tag in use with its note count — the vocabulary before tagging. */
+function listTags(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
+	const workspace = str(args, 'workspace');
+	const counts = new Map<string, { tag: string; workspaceId: string; noteCount: number }>();
+	for (const note of notesOf(ctx.snapshot, workspace)) {
+		for (const tag of note.tags) {
+			const key = `${note.workspaceId}\0${tag}`;
+			const entry = counts.get(key);
+			if (entry) entry.noteCount += 1;
+			else counts.set(key, { tag, workspaceId: note.workspaceId, noteCount: 1 });
+		}
+	}
+	const tags = [...counts.values()].sort(
+		(a, b) => b.noteCount - a.noteCount || a.tag.localeCompare(b.tag)
+	);
+	return { ok: true, data: { total: tags.length, tags } };
+}
+
 function graphQuery(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const raw = str(args, 'id');
 	if (!raw) return { ok: false, error: '`id` is required.' };
@@ -253,6 +286,10 @@ function runRead(ctx: ToolContext, name: string, args: Record<string, unknown>):
 			return dailySummary(ctx, args);
 		case 'graph_query':
 			return graphQuery(ctx, args);
+		case 'list_folders':
+			return listFolders(ctx, args);
+		case 'list_tags':
+			return listTags(ctx, args);
 		default:
 			return null;
 	}
@@ -277,6 +314,8 @@ async function runWrite(
 			return fromWrite(await createNoteAction(ctx.write, args));
 		case 'update_note_body':
 			return fromWrite(await updateNoteBodyAction(ctx.write, args));
+		case 'update_note':
+			return fromWrite(await updateNoteAction(ctx.write, args));
 		case 'delete_note':
 			if (args.confirm !== true) return { ok: false, error: '`confirm` must be true to delete.' };
 			return fromWrite(await deleteNoteAction(ctx.write, args));
@@ -397,6 +436,8 @@ export function describeToolCall(name: string, rawArgs: string): string {
 			return `Create a task${title ? ` “${title}”` : ''}`;
 		case 'update_note_body':
 			return 'Replace a note’s body';
+		case 'update_note':
+			return 'Update a note’s title, folder, tags or pin';
 		case 'update_task':
 			return 'Update a task';
 		case 'complete_task':

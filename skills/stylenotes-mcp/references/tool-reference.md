@@ -1,6 +1,6 @@
 # Tool reference
 
-All 24 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
+All 27 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
 are executed by the running app. `workspace` is optional on every tool that
 takes it and falls back to `workspace-default`.
 
@@ -18,6 +18,45 @@ No arguments. Returns every workspace with counts.
 ```json
 { "ok": true, "count": 2, "workspaces": [
   { "id": "workspace-default", "name": "Personal", "noteCount": 1, "taskCount": 0, "openTaskCount": 0 }
+]}
+```
+
+### `list_folders`
+
+| Argument | Type |
+|---|---|
+| `workspace` | string |
+
+Returns `{ ok, count, folders[] }` where each folder is
+`{ id, label, workspaceId, noteCount }`.
+
+`label` mirrors `id` — the snapshot carries no display name for a folder. The id
+is what `list_notes { folder }` and `update_note { patch: { folder } }` accept;
+a label matches nothing. A folder that exists in two workspaces is two rows.
+
+```json
+{ "ok": true, "count": 2, "folders": [
+  { "id": "launch", "label": "launch", "workspaceId": "abc-123", "noteCount": 4 },
+  { "id": "personal", "label": "personal", "workspaceId": "abc-123", "noteCount": 11 }
+]}
+```
+
+### `list_tags`
+
+| Argument | Type |
+|---|---|
+| `workspace` | string |
+
+Returns `{ ok, count, tags[] }` where each tag is
+`{ tag, noteCount, workspaceId }`, most used first then alphabetical.
+
+Call this before tagging a note so you extend the existing vocabulary instead of
+inventing a near-duplicate. A tag used in two workspaces is two rows.
+
+```json
+{ "ok": true, "count": 2, "tags": [
+  { "tag": "spec", "noteCount": 7, "workspaceId": "abc-123" },
+  { "tag": "pricing", "noteCount": 2, "workspaceId": "abc-123" }
 ]}
 ```
 
@@ -55,6 +94,10 @@ title above tags above body.
 
 Returns the note fields at the **top level**, plus `backlinks` and `outlinks`
 (arrays of `{ id, title, kind }`). Fails `snapshot_truncated` in index-only mode.
+
+`createdAt` is the epoch millisecond the note was first written; `updatedAt` the
+last write. Both are real timestamps — `list_notes { order: "created" }` is
+meaningful.
 
 ### `context`
 
@@ -171,6 +214,27 @@ Returns `{ note: { id, workspaceId, title } }`.
 
 The app keeps a backup of the previous body first. Returns the note id and new
 `chars`. Refused with `busy_local_edit` if that note has unsaved edits in the app.
+
+### `update_note`
+
+| Argument | Type | Notes |
+|---|---|---|
+| `id` | string | **required** |
+| `patch` | object | **required**; keys: `title`, `folder`, `tags`, `pinned` |
+| `workspace` | string | |
+
+Patches metadata only — the body is never touched. Use it to fix a bad title,
+re-file a note, or add the tags the recall tools rank by.
+
+- A key you omit is left alone. `tags` **replaces** the whole list.
+- Tags are trimmed and de-duplicated; an empty result removes every tag.
+- `title` must not be blank — a blank title is refused with `bad_arguments`
+  rather than silently ignored.
+- Refused with `busy_local_edit` if that note has unsaved edits in the app.
+
+```json
+{ "name": "update_note", "arguments": { "id": "abc-123/note-uuid", "patch": { "title": "Pricing model", "folder": "launch", "tags": ["spec", "pricing"] } } }
+```
 
 ### `delete_note`
 

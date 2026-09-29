@@ -12,6 +12,7 @@ import {
 	resetNotesToSeed,
 	loadFolders,
 	listNotes,
+	listAllNotes,
 	applyNotePatch,
 	type CustomFolder,
 	type Folder,
@@ -25,8 +26,10 @@ import {
 import { persistNotifications, resetNotifications, type AppNotification } from '$lib/stores/notifications';
 import type { TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 import type { WikiEntity } from '$lib/content/wiki-links';
-import { refreshTasks, clearTasks } from '$lib/stores/tasks.svelte';
+import { refreshTasks, clearTasks, listAllTasks } from '$lib/stores/tasks.svelte';
 import type { Task } from '$lib/stores/tasks';
+import { pendingEdits } from '$lib/stores/mcp-pending-edits';
+import { unsavedInWorkspace } from '$lib/content/mcp-write-actions';
 import { isTauri, openNoteWindow, type WorkspaceSection } from '$lib/windows';
 import {
 	createWorkspace,
@@ -206,15 +209,58 @@ export function createWorkspaceController() {
 	}
 
 	async function deleteWorkspaceById(id: string) {
-		const wasActive = id === workspaceStore.activeId;
-		if (!(await deleteWorkspace(id))) {
-			showToast(t('editor.actions.workspaceDeleteFailed'));
-			return false;
+		// Guard against a second delete (or a switch) started while this one is
+		// still awaiting the transaction: two overlapping `changeWorkspace`
+		// calls would each reload records and could leave the UI showing the
+		// lists of a workspace that was just removed.
+		if (workspaceLoading) return false;
+		workspaceLoading = true;
+		try {
+			const wasActive = id === workspaceStore.activeId;
+			if (!(await deleteWorkspace(id))) {
+				showToast(t('editor.actions.workspaceDeleteFailed'));
+				return false;
+			}
+			if (wasActive) {
+				// `changeWorkspace` re-reads the notes, tasks and dependencies of
+				// the workspace that took over, so the deleted records cannot
+				// linger in the view. It also re-asserts the selection, which can
+				// fail; surface that instead of claiming everything is saved.
+				if (!(await setActiveWorkspace(workspaceStore.activeId))) {
+					notifyWorkspacesChanged();
+					showToast(t('editor.actions.workspaceDeleteFailed'));
+					return false;
+				}
+				await reloadWorkspaceRecords(workspaceStore.activeId);
+				notifyWorkspacesChanged();
+			} else {
+				// The remaining lists did not change, but a board or the dock may
+				// have been showing the removed workspace.
+				notifyWorkspacesChanged();
+			}
+			showToast(t('editor.actions.workspaceDeleted'));
+			return true;
+		} finally {
+			workspaceLoading = false;
 		}
-		if (wasActive) await changeWorkspace(workspaceStore.activeId);
-		else notifyWorkspacesChanged();
-		showToast(t('editor.actions.workspaceDeleted'));
-		return true;
+	}
+
+	/**
+	 * Dirty notes and tasks of `workspaceId`, for the delete confirmation.
+	 *
+	 * Reads across workspaces on purpose: the records being removed are not
+	 * necessarily the ones this window is showing, and the pending sets are
+	 * cross-window truth (`mcp-pending-edits` is written by every detail
+	 * window's save queue). The loaded lists are only a fallback for the case
+	 * where the database cannot be read.
+	 */
+	async function unsavedWorkspaceRecords(
+		workspaceId: string
+	): Promise<{ notes: string[]; tasks: string[] }> {
+		const pending = pendingEdits();
+		if (!pending.note.size && !pending.task.size) return { notes: [], tasks: [] };
+		const [notes, tasks] = await Promise.all([listAllNotes(), listAllTasks()]);
+		return unsavedInWorkspace(workspaceId, notes, tasks, pending);
 	}
 
 	function createNote() {
@@ -481,6 +527,7 @@ export function createWorkspaceController() {
 		createWorkspaceByName,
 		renameWorkspaceById,
 		deleteWorkspaceById,
+		unsavedWorkspaceRecords,
 		createNote,
 		commitNewNote,
 		handleWikiClick,

@@ -16,8 +16,8 @@ import { emit } from '@tauri-apps/api/event';
 import { workspacesRepo } from '$lib/db/workspaces';
 import { WORKSPACES_CHANGED } from '$lib/stores/workspaces.svelte';
 import { isTauri } from '$lib/windows';
-import type { WriteContext, WriteOutcome } from '$lib/content/mcp-write-actions';
-import { fail, parseEntityRef } from '$lib/content/mcp-write-actions';
+import type { WriteContext, WriteOutcome } from '$lib/content/mcp-write-context';
+import { fail, parseEntityRef } from '$lib/content/mcp-write-context';
 import type { Workspace } from '$lib/workspace';
 
 async function notify(): Promise<void> {

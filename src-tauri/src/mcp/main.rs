@@ -207,6 +207,8 @@ fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
         "critical_path" => read_deps::critical_path(bridge, args),
         "graph_query" => read_graph::graph_query(bridge, args),
         "list_workspaces" => read_workspaces::list_workspaces(bridge, args),
+        "list_folders" => read_workspaces::list_folders(bridge, args),
+        "list_tags" => read_workspaces::list_tags(bridge, args),
         other => protocol::tool_error("unknown_tool", format!("Unknown read tool `{other}`.")),
     }
 }

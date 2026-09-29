@@ -25,6 +25,15 @@ export function hasPendingEdit(kind: PendingKind, id: string): boolean {
 	return pending[kind].has(id);
 }
 
+/**
+ * Raw pending sets, for a caller that must intersect them with a workspace's
+ * records before deleting it (`unsavedInWorkspace` in `mcp-write-actions`).
+ * Returns copies: the sets are mutated by the detail windows.
+ */
+export function pendingEdits(): { note: Set<string>; task: Set<string> } {
+	return { note: new Set(pending.note), task: new Set(pending.task) };
+}
+
 /** Test seam: forgets every tracked edit. */
 export function clearPendingEdits(): void {
 	pending.note.clear();

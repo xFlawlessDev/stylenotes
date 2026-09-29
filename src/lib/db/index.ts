@@ -69,9 +69,17 @@ type NoteRow = {
 	overlay: number;
 	updated: string;
 	updated_at: number | null;
+	created_at: string | null;
 };
 
 type TagRow = { note_id: string; tag: string };
+
+/** SQLite `created_at` is `datetime('now')` — UTC, no zone designator. */
+function parseSqliteDate(raw: string | null): number | undefined {
+	if (!raw) return undefined;
+	const parsed = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+	return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 function toNote(row: NoteRow, tags: string[]): Note {
 	const note: Note = {
@@ -89,6 +97,8 @@ function toNote(row: NoteRow, tags: string[]): Note {
 	};
 	if (row.workspace_id) note.workspaceId = row.workspace_id;
 	if (row.updated_at != null) note.updatedAt = Number(row.updated_at);
+	const createdAt = parseSqliteDate(row.created_at);
+	if (createdAt != null) note.createdAt = createdAt;
 	return note;
 }
 
@@ -161,6 +171,9 @@ export const notesRepo = {
 					overlay: note.overlay,
 					updated: note.updated,
 					updatedAt,
+					// Only the first save sets the birthday; the SQL `ON CONFLICT`
+					// keeps the stored value on every later save (#D17).
+					createdAt: note.createdAt ?? updatedAt,
 					tags: note.tags,
 				});
 				return;
@@ -170,21 +183,22 @@ export const notesRepo = {
 			}
 		}
 		const db = await getDb();
+		const createdAt = new Date(note.createdAt ?? updatedAt).toISOString();
 		if (!note.workspaceId) {
 			await db.execute(
-				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 				 ON CONFLICT(id) DO UPDATE SET title = excluded.title, folder = excluded.folder, body = excluded.body,
 				 excerpt = excluded.excerpt, words = excluded.words, chars = excluded.chars, pinned = excluded.pinned,
 				 overlay = excluded.overlay, updated = excluded.updated, updated_at = excluded.updated_at`,
-				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated, updatedAt]
+				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated, updatedAt, createdAt]
 			);
 			await writeTags(note.id, note.tags);
 			return;
 		}
 		await db.execute(
-			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			 ON CONFLICT(id) DO UPDATE SET
 				workspace_id = excluded.workspace_id,
 				title = excluded.title,
@@ -210,6 +224,7 @@ export const notesRepo = {
 				note.overlay ? 1 : 0,
 				note.updated,
 				updatedAt,
+				createdAt,
 			]
 		);
 		await writeTags(note.id, note.tags);

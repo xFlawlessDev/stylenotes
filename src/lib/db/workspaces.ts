@@ -1,4 +1,5 @@
 import type { Workspace } from '$lib/workspace';
+import { invoke } from '@tauri-apps/api/core';
 import { getDb } from './index';
 
 /**
@@ -46,21 +47,36 @@ export const workspacesRepo = {
 	 * Deletes a workspace and everything scoped to it. The children go first
 	 * and in dependency order so nothing dangles when SQLite runs without
 	 * foreign-key enforcement.
+	 *
+	 * The Rust `workspace_remove_tx` command runs those statements in one
+	 * transaction; the plugin path below is only a fallback for a build whose
+	 * write pool is unavailable, and is *not* atomic — a failure part way
+	 * leaves the children orphaned, so callers must surface the failure.
 	 */
 	async remove(id: string): Promise<boolean> {
+		try {
+			await invoke('workspace_remove_tx', { id });
+			return true;
+		} catch {
+			// Fall through to the direct path when the write pool is unavailable.
+		}
 		try {
 			const db = await getDb();
 			await db.execute(
 				'DELETE FROM tags WHERE note_id IN (SELECT id FROM notes WHERE workspace_id = $1)',
 				[id]
 			);
-			await db.execute('DELETE FROM notes WHERE workspace_id = $1', [id]);
+			await db.execute(
+				'DELETE FROM task_notes WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)',
+				[id]
+			);
 			await db.execute(
 				`DELETE FROM task_dependencies
 				 WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)
 				    OR depends_on_task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)`,
 				[id]
 			);
+			await db.execute('DELETE FROM notes WHERE workspace_id = $1', [id]);
 			await db.execute('DELETE FROM tasks WHERE workspace_id = $1', [id]);
 			await db.execute('DELETE FROM folders WHERE workspace_id = $1', [id]);
 			await db.execute('DELETE FROM workspaces WHERE id = $1', [id]);

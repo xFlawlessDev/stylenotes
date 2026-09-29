@@ -59,13 +59,16 @@ pub async fn note_upsert_tx(
     overlay: bool,
     updated: String,
     updated_at: i64,
+    created_at: Option<i64>,
     tags: Vec<String>,
 ) -> Result<(), String> {
     let mut tx = pool.0.begin().await.map_err(|error| error.to_string())?;
 
+    // `created_at` is only written on insert: on conflict the existing value
+    // must survive, or every save would reset a note's birthday (#D17).
     sqlx::query(
-        "INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        "INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT(id) DO UPDATE SET
             workspace_id = excluded.workspace_id,
             title = excluded.title,
@@ -91,6 +94,7 @@ pub async fn note_upsert_tx(
     .bind(i64::from(overlay))
     .bind(&updated)
     .bind(updated_at)
+    .bind(created_at)
     .execute(&mut *tx)
     .await
     .map_err(|error| error.to_string())?;
@@ -136,5 +140,40 @@ pub async fn note_remove_tx(pool: State<'_, WritePool>, id: String) -> Result<()
         .execute(&mut *tx)
         .await
         .map_err(|error| error.to_string())?;
+    tx.commit().await.map_err(|error| error.to_string())
+}
+
+/// Deletes a workspace and everything scoped to it in one transaction.
+///
+/// Mirrors `workspacesRepo.remove`, but the six statements must be atomic:
+/// `tauri-plugin-sql` may hand each `db.execute()` a different pooled
+/// connection, so a failure midway would otherwise leave notes, tasks or
+/// folders stranded in a workspace that no longer exists — invisible in the
+/// UI but still writable by a racing auto-save. Children go first and in
+/// dependency order (`tags` before `notes`, `task_notes`/`task_dependencies`
+/// before `tasks`), which is what the frontend expects when SQLite runs
+/// without `foreign_keys` enforcement.
+#[tauri::command]
+pub async fn workspace_remove_tx(pool: State<'_, WritePool>, id: String) -> Result<(), String> {
+    let mut tx = pool.0.begin().await.map_err(|error| error.to_string())?;
+
+    for statement in [
+        "DELETE FROM tags WHERE note_id IN (SELECT id FROM notes WHERE workspace_id = $1)",
+        "DELETE FROM task_notes WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)",
+        "DELETE FROM task_dependencies
+             WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)
+                OR depends_on_task_id IN (SELECT id FROM tasks WHERE workspace_id = $1)",
+        "DELETE FROM notes WHERE workspace_id = $1",
+        "DELETE FROM tasks WHERE workspace_id = $1",
+        "DELETE FROM folders WHERE workspace_id = $1",
+        "DELETE FROM workspaces WHERE id = $1",
+    ] {
+        sqlx::query(statement)
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+
     tx.commit().await.map_err(|error| error.to_string())
 }

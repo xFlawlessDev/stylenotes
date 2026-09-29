@@ -136,6 +136,13 @@ export async function renameWorkspace(id: string, name: string): Promise<boolean
  * workspace is never removed: the next one takes over, so `items` stays
  * non-empty. Returns `false` (and restores the list) when the write fails or
  * this is the last workspace.
+ *
+ * The repository deletes the children in one transaction, so `true` means
+ * nothing is left behind under the dead id. A window that was editing one of
+ * those records can still write *after* this returns — the detail windows save
+ * from another process — which is why the delete dialog warns about unsaved
+ * edits before calling in, and the MCP/AI write path refuses to resurrect a
+ * record whose workspace is gone.
  */
 export async function deleteWorkspace(id: string): Promise<boolean> {
 	const previous = workspaceStore.items;

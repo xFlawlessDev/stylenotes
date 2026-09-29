@@ -11,6 +11,8 @@ export type Note = {
   updated: string;
   /** Epoch milliseconds of the last write; the machine-readable `updated` (#D13). */
   updatedAt?: number;
+  /** Epoch milliseconds of the first write, read from `notes.created_at` (#D17). */
+  createdAt?: number;
   pinned: boolean;
   overlay: boolean;
   excerpt: string;
@@ -31,20 +33,22 @@ export function buildExcerpt(body: string, limit = 150): string {
 
 export function createNote(seed: Partial<Note> = {}): Note {
   const body = seed.body ?? '';
+  const now = Date.now();
   return {
 		id: seed.id ?? crypto.randomUUID(),
 		workspaceId: seed.workspaceId ?? 'workspace-default',
     title: seed.title?.trim() || 'Untitled note',
     folder: seed.folder ?? 'personal',
     tags: seed.tags ?? [],
-    updated: seed.updated ?? formatRelative(seed.updatedAt ?? Date.now()),
+    updated: seed.updated ?? formatRelative(seed.updatedAt ?? now),
     pinned: seed.pinned ?? false,
     overlay: seed.overlay ?? false,
     excerpt: seed.excerpt ?? buildExcerpt(body),
     body,
     words: seed.words ?? countWords(body),
     chars: seed.chars ?? body.length,
-    updatedAt: seed.updatedAt ?? Date.now(),
+    updatedAt: seed.updatedAt ?? now,
+    createdAt: seed.createdAt ?? now,
   };
 }
 

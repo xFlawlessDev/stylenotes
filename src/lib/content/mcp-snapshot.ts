@@ -44,6 +44,7 @@ function workspaceOf(record: { workspaceId?: string }): string {
 /** Epoch millis of a note's last write, from `updatedAt` or the created date. */
 function noteUpdatedAt(note: Note): number {
 	if (typeof note.updatedAt === 'number' && Number.isFinite(note.updatedAt)) return note.updatedAt;
+	if (typeof note.createdAt === 'number' && Number.isFinite(note.createdAt)) return note.createdAt;
 	return 0;
 }
 
@@ -119,7 +120,7 @@ function toSnapshotNote(note: Note, includeBody: boolean): McpSnapshotNote {
 		pinned: note.pinned,
 		overlay: note.overlay,
 		excerpt: note.excerpt,
-		createdAt: 0,
+		createdAt: note.createdAt ?? noteUpdatedAt(note),
 		updatedAt: noteUpdatedAt(note),
 	};
 	if (includeBody) snapshot.body = capped;
