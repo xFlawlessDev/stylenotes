@@ -3,8 +3,10 @@ import type {
 	AiMessageRecord,
 	AiRole,
 	AiSettings,
-	AiThread
+	AiThread,
+	AiToolCall
 } from '$lib/content/ai-types';
+import type { ToolResult } from '$lib/content/ai-tools';
 import type { McpAccess, McpScope } from '$lib/content/mcp-types';
 import { getDb } from './index';
 
@@ -61,8 +63,35 @@ type AiMessageRow = {
 	thread_id: string;
 	role: string;
 	content: string;
+	reasoning?: string | null;
+	tool_calls?: string | null;
+	tool_results?: string | null;
 	created_at: string;
 };
+
+/** Parses a JSON column, falling back to `fallback` on anything unusable. */
+function parseJson<T>(raw: string | null | undefined, fallback: T): T {
+	if (!raw) return fallback;
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return (parsed ?? fallback) as T;
+	} catch {
+		return fallback;
+	}
+}
+
+/** Keeps only well-formed persisted tool calls; a bad row must not break a chat. */
+function parseToolCalls(raw: string | null | undefined): AiToolCall[] {
+	const parsed = parseJson<unknown>(raw, []);
+	if (!Array.isArray(parsed)) return [];
+	return parsed.filter(
+		(item): item is AiToolCall =>
+			typeof item === 'object' &&
+			item !== null &&
+			typeof (item as AiToolCall).id === 'string' &&
+			typeof (item as AiToolCall).name === 'string'
+	);
+}
 
 function toRole(raw: string): AiRole {
 	return raw === 'assistant' || raw === 'system' ? raw : 'user';
@@ -100,6 +129,9 @@ function toMessage(row: AiMessageRow): AiMessageRecord {
 		threadId: row.thread_id,
 		role: toRole(row.role),
 		content: row.content,
+		reasoning: row.reasoning ?? '',
+		toolCalls: parseToolCalls(row.tool_calls),
+		toolResults: parseJson<Record<string, ToolResult>>(row.tool_results, {}),
 		createdAt: row.created_at
 	};
 }
@@ -261,17 +293,34 @@ export const aiRepo = {
 		}
 	},
 
-	/** Appends a message and returns it (with its assigned id). */
+	/**
+	 * Appends a message and returns it (with its assigned id).
+	 *
+	 * `trace` carries the reasoning and tool traffic captured alongside the
+	 * answer. It is optional for user turns, which only ever have content.
+	 */
 	async addMessage(
 		threadId: string,
 		role: AiRole,
-		content: string
+		content: string,
+		trace?: { reasoning?: string; toolCalls?: AiToolCall[]; toolResults?: Record<string, ToolResult> }
 	): Promise<AiMessageRecord | null> {
+		const reasoning = trace?.reasoning ?? '';
+		const toolCalls = trace?.toolCalls ?? [];
+		const toolResults = trace?.toolResults ?? {};
 		try {
 			const db = await getDb();
 			const result = await db.execute(
-				'INSERT INTO ai_messages (thread_id, role, content) VALUES ($1, $2, $3)',
-				[threadId, role, content]
+				`INSERT INTO ai_messages (thread_id, role, content, reasoning, tool_calls, tool_results)
+				 VALUES ($1, $2, $3, $4, $5, $6)`,
+				[
+					threadId,
+					role,
+					content,
+					reasoning,
+					JSON.stringify(toolCalls),
+					JSON.stringify(toolResults)
+				]
 			);
 			await db.execute("UPDATE ai_threads SET updated_at = datetime('now') WHERE id = $1", [
 				threadId
@@ -284,6 +333,9 @@ export const aiRepo = {
 					threadId,
 					role,
 					content,
+					reasoning,
+					toolCalls,
+					toolResults,
 					createdAt: new Date().toISOString()
 				};
 			}

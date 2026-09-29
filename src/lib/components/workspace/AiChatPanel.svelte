@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { Bot, Check, Copy, Loader2, Plus, Sparkles, Trash2, Wrench, X } from '@lucide/svelte';
+	import { Bot, Check, Copy, Loader2, Plus, Sparkles, Trash2, X } from '@lucide/svelte';
 	import { Button, EmptyState } from '$lib/components/base';
 	import AiMessageBody from '$lib/components/note/AiMessageBody.svelte';
 	import AiComposer from '$lib/components/note/AiComposer.svelte';
-	import type { AiMessage, AiToolCall } from '$lib/content/ai-types';
+	import AiReasoning from '$lib/components/ai/AiReasoning.svelte';
+	import AiToolTrace from '$lib/components/ai/AiToolTrace.svelte';
+	import type { AiMessage, AiMessageRecord, AiToolCall } from '$lib/content/ai-types';
 	import type { WikiSource, WikiClick } from '$lib/content/wiki-links';
 	import { mentionPool, mentionedIds } from '$lib/content/ai-mentions';
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
-	import { AI_TOOLS, toolDefinitions, toolLabel } from '$lib/content/ai-tool-schema';
+	import { AI_TOOLS, toolDefinitions } from '$lib/content/ai-tool-schema';
+	import { toolTraceFromRecord, type ToolTraceEntry } from '$lib/content/ai-trace';
 	import { loadToolContext } from '$lib/content/ai-context';
 	import {
 		aiReady,
@@ -46,8 +49,12 @@
 	let error = $state<string | null>(null);
 	let copiedId = $state<number | null>(null);
 	let scrollEl = $state<HTMLElement | null>(null);
+	/** Chain of thought for the turn in flight; never persisted on its own. */
+	let reasoning = $state('');
+	/** Seconds the current thought took, frozen when the stream ends. */
+	let reasoningSeconds = $state(0);
 	/** Read/write calls shown under the current reply. */
-	let toolCalls = $state<{ call: AiToolCall; result?: ToolResult; confirmed?: boolean }[]>([]);
+	let toolCalls = $state<ToolTraceEntry[]>([]);
 	/** Set while a write call waits for the user to allow or decline it. */
 	let pendingWrite = $state<{ call: AiToolCall; resolve: (ok: boolean) => void } | null>(null);
 
@@ -96,7 +103,10 @@
 		const threadId = aiStore.activeThreadId;
 		sending = true;
 		draft = '';
+		reasoning = '';
+		reasoningSeconds = 0;
 		toolCalls = [];
+		const startedThinkingAt = Date.now();
 		try {
 			const context = await loadToolContext();
 			const history = buildHistory(question);
@@ -105,6 +115,7 @@
 				task: 'chat',
 				tools: toolDefinitions(grant),
 				onDelta: (delta) => (draft += delta),
+				onReasoning: (delta) => (reasoning += delta),
 				onToolCall: (call) => (toolCalls = [...toolCalls, { call }]),
 				toolRunner: async (call) => {
 					const isWrite = AI_TOOLS.find((tool) => tool.name === call.name)?.kind === 'write';
@@ -115,7 +126,18 @@
 					return result;
 				}
 			});
-			if (output.trim()) await appendMessage('assistant', output);
+			// Freeze the thought's duration before it is persisted.
+			if (reasoning) reasoningSeconds = Math.max(1, Math.round((Date.now() - startedThinkingAt) / 1000));
+			// The trace is saved with the answer, so reopening the chat still
+			// shows what the assistant ran and what it was thinking.
+			const trace = {
+				reasoning,
+				toolCalls: toolCalls.map((entry) => entry.call),
+				toolResults: toolResultsById(toolCalls)
+			};
+			if (output.trim() || trace.toolCalls.length || trace.reasoning) {
+				await appendMessage('assistant', output, trace);
+			}
 			if (threadId && aiStore.messages.length === 2) {
 				generateThreadTitle(threadId);
 			}
@@ -123,9 +145,20 @@
 			error = cause instanceof Error ? cause.message : String(cause);
 		} finally {
 			draft = '';
+			reasoning = '';
+			toolCalls = [];
 			sending = false;
 			pendingWrite = null;
 		}
+	}
+
+	/** Indexes the finished results by call id, for persistence. */
+	function toolResultsById(entries: ToolTraceEntry[]): Record<string, ToolResult> {
+		const map: Record<string, ToolResult> = {};
+		for (const entry of entries) {
+			if (entry.result) map[entry.call.id] = entry.result;
+		}
+		return map;
 	}
 
 	/** Records a tool result against its call for the inline list. */
@@ -133,6 +166,16 @@
 		toolCalls = toolCalls.map((entry) =>
 			entry.call.id === call.id ? { ...entry, result } : entry
 		);
+	}
+
+	/** Rebuilds a saved message's trace for display. */
+	function savedTrace(message: AiMessageRecord) {
+		return {
+			entries: toolTraceFromRecord(message.toolCalls, message.toolResults),
+			reasoning: message.reasoning,
+			/** Persisted history has no measured duration, so it says "quickly". */
+			seconds: 0
+		};
 	}
 
 	/**
@@ -168,6 +211,8 @@
 		await createThread('New chat');
 		draft = '';
 		error = null;
+		reasoning = '';
+		reasoningSeconds = 0;
 		toolCalls = [];
 	}
 
@@ -263,6 +308,17 @@
 			{#each aiStore.messages as message (message.id)}
 				<div class="flex flex-col gap-1 {message.role === 'user' ? 'items-end' : 'items-start'}">
 					{#if message.role === 'assistant'}
+						{@const trace = savedTrace(message)}
+						{#if trace.reasoning}
+							<AiReasoning
+								content={trace.reasoning}
+								seconds={trace.seconds}
+								class="w-[92%]"
+							/>
+						{/if}
+						{#if trace.entries.length}
+							<AiToolTrace entries={trace.entries} class="w-[92%]" />
+						{/if}
 						<div
 							class="max-w-[92%] rounded-2xl bg-surface-container-lowest/40 px-3.5 py-2.5 text-body-sm font-body text-on-surface"
 						>
@@ -301,40 +357,22 @@
 			{/each}
 
 			{#if sending}
-				<div class="flex items-start">
+				<div class="flex flex-col items-start gap-1">
+					{#if reasoning}
+						<AiReasoning content={reasoning} streaming seconds={reasoningSeconds} class="w-[92%]" />
+					{/if}
+					{#if toolCalls.length}
+						<AiToolTrace entries={toolCalls} class="w-[92%]" />
+					{/if}
 					<div
 						class="max-w-[92%] rounded-2xl bg-surface-container-lowest/40 px-3.5 py-2.5 text-body-sm font-body text-on-surface"
 					>
 						{#if draft}
 							<AiMessageBody content={draft} streaming class="markdown-body markdown-body--compact" />
-						{:else}
+						{:else if !reasoning && !toolCalls.length}
 							<Loader2 size={14} class="animate-spin text-outline" />
 						{/if}
 					</div>
-				</div>
-			{/if}
-
-			{#if toolCalls.length}
-				<div class="flex flex-col gap-1.5 rounded-xl bg-surface-container-lowest/40 p-2.5">
-					<span class="flex items-center gap-1.5 text-label-sm font-label text-outline">
-						<Wrench size={12} /> Tools
-					</span>
-					{#each toolCalls as entry (entry.call.id)}
-						<div class="flex items-center justify-between gap-2 text-label-sm font-label">
-							<span class="truncate text-on-surface-variant">{toolLabel(entry.call.name)}</span>
-							{#if entry.result}
-								{#if entry.result.ok}
-									<span class="shrink-0 text-tertiary">Done</span>
-								{:else}
-									<span class="shrink-0 truncate text-error" title={entry.result.error}>
-										{entry.result.error}
-									</span>
-								{/if}
-							{:else}
-								<Loader2 size={12} class="shrink-0 animate-spin text-outline" />
-							{/if}
-						</div>
-					{/each}
 				</div>
 			{/if}
 

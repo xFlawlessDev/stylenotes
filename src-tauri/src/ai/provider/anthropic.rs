@@ -105,6 +105,28 @@ fn delta_text(payload: &str) -> Option<String> {
     }
 }
 
+/// Reads the `thinking` text from a `content_block_delta` event.
+///
+/// Extended thinking streams `thinking_delta` blocks before the answer; they
+/// belong in a reasoning block, not the answer body. `signature_delta` chunks
+/// carry only an integrity signature and are intentionally dropped.
+fn reasoning_text(payload: &str) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_str(payload).ok()?;
+    if json.get("type")?.as_str()? != "content_block_delta" {
+        return None;
+    }
+    let delta = json.get("delta")?;
+    if delta.get("type")?.as_str()? != "thinking_delta" {
+        return None;
+    }
+    let text = delta.get("thinking")?.as_str()?;
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
+    }
+}
+
 /// Reads the top-level `error.message` Anthropic returns on failure.
 fn error_message(payload: &str) -> Option<String> {
     let json: serde_json::Value = serde_json::from_str(payload).ok()?;
@@ -321,6 +343,9 @@ fn handle_line(
         *finish = reason;
     }
     tools.push(data);
+    if let Some(text) = reasoning_text(data) {
+        return Some(Ok(StreamEvent::Reasoning { text }));
+    }
     delta_text(data).map(|text| Ok(StreamEvent::Delta { text }))
 }
 
@@ -351,6 +376,26 @@ mod tests {
     fn delta_text_ignores_other_events() {
         let payload = r#"{"type":"message_start","message":{}}"#;
         assert_eq!(delta_text(payload), None);
+    }
+
+    #[test]
+    fn reasoning_text_reads_thinking_delta() {
+        let payload =
+            r#"{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hmm"}}"#;
+        assert_eq!(reasoning_text(payload).as_deref(), Some("hmm"));
+    }
+
+    /// Signatures carry no displayable text and must not become reasoning.
+    #[test]
+    fn reasoning_text_ignores_signature_delta() {
+        let payload = r#"{"type":"content_block_delta","delta":{"type":"signature_delta","signature":"abc"}}"#;
+        assert_eq!(reasoning_text(payload), None);
+    }
+
+    #[test]
+    fn reasoning_text_ignores_text_delta() {
+        let payload = r#"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}"#;
+        assert_eq!(reasoning_text(payload), None);
     }
 
     #[test]

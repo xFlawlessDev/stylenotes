@@ -14,7 +14,7 @@ import {
 	type AiThread,
 	type AiMessageRecord,
 	type AiToolCall,
-	type AiToolDefinition,
+	type AiToolDefinition
 } from '$lib/content/ai-types';
 import type { McpScope } from '$lib/content/mcp-types';
 import type { ToolResult } from '$lib/content/ai-tools';
@@ -234,6 +234,8 @@ export async function streamCompletion(options: {
 	task: AiTask;
 	instruction?: string;
 	onDelta?: (text: string) => void;
+	/** Called for each chain-of-thought chunk; never mixed into the answer. */
+	onReasoning?: (text: string) => void;
 	/** Overrides the configured token cap, e.g. a small one for titles. */
 	maxTokensOverride?: number;
 	/** Tool definitions to advertise; omit for a plain completion. */
@@ -262,7 +264,7 @@ export async function streamCompletion(options: {
 	try {
 		let full = '';
 		for (let step = 0; step < AI_MAX_TOOL_STEPS; step += 1) {
-			const turn = await runProviderTurn(config, history, options.task, options.instruction, options.onDelta);
+			const turn = await runProviderTurn(config, history, options);
 			full += turn.text;
 
 			if (!turn.toolCalls.length) return full;
@@ -293,9 +295,7 @@ export async function streamCompletion(options: {
 async function runProviderTurn(
 	config: Awaited<ReturnType<typeof providerConfig>>,
 	messages: AiMessage[],
-	task: AiTask,
-	instruction: string | undefined,
-	onDelta?: (text: string) => void
+	options: { task: AiTask; instruction?: string; onDelta?: (text: string) => void; onReasoning?: (text: string) => void }
 ): Promise<{ text: string; toolCalls: AiToolCall[] }> {
 	const requestId = crypto.randomUUID();
 	let text = '';
@@ -307,7 +307,9 @@ async function runProviderTurn(
 	channel.onmessage = (event) => {
 		if (event.kind === 'delta' && event.text) {
 			text += event.text;
-			onDelta?.(event.text);
+			options.onDelta?.(event.text);
+		} else if (event.kind === 'reasoning' && event.text) {
+			options.onReasoning?.(event.text);
 		} else if (event.kind === 'tool_call' && event.call) {
 			toolCalls.push(event.call);
 		} else if (event.kind === 'error') {
@@ -320,8 +322,8 @@ async function runProviderTurn(
 	const request: AiStreamRequest & { config: typeof config } = {
 		requestId,
 		messages,
-		task,
-		instruction,
+		task: options.task,
+		instruction: options.instruction,
 		config
 	};
 	await invoke('ai_stream', { request, onEvent: channel });
@@ -462,7 +464,8 @@ export async function deleteThread(id: string): Promise<boolean> {
 /** Appends a message to the active thread (or a fresh one) and persists it. */
 export async function appendMessage(
 	role: AiMessage['role'],
-	content: string
+	content: string,
+	trace?: { reasoning?: string; toolCalls?: AiToolCall[]; toolResults?: Record<string, ToolResult> }
 ): Promise<AiMessageRecord | null> {
 	let threadId = aiStore.activeThreadId;
 	if (!threadId) {
@@ -471,7 +474,7 @@ export async function appendMessage(
 		// The title is just the message stub, so let the model name it later.
 		markThreadAutoTitle(threadId);
 	}
-	const record = await aiRepo.addMessage(threadId, role, content);
+	const record = await aiRepo.addMessage(threadId, role, content, trace);
 	if (!record) {
 		aiStore.error = 'Could not save the message';
 		return null;

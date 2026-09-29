@@ -562,6 +562,23 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // The assistant's reasoning and tool traffic, so a reopened chat shows
+        // how an answer was reached. `ai_messages.content` stays the answer
+        // body only: reasoning is never mixed into it, because a model's raw
+        // chain of thought must not read as the reply.
+        // `tool_calls` is the raw `AiToolCall[]` JSON the model asked for;
+        // `tool_results` maps call id to `ToolResult` JSON, so a call with no
+        // entry is still awaiting a verdict when the app was closed.
+        Migration {
+            version: 16,
+            description: "add_ai_message_trace",
+            sql: "
+                ALTER TABLE ai_messages ADD COLUMN reasoning TEXT NOT NULL DEFAULT '';
+                ALTER TABLE ai_messages ADD COLUMN tool_calls TEXT NOT NULL DEFAULT '[]';
+                ALTER TABLE ai_messages ADD COLUMN tool_results TEXT NOT NULL DEFAULT '{}';
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

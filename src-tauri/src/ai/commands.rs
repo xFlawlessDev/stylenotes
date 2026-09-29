@@ -103,6 +103,14 @@ impl EmittedEvent {
                 message: None,
                 call: None,
             },
+            StreamEvent::Reasoning { text } => Self {
+                request_id: request_id.to_string(),
+                kind: "reasoning",
+                text: Some(text),
+                finish_reason: None,
+                message: None,
+                call: None,
+            },
             StreamEvent::ToolCall { call } => Self {
                 request_id: request_id.to_string(),
                 kind: "tool_call",

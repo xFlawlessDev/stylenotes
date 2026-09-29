@@ -11,6 +11,7 @@
  */
 
 import type { McpAccess, McpScope } from '$lib/content/mcp-types';
+import type { ToolResult } from '$lib/content/ai-tools';
 
 /** Bumped whenever the streaming envelope or settings shape changes incompatibly. */
 export const AI_PROTOCOL = 1;
@@ -118,6 +119,8 @@ export type AiStreamRequest = {
 export type AiStreamEvent =
 	| { requestId: string; kind: 'start' }
 	| { requestId: string; kind: 'delta'; text: string }
+	/** The model's chain of thought, kept out of the answer body. */
+	| { requestId: string; kind: 'reasoning'; text: string }
 	| { requestId: string; kind: 'tool_call'; call: AiToolCall }
 	| { requestId: string; kind: 'done'; finishReason: string }
 	| { requestId: string; kind: 'error'; message: string };
@@ -139,7 +142,14 @@ export type AiMessageRecord = {
 	id: number;
 	threadId: string;
 	role: AiRole;
+	/** The answer body only; reasoning and tool traffic live in their own fields. */
 	content: string;
+	/** The model's chain of thought, when the provider streamed any. */
+	reasoning: string;
+	/** Tool calls the model requested on this turn, in request order. */
+	toolCalls: AiToolCall[];
+	/** Result per tool-call id. A call with no entry is still unanswered. */
+	toolResults: Record<string, ToolResult>;
 	createdAt: string;
 };
 

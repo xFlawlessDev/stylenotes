@@ -83,6 +83,9 @@ const message = (id: number, role: 'user' | 'assistant', content: string) => ({
 	threadId: 't1',
 	role,
 	content,
+	reasoning: '',
+	toolCalls: [],
+	toolResults: {},
 	createdAt: 'now'
 });
 

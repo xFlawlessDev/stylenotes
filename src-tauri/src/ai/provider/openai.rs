@@ -78,6 +78,37 @@ fn delta_text(payload: &str) -> Option<String> {
     }
 }
 
+/// Extracts the visible reasoning string from one SSE JSON payload.
+///
+/// Reasoner models put their chain of thought in a sibling of `content`:
+/// DeepSeek and most gateways use `reasoning_content`, OpenRouter and newer
+/// OpenAI-compatible servers use `reasoning`. Both are plain strings; some
+/// gateways send an array of parts, which is joined in order.
+fn reasoning_text(payload: &str) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_str(payload).ok()?;
+    let delta = json.get("choices")?.as_array()?.first()?.get("delta")?;
+    let raw = delta
+        .get("reasoning_content")
+        .or_else(|| delta.get("reasoning"))?;
+    let text = match raw {
+        serde_json::Value::String(value) => value.clone(),
+        serde_json::Value::Array(parts) => parts
+            .iter()
+            .filter_map(|part| {
+                part.as_str()
+                    .map(str::to_string)
+                    .or_else(|| part.get("text")?.as_str().map(str::to_string))
+            })
+            .collect::<String>(),
+        _ => return None,
+    };
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
 /// Reads the `finish_reason` from a choice, when present.
 fn finish_reason(payload: &str) -> Option<String> {
     let json: serde_json::Value = serde_json::from_str(payload).ok()?;
@@ -276,6 +307,9 @@ fn handle_line(
     // Tool-call fragments are collected here and emitted at the end of the
     // message, so the caller receives only fully assembled calls.
     tool_calls.push(data);
+    if let Some(text) = reasoning_text(data) {
+        return Some(Ok(StreamEvent::Reasoning { text }));
+    }
     delta_text(data).map(|text| Ok(StreamEvent::Delta { text }))
 }
 
@@ -293,6 +327,46 @@ mod tests {
     fn delta_text_ignores_empty_content() {
         let payload = r#"{"choices":[{"delta":{"content":""}}]}"#;
         assert_eq!(delta_text(payload), None);
+    }
+
+    #[test]
+    fn reasoning_text_reads_deepseek_field() {
+        let payload = r#"{"choices":[{"delta":{"reasoning_content":"let me think"}}]}"#;
+        assert_eq!(reasoning_text(payload).as_deref(), Some("let me think"));
+    }
+
+    /// OpenRouter and newer OpenAI-compatible servers use `reasoning`.
+    #[test]
+    fn reasoning_text_reads_openrouter_field() {
+        let payload = r#"{"choices":[{"delta":{"reasoning":"hmm"}}]}"#;
+        assert_eq!(reasoning_text(payload).as_deref(), Some("hmm"));
+    }
+
+    #[test]
+    fn reasoning_text_joins_part_arrays() {
+        let payload =
+            r#"{"choices":[{"delta":{"reasoning":[{"type":"text","text":"a"},{"text":"b"}]}}]}"#;
+        assert_eq!(reasoning_text(payload).as_deref(), Some("ab"));
+    }
+
+    #[test]
+    fn reasoning_text_ignores_plain_content() {
+        let payload = r#"{"choices":[{"delta":{"content":"an answer"}}]}"#;
+        assert_eq!(reasoning_text(payload), None);
+    }
+
+    /// Reasoning must win over content when a gateway streams both, so the
+    /// thought never leaks into the answer body.
+    #[test]
+    fn reasoning_takes_precedence_in_handle_line() {
+        let mut finish = "stop".to_string();
+        let mut calls = ToolCallAccumulator::default();
+        let line =
+            r#"data: {"choices":[{"delta":{"reasoning_content":"thinking","content":"answer"}}]}"#;
+        let event = handle_line(line, &mut finish, &mut calls)
+            .expect("an event")
+            .expect("no error");
+        assert!(matches!(event, StreamEvent::Reasoning { .. }));
     }
 
     #[test]

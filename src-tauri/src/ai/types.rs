@@ -109,6 +109,11 @@ pub enum StreamEvent {
     Delta {
         text: String,
     },
+    /// The model's visible reasoning. Separate from `Delta` so the frontend can
+    /// show it in its own collapsible block instead of the answer body.
+    Reasoning {
+        text: String,
+    },
     /// The model wants to call a tool. Emitted once per call, fully assembled.
     ToolCall {
         call: ToolCall,
