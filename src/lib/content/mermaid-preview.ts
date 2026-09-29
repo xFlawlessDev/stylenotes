@@ -1,5 +1,4 @@
 import DOMPurify from 'dompurify';
-import { addMermaidDownloadButtons } from '$lib/content/preview-actions';
 
 let mermaidModule: Promise<typeof import('mermaid').default> | undefined;
 let diagramId = 0;
@@ -39,10 +38,10 @@ export async function renderMermaidBlocks(
 			const safeSvg = DOMPurify.sanitize(svg, {
 				USE_PROFILES: { html: true, svg: true, svgFilters: true },
 			});
+			if (!safeSvg.includes('<svg')) continue;
 			const diagram = document.createElement('div');
 			diagram.className = 'mermaid-diagram';
 			diagram.innerHTML = safeSvg;
-			if (diagram.querySelector('svg')) addMermaidDownloadButtons(diagram);
 			code.parentElement?.replaceWith(diagram);
 		} catch {
 			continue;

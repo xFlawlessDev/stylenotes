@@ -262,6 +262,7 @@ describe('settingsRepo', () => {
 			density: 'comfortable',
 			reduceMotion: false,
 			editorView: 'preview',
+			taskView: 'write',
 			focusMode: false,
 			spellcheck: true,
 			showWordCount: true,

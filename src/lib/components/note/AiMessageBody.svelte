@@ -4,6 +4,7 @@
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { handleExternalLink } from '$lib/content/external-links';
+	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
 
 	/**
 	 * Renders assistant text as sanitized Markdown, using the exact pipeline the
@@ -70,7 +71,7 @@
 
 {#if html}
 	<!-- Sanitized by renderNoteHtml (DOMPurify); same trust boundary as the note preview. -->
-	<div bind:this={bodyEl} class={className} onclick={onBodyClick} role="presentation">{@html html}</div>
+	<div bind:this={bodyEl} class={className} onclick={onBodyClick} role="presentation" use:hydrateMermaid>{@html html}</div>
 {:else}
 	<div class="{className} whitespace-pre-wrap">{content}</div>
 {/if}

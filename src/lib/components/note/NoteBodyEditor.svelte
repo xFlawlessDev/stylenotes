@@ -14,6 +14,7 @@
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
+	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { settings, type EditorView } from '$lib/stores/settings.svelte';
 	import { Textarea } from '$lib/components/base';
@@ -352,7 +353,8 @@
 						onclick={togglePreviewCheckbox}
 					>
 						{#if html}
-							<div class="markdown-body">{@html html}</div>
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
 						{:else}
 							<p class="text-body-sm font-body text-outline">Preview appears here.</p>
 						{/if}
@@ -366,7 +368,8 @@
 					onclick={togglePreviewCheckbox}
 				>
 					{#if html}
-						<div class="markdown-body">{@html html}</div>
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
 					{:else}
 						<p class="text-body-md font-body text-outline">
 							This note is empty. Switch to Write to start composing.

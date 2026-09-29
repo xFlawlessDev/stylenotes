@@ -969,17 +969,271 @@ html.dark .markdown-body .shiki span {
 .markdown-body .mermaid-diagram {
 	max-width: 100%;
 	margin: 1.1rem 0;
-	overflow-x: auto;
+	overflow: hidden;
 	border: 1px solid var(--glass-stroke);
 	border-radius: 0.9rem;
 	background-color: color-mix(in oklab, var(--color-surface-container-lowest) 55%, transparent);
 }
 
-.markdown-body .mermaid-diagram svg {
+/* ---------------------------------------------------------- mermaid viewer */
+
+.mermaid-diagram-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.3rem 0.35rem 0.3rem 0.75rem;
+	border-bottom: 1px solid var(--glass-stroke);
+	background-color: color-mix(in oklab, var(--color-surface-container-low) 70%, transparent);
+}
+
+.mermaid-diagram-title {
+	font-family: var(--font-label);
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-outline);
+}
+
+.mermaid-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.mermaid-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.mermaid-icon-button:hover {
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 80%, transparent);
+	color: var(--color-on-surface);
+}
+
+.mermaid-icon-button:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
+/* Export dropdown */
+.mermaid-export {
+	position: relative;
+}
+
+.mermaid-export-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	height: 1.5rem;
+	padding: 0 0.5rem;
+	border: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+
+.mermaid-export-button:hover {
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 80%, transparent);
+	color: var(--color-on-surface);
+}
+
+.mermaid-export-button:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
+.mermaid-export-menu {
+	position: absolute;
+	top: calc(100% + 0.2rem);
+	right: 0;
+	z-index: 5;
+	display: flex;
+	min-width: 8rem;
+	flex-direction: column;
+	padding: 0.2rem;
+	border: 1px solid var(--glass-stroke);
+	border-radius: 0.6rem;
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 96%, transparent);
+	backdrop-filter: blur(var(--glass-blur));
+	-webkit-backdrop-filter: blur(var(--glass-blur));
+	box-shadow: 0 12px 30px -12px var(--glass-shadow);
+}
+
+.mermaid-export-menu[hidden] {
+	display: none;
+}
+
+.mermaid-export-item {
+	padding: 0.35rem 0.5rem;
+	border: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	font-family: var(--font-body);
+	font-size: 0.78rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mermaid-export-item:hover {
+	background-color: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+/* Pan/zoom canvas */
+.mermaid-diagram-canvas {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+}
+
+.mermaid-canvas-stage {
+	position: relative;
+	overflow: hidden;
+	height: 18rem;
+	cursor: grab;
+	touch-action: none;
+	background-image: radial-gradient(
+		color-mix(in oklab, var(--color-outline) 22%, transparent) 1px,
+		transparent 1px
+	);
+	background-size: 16px 16px;
+	background-position: 0 0;
+}
+
+.mermaid-canvas-stage.dragging {
+	cursor: grabbing;
+}
+
+.mermaid-canvas-content {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: 0 0;
+	/* No `will-change: transform` and no `backface-visibility`: promoting this
+	   layer makes the browser rasterize the SVG once at scale 1 and stretch the
+	   bitmap on zoom, which looks blurry. Letting it re-rasterize keeps vector
+	   text and strokes crisp at every zoom level. */
+}
+
+/* No `will-change: transform` here: promoting the content to its own
+   compositing layer rasterizes the SVG once at scale 1 and stretches the
+   bitmap on zoom, which looks blurry. Letting the browser re-rasterize keeps
+   vector text and strokes crisp at every zoom level. */
+.mermaid-canvas-content svg {
 	display: block;
-	max-width: 100%;
+	max-width: none;
 	height: auto;
-	margin: 0 auto;
+	/* Keep SVG vector rendering crisp when scaled by the canvas transform. */
+	image-rendering: auto;
+	shape-rendering: geometricPrecision;
+}
+
+.mermaid-canvas-controls {
+	position: absolute;
+	right: 0.6rem;
+	bottom: 0.6rem;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 0.1rem;
+	padding: 0.15rem;
+	border: 1px solid color-mix(in oklab, var(--glass-highlight) 50%, transparent);
+	border-radius: 0.7rem;
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 88%, transparent);
+	backdrop-filter: blur(var(--glass-blur));
+	-webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.mermaid-zoom-label-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 3rem;
+	height: 1.5rem;
+	padding: 0 0.35rem;
+	border: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.mermaid-zoom-label-button:hover {
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 80%, transparent);
+	color: var(--color-on-surface);
+}
+
+/* Full-screen overlay */
+.mermaid-fullscreen-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.25rem;
+	background-color: rgb(0 0 0 / 0.6);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+}
+
+.mermaid-fullscreen-body {
+	position: relative;
+	display: flex;
+	width: min(96vw, 1500px);
+	height: min(92vh, 1000px);
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid color-mix(in oklab, var(--glass-highlight) 50%, transparent);
+	border-radius: 1rem;
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 96%, transparent);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.08),
+		0 24px 60px -24px var(--glass-shadow);
+}
+
+.mermaid-fullscreen-canvas {
+	display: flex;
+	position: relative;
+	min-height: 0;
+	flex: 1 1 auto;
+	flex-direction: column;
+	overflow: hidden;
+	border-radius: 0 0 1rem 1rem;
+}
+
+.mermaid-fullscreen-canvas .mermaid-canvas-stage {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+	border-radius: 0;
+}
+
+.mermaid-fullscreen-close {
+	position: absolute;
+	top: 0.6rem;
+	right: 0.6rem;
+	z-index: 2;
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 90%, transparent);
 }
 
 .markdown-body hr {
@@ -1057,5 +1311,9 @@ html.dark .markdown-body .shiki span {
 .markdown-body--compact img,
 .markdown-body--compact .mermaid-diagram {
 	margin: 0.6rem 0;
+}
+
+.markdown-body--compact .mermaid-canvas-stage {
+	height: 12rem;
 }
 

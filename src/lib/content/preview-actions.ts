@@ -31,29 +31,10 @@ export function addCodeCopyButtons(html: string): string {
 	return template.innerHTML;
 }
 
-export function addMermaidDownloadButtons(container: HTMLElement) {
-	appendActionBar(container, [
-		['download-svg', 'SVG'],
-		['download-png', 'PNG'],
-	]);
-}
-
 export function extractCodeText(code: HTMLElement): string {
 	const lines = code.querySelectorAll('.line');
 	if (!lines.length) return code.textContent ?? '';
 	return Array.from(lines, (line) => line.textContent ?? '').join('\n');
-}
-
-export function serializeSvg(svg: SVGSVGElement): string {
-	const clone = svg.cloneNode(true) as SVGSVGElement;
-	clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-	if (!clone.getAttribute('width') && clone.viewBox.baseVal.width) {
-		clone.setAttribute('width', String(clone.viewBox.baseVal.width));
-	}
-	if (!clone.getAttribute('height') && clone.viewBox.baseVal.height) {
-		clone.setAttribute('height', String(clone.viewBox.baseVal.height));
-	}
-	return new XMLSerializer().serializeToString(clone);
 }
 
 export async function svgToPng(svgText: string): Promise<Blob> {
@@ -148,26 +129,6 @@ export async function handlePreviewAction(event: MouseEvent, root: HTMLElement):
 		try {
 			await navigator.clipboard.writeText(extractCodeText(code));
 			setActionFeedback(button, true);
-		} catch {
-			setActionFeedback(button, false);
-		}
-		return true;
-	}
-
-	if (action === 'download-svg' || action === 'download-png') {
-		const svg = button.closest('.mermaid-diagram')?.querySelector('svg');
-		if (!svg) {
-			setActionFeedback(button, false);
-			return true;
-		}
-		const snapshot = serializeSvg(svg);
-		const format = action === 'download-svg' ? 'svg' : 'png';
-		try {
-			const blob = format === 'svg'
-				? new Blob([snapshot], { type: 'image/svg+xml;charset=utf-8' })
-				: await svgToPng(snapshot);
-			const saved = await saveDiagram(blob, `mermaid-diagram.${format}`, format);
-			if (saved) setActionFeedback(button, true);
 		} catch {
 			setActionFeedback(button, false);
 		}

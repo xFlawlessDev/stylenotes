@@ -34,7 +34,7 @@ describe('renderMermaidBlocks', () => {
 		const html = await renderMermaidBlocks(source, async () => Promise.reject(new Error('invalid')));
 
 		expect(html).toContain('<pre><code class="language-mermaid">invalid syntax</code></pre>');
-		expect(html).not.toContain('data-preview-action="download-svg"');
+		expect(html).not.toContain('class="mermaid-diagram"');
 	});
 });
 
@@ -49,8 +49,6 @@ describe('renderNotePreviewHtml', () => {
 		expect(html).toContain('<svg');
 		expect(html).toContain('Start');
 		expect(html).toContain('End');
-		expect(html).toContain('data-preview-action="download-svg"');
-		expect(html).toContain('data-preview-action="download-png"');
 	});
 
 	it('keeps real diagram labels as SVG text after sanitizing', async () => {
