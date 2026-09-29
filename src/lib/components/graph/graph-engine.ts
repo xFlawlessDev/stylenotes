@@ -1,19 +1,24 @@
-import type { Container, FederatedPointerEvent, Graphics, Sprite, Text } from 'pixi.js';
-import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
+import * as THREE from 'three';
 import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
-import { GRAPH_TOKENS, graphEdgeColor, graphNodeColor, graphTokenColor } from '$lib/components/graph/graph-palette';
+import { refreshGraphPalette } from '$lib/components/graph/graph-palette';
+import { activeNodeId, buildAdjacency, nodeSize, type GraphFocus } from '$lib/components/graph/graph-appearance';
+import { createGraphAppearance } from '$lib/components/graph/graph-appearance-transition';
+import { buildGraphScene, retintGraphScene, sceneExtent, type GraphScene } from '$lib/components/graph/graph-scene';
+import { createCameraRig, framingDistance, HOME_DIRECTION } from '$lib/components/graph/graph-camera';
+import { attachGraphInput, type GraphInput } from '$lib/components/graph/graph-input';
+import { centerOffset, centroid, clampFraming } from '$lib/components/graph/graph-framing';
 
-type SimNode = GraphNode & SimulationNodeDatum;
-type SimLink = SimulationLinkDatum<SimNode> & { id: string; kind: GraphEdgeKind };
-
-type NodeView = {
-	container: Container;
-	halo: Sprite;
-	circle: Sprite;
-	label: Text;
-	fontSize: number;
-	node: SimNode;
-};
+/**
+ * Three.js 3D graph: nodes sit on per-folder orbital rings, links are one batched
+ * ribbon buffer, and hover/selection drives a per-node brightness transition the
+ * render loop eases toward.
+ *
+ * The scene is rebuilt only when the graph *shape* changes; highlight, edge-kind
+ * visibility, selection and theme mutate the existing buffers, so interacting
+ * with the graph never stutters on a rebuild. Camera behaviour lives in
+ * `graph-camera`, input in `graph-input`, buffer transitions in
+ * `graph-appearance-transition`.
+ */
 
 export type GraphEngine = {
 	update(nodes: GraphNode[], edges: GraphEdge[]): void;
@@ -21,490 +26,453 @@ export type GraphEngine = {
 	setVisibleKinds(kinds: Record<GraphEdgeKind, boolean>): void;
 	/** Persistent focus driven by the details drawer. */
 	setSelected(id: string | null): void;
-	/** Re-tint nodes, links and labels after a light/dark or accent change. */
+	/** Fly the camera to a node and pin it (used by search results). */
+	focusNode(id: string): void;
+	/** Fly the camera to frame an edge's full span. */
+	focusEdge(id: string): void;
+	/** Slow idle rotation, off for `prefers-reduced-motion`. */
+	setAutoRotate(enabled: boolean): void;
+	/** Re-tint nodes, links and guides after a light/dark or accent change. */
 	refreshTheme(): void;
+	/** Show or hide the decorative orbital rings. */
+	setGuidesVisible(visible: boolean): void;
 	fit(): void;
 	destroy(): void;
 };
 
 export type GraphEngineOptions = {
 	host: HTMLElement;
-	/** Node click: opens the details drawer (null when the background is clicked). */
+	/**
+	 * Node click: opens the details drawer (null when the background is clicked).
+	 * When `onclickFrames` is set the engine also flies the camera to the node, so
+	 * the click both selects and focuses.
+	 */
 	onselect: (node: GraphNode | null) => void;
-	/** Reports the hovered node (null when the pointer leaves), for the status pill. */
-	onfocus?: (node: GraphNode | null) => void;
+	/**
+	 * Double-clicking a node opens it. Optional: without it a double-click just
+	 * behaves like two selections.
+	 */
+	onopen?: (node: GraphNode) => void;
+	/**
+	 * Reports the hovered node (null when the pointer leaves), for the status pill
+	 * and the hover card. `screen` is the node's client-space position.
+	 */
+	onfocus?: (node: GraphNode | null, screen: { x: number; y: number } | null) => void;
 };
 
-function edgeStyle(kind: GraphEdgeKind): { width: number; alpha: number; color: number } {
-	const color = graphEdgeColor(kind);
-	if (kind === 'wiki') return { width: 0.8, alpha: 0.34, color };
-	if (kind === 'link') return { width: 0.9, alpha: 0.42, color };
-	return { width: 0.9, alpha: 0.38, color };
-}
+export async function createGraphEngine({ host, onselect, onopen, onfocus }: GraphEngineOptions): Promise<GraphEngine> {
+	let nodes: GraphNode[] = [];
+	let links: GraphEdge[] = [];
+	let scene: GraphScene | null = null;
 
-function seededRandom(seed = 42) {
-	let value = seed >>> 0;
-	return () => {
-		value = (value * 1664525 + 1013904223) >>> 0;
-		return value / 4294967296;
-	};
-}
-
-/**
- * Force-directed Pixi canvas themed by the workspace: node, link and label
- * colours resolve from CSS custom properties (see `graph-palette`), links are
- * drawn as one redrawable Graphics, and hover focus isolates a node's
- * connections. `refreshTheme` re-tints the scene after a light/dark swap.
- */
-export async function createGraphEngine({ host, onselect, onfocus }: GraphEngineOptions): Promise<GraphEngine> {
-	const PIXI = await import('pixi.js');
-	const { Viewport } = await import('pixi-viewport');
-	const d3 = await import('d3-force');
-
-	const width = Math.max(host.clientWidth, 480);
-	const height = Math.max(host.clientHeight, 320);
-	const worldWidth = width * 1.7;
-	const worldHeight = height * 1.7;
-
-	const app = new PIXI.Application();
-	await app.init({
-		width,
-		height,
-		backgroundAlpha: 0,
-		antialias: true,
-		autoDensity: true,
-		resolution: Math.min(window.devicePixelRatio || 1, 2),
-	});
-	app.canvas.style.display = 'block';
-	app.canvas.style.touchAction = 'none';
-	host.appendChild(app.canvas);
-
-	const viewport = new Viewport({
-		screenWidth: width,
-		screenHeight: height,
-		worldWidth,
-		worldHeight,
-		events: app.renderer.events,
-		passiveWheel: false,
-	});
-	viewport.drag().pinch().wheel({ smooth: 4 }).decelerate().clampZoom({ minScale: 0.35, maxScale: 4 });
-	app.stage.addChild(viewport);
-
-	const linksLayer = new PIXI.Graphics();
-	const nodesLayer = new PIXI.Container();
-	const labelsLayer = new PIXI.Container();
-	viewport.addChild(linksLayer, nodesLayer, labelsLayer);
-
-	const baseCircle = new PIXI.Graphics();
-	baseCircle.circle(0, 0, 24).fill(0xffffff);
-	const circleTexture = app.renderer.generateTexture({ target: baseCircle, resolution: 2, antialias: true });
-	baseCircle.destroy();
-
-	let simulation: Simulation<SimNode, SimLink> | null = null;
-	let simNodes: SimNode[] = [];
-	let simLinks: SimLink[] = [];
-	let highlight: Set<string> | null = null;
+	const focus: GraphFocus = { hoveredId: null, selectedId: null, highlight: null };
 	let visibleKinds: Record<GraphEdgeKind, boolean> = { wiki: true, dependency: true, link: true };
-	let hoverId: string | null = null;
-	let selectedId: string | null = null;
-	let dragging = false;
-	let fitted = false;
-	let dragPointerId: number | null = null;
-	let dragView: NodeView | null = null;
-	let dragActive = false;
-	let dragMoved = false;
-	let dragOrigin = { x: 0, y: 0 };
+	let adjacency = buildAdjacency([], []);
+	let appearance = createGraphAppearance(adjacency);
+	let appearanceDirty = true;
 
-	const nodeViews = new Map<string, NodeView>();
+	const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+	renderer.setClearColor(0x000000, 0);
+	renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-	function nodeRadius(node: GraphNode): number {
-		return Math.min(18, 7 + Math.sqrt(node.degree) * 3.2);
+	const canvas = renderer.domElement;
+	canvas.style.display = 'block';
+	canvas.style.touchAction = 'none';
+	canvas.style.cursor = 'grab';
+	canvas.tabIndex = 0;
+	host.appendChild(canvas);
+
+	const motionPreference =
+		typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+			? window.matchMedia('(prefers-reduced-motion: reduce)')
+			: null;
+	let reducedMotion = motionPreference?.matches ?? false;
+
+	const rig = createCameraRig({
+		canvas,
+		reducedMotion,
+		// Fires from OrbitControls, so `rig` is assigned before a user can interact.
+		onInteract: () => {
+			rig.cancel();
+			setHovered(null);
+		},
+	});
+	const { camera, controls } = rig;
+	rig.setAutoRotate(!reducedMotion);
+
+	const raycaster = new THREE.Raycaster();
+	const pointer = new THREE.Vector2();
+	const projected = new THREE.Vector3();
+	const viewPosition = new THREE.Vector3();
+	const hits: THREE.Intersection[] = [];
+
+	let input: GraphInput | null = null;
+	let frame = 0;
+	let disposed = false;
+	let firstResize = true;
+	let contextLost = false;
+
+	// ── Appearance ───────────────────────────────────────────────────────────
+
+	/** Recompute targets from the current focus; the render loop eases toward them. */
+	function retarget(): void {
+		if (!scene) return;
+		appearance.retarget(scene, nodes, links, focus, visibleKinds);
+		// Focused ribbons thicken slightly, so a highlighted path reads at a glance.
+		scene.edgeMaterial.uniforms.uScale.value = activeNodeId(focus) ? 1.35 : 1;
+		appearanceDirty = true;
 	}
 
-	/** Label style follows the workspace theme so text stays legible in both modes. */
-	function labelStyle(fontSize: number, degree: number) {
+	// ── Picking ──────────────────────────────────────────────────────────────
+
+	function pick(x: number, y: number): string | null {
+		const current = scene;
+		if (!current) return null;
+
+		const rect = canvas.getBoundingClientRect();
+		const px = x - rect.left;
+		const py = y - rect.top;
+		if (px < 0 || py < 0 || px > rect.width || py > rect.height) return null;
+
+		camera.updateMatrixWorld();
+		current.nodes.updateMatrixWorld();
+		pointer.set((px / rect.width) * 2 - 1, -(py / rect.height) * 2 + 1);
+
+		// A conservative world-space threshold, then a screen-space reject: a point
+		// can be near in world space yet far from the cursor on screen.
+		const farthestDepth = camera.position.length() + sceneExtent(current.layout) * 1.2;
+		raycaster.params.Points.threshold =
+			((2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * farthestDepth) / rect.height) * 16;
+		raycaster.setFromCamera(pointer, camera);
+
+		hits.length = 0;
+		raycaster.intersectObject(current.nodes, false, hits);
+
+		let closest: string | null = null;
+		let best = Infinity;
+
+		for (const hit of hits) {
+			if (hit.index === undefined) continue;
+			const position = current.layout.positions[hit.index];
+			if (!position) continue;
+
+			projected.copy(position).project(camera);
+			if (projected.z < -1 || projected.z > 1) continue;
+
+			const sx = (projected.x * 0.5 + 0.5) * rect.width;
+			const sy = (-projected.y * 0.5 + 0.5) * rect.height;
+			viewPosition.copy(position).applyMatrix4(camera.matrixWorldInverse);
+
+			const attenuation = THREE.MathUtils.clamp(110 / Math.max(1, -viewPosition.z), 0.72, 1.65);
+			const radius = THREE.MathUtils.clamp(current.sizes[hit.index] * attenuation * 0.42, 8, 18);
+			const distance = (sx - px) ** 2 + (sy - py) ** 2;
+
+			if (distance <= radius * radius && distance < best) {
+				best = distance;
+				closest = current.ids[hit.index] ?? null;
+			}
+		}
+
+		return closest;
+	}
+
+	function nodeById(id: string | null): GraphNode | null {
+		return id ? (nodes.find((node) => node.id === id) ?? null) : null;
+	}
+
+	/**
+	 * Screen position of a node in client coordinates, for anchoring overlays like
+	 * the hover card. Null when the node is behind the camera.
+	 */
+	function projectToScreen(id: string): { x: number; y: number } | null {
+		const current = scene;
+		const index = current ? current.ids.indexOf(id) : -1;
+		if (!current || index < 0) return null;
+
+		const rect = canvas.getBoundingClientRect();
+		projected.copy(current.layout.positions[index]).project(camera);
+		if (projected.z < -1 || projected.z > 1) return null;
+
 		return {
-			fontFamily: 'Inter, Arial, sans-serif',
-			fontSize,
-			fill: graphTokenColor(GRAPH_TOKENS.label),
-			stroke: { color: graphTokenColor(GRAPH_TOKENS.labelStroke), width: degree >= 4 ? 5 : 4 },
-			fontWeight: (degree >= 4 ? '600' : '400') as '600' | '400',
+			x: rect.left + (projected.x * 0.5 + 0.5) * rect.width,
+			y: rect.top + (-projected.y * 0.5 + 0.5) * rect.height,
 		};
 	}
 
-	function refreshTheme() {
-		for (const view of nodeViews.values()) {
-			view.halo.tint = graphNodeColor(view.node);
-			view.circle.tint = graphNodeColor(view.node);
-			view.label.style = labelStyle(view.fontSize, view.node.degree);
+	function setHovered(id: string | null): void {
+		if (focus.hoveredId !== id) {
+			focus.hoveredId = id;
+			retarget();
+			onfocus?.(nodeById(id), id ? projectToScreen(id) : null);
 		}
-		drawLinks();
+		input?.setCursor(input.pointerCount > 0 ? 'grabbing' : id === null ? 'grab' : 'pointer');
 	}
 
-	function linkNode(endpoint: string | number | SimNode): SimNode | undefined {
-		return typeof endpoint === 'object' ? endpoint : simNodes.find((node) => node.id === String(endpoint));
-	}
+	// ── Sizing ───────────────────────────────────────────────────────────────
 
-	function linkEnds(link: SimLink): { source: SimNode; target: SimNode } | null {
-		const source = linkNode(link.source);
-		const target = linkNode(link.target);
-		return source && target ? { source, target } : null;
-	}
+	function resize(): void {
+		const width = Math.max(1, host.clientWidth);
+		const height = Math.max(1, host.clientHeight);
+		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-	function connectedTo(id: string): Set<string> {
-		const ids = new Set<string>([id]);
-		for (const link of simLinks) {
-			const ends = linkEnds(link);
-			if (!ends) continue;
-			if (ends.source.id === id) ids.add(ends.target.id);
-			if (ends.target.id === id) ids.add(ends.source.id);
-		}
-		return ids;
-	}
+		renderer.setPixelRatio(dpr);
+		renderer.setSize(width, height, false);
+		camera.aspect = width / height;
+		camera.updateProjectionMatrix();
 
-	function focus(): string | null {
-		return hoverId ?? selectedId;
-	}
+		const distance = framingDistance((scene ? sceneExtent(scene.layout) : 40) * 1.05, camera.fov, camera.aspect);
+		rig.homePosition.copy(HOME_DIRECTION).multiplyScalar(distance);
+		controls.maxDistance = Math.max(160, distance * 1.8);
 
-	function drawLinks() {
-		linksLayer.clear();
-		for (const kind of ['wiki', 'link', 'dependency'] as GraphEdgeKind[]) {
-			if (!visibleKinds[kind]) continue;
-			const style = edgeStyle(kind);
-			let drew = false;
-			for (const link of simLinks) {
-				if (link.kind !== kind) continue;
-				const ends = linkEnds(link);
-				if (!ends) continue;
-				linksLayer.moveTo(ends.source.x ?? 0, ends.source.y ?? 0);
-				linksLayer.lineTo(ends.target.x ?? 0, ends.target.y ?? 0);
-				drew = true;
-			}
-			if (drew) linksLayer.stroke({ width: style.width, color: style.color, alpha: style.alpha });
+		if (scene) {
+			scene.nodeMaterial.uniforms.uDpr.value = dpr;
+			scene.coreMaterial.uniforms.uDpr.value = dpr;
+			// Ribbon thickness is authored in CSS pixels, so the shader needs the
+			// CSS-pixel viewport, not the device-pixel drawing buffer.
+			(scene.edgeMaterial.uniforms.uResolution.value as THREE.Vector2).set(width, height);
+			scene.edgeMaterial.uniforms.uScale.value = 1;
+			scene.edgeMaterial.uniforms.uHalfFovTan.value = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 		}
 
-		// Focus pass: the focused node's connections glow in its own colour.
-		const focusNodeId = focus();
-		const focusView = focusNodeId ? nodeViews.get(focusNodeId) : undefined;
-		const activeIds = focusNodeId ? connectedTo(focusNodeId) : highlight;
-		if (!activeIds || activeIds.size === 0) return;
-		const color = focusView ? graphNodeColor(focusView.node) : graphTokenColor(GRAPH_TOKENS.label);
-		let drew = false;
-		for (const link of simLinks) {
-			if (!visibleKinds[link.kind]) continue;
-			const ends = linkEnds(link);
-			if (!ends) continue;
-			if (!activeIds.has(ends.source.id) && !activeIds.has(ends.target.id)) continue;
-			linksLayer.moveTo(ends.source.x ?? 0, ends.source.y ?? 0);
-			linksLayer.lineTo(ends.target.x ?? 0, ends.target.y ?? 0);
-			drew = true;
-		}
-		if (drew) linksLayer.stroke({ width: 1.8, color, alpha: focusNodeId ? 0.72 : 0.5 });
-	}
-
-	function applyDimming() {
-		const focusNodeId = focus();
-		const activeIds = focusNodeId ? connectedTo(focusNodeId) : highlight;
-		for (const [id, view] of nodeViews) {
-			const active = !activeIds || activeIds.has(id);
-			view.container.alpha = active ? 1 : 0.2;
-			view.label.alpha = active ? 1 : 0.18;
-			view.halo.alpha = id === focusNodeId ? 0.22 : 0.07;
-			view.container.scale.set(id === focusNodeId ? 1.22 : 1);
+		// Only the very first resize positions the camera. Later ones must not: a
+		// rebuild would otherwise yank the view back to the "fit everything" pose
+		// right after a search flight had aimed it at a node.
+		if (firstResize) {
+			camera.position.copy(rig.homePosition);
+			controls.target.set(0, 0, 0);
+			controls.update(0);
+			firstResize = false;
+		} else if (focus.selectedId === null && !input?.pointerCount && !rig.flight) {
+			// Keep the orientation, but refit the orbital envelope.
+			const direction = camera.position.clone().sub(controls.target).normalize();
+			if (direction.lengthSq() === 0) direction.copy(HOME_DIRECTION);
+			camera.position.copy(controls.target).addScaledVector(direction, distance);
+			controls.update(0);
 		}
 	}
 
-	function refreshFocus() {
-		drawLinks();
-		applyDimming();
-	}
+	// ── Rebuild ──────────────────────────────────────────────────────────────
 
-	function setSelected(id: string | null) {
-		selectedId = id;
-		refreshFocus();
-	}
+	function build(nextNodes: GraphNode[], nextLinks: GraphEdge[]): void {
+		const isFirstBuild = scene === null;
+		scene?.dispose();
+		nodes = nextNodes;
+		links = nextLinks;
+		adjacency = buildAdjacency(nodes, links);
+		appearance = createGraphAppearance(adjacency);
 
-	function nodeAt(world: { x: number; y: number }): NodeView | null {
-		let found: NodeView | null = null;
-		let best = Infinity;
-		for (const view of nodeViews.values()) {
-			const distance = Math.hypot((view.node.x ?? 0) - world.x, (view.node.y ?? 0) - world.y);
-			if (distance > nodeRadius(view.node) + 6 || distance >= best) continue;
-			best = distance;
-			found = view;
-		}
-		return found;
-	}
+		scene = buildGraphScene(nodes, links);
 
-	function pointerToWorld(event: PointerEvent) {
-		const rect = app.canvas.getBoundingClientRect();
-		return viewport.toWorld(event.clientX - rect.left, event.clientY - rect.top);
-	}
-
-	/** Press-and-hold a node to move it; the rest of the layout re-settles. */
-	function beginNodeDrag(view: NodeView, event: FederatedPointerEvent) {
-		if (event.button !== 0 || dragPointerId !== null) return;
-		event.stopPropagation();
-		dragPointerId = event.pointerId;
-		dragView = view;
-		dragActive = false;
-		dragMoved = false;
-		dragOrigin = { x: event.clientX, y: event.clientY };
-		// Keep the viewport from panning while the node is held.
-		viewport.plugins.pause('drag');
-		window.addEventListener('pointermove', onNodePointerMove);
-		window.addEventListener('pointerup', onNodePointerUp);
-		window.addEventListener('pointercancel', onNodePointerUp);
-	}
-
-	function onNodePointerMove(event: PointerEvent) {
-		const view = dragView;
-		if (event.pointerId !== dragPointerId || !view) return;
-		if (!dragActive) {
-			const moved = Math.hypot(event.clientX - dragOrigin.x, event.clientY - dragOrigin.y);
-			if (moved < 4) return;
-			dragActive = true;
-			dragMoved = true;
-			view.container.cursor = 'grabbing';
-			app.canvas.style.cursor = 'grabbing';
-			simulation?.alphaTarget(0.18).restart();
-		}
-		const point = pointerToWorld(event);
-		view.node.fx = point.x;
-		view.node.fy = point.y;
-		// Follow the pointer exactly so the node never slips out from under it.
-		view.node.x = point.x;
-		view.node.y = point.y;
-		view.container.position.set(point.x, point.y);
-		view.label.position.set(point.x + nodeRadius(view.node) + 5, point.y - view.fontSize * 0.45);
-	}
-
-	function endNodeDrag() {
-		const view = dragView;
-		window.removeEventListener('pointermove', onNodePointerMove);
-		window.removeEventListener('pointerup', onNodePointerUp);
-		window.removeEventListener('pointercancel', onNodePointerUp);
-		dragPointerId = null;
-		dragView = null;
-		viewport.plugins.resume('drag');
-		app.canvas.style.cursor = '';
-		if (view) {
-			view.node.fx = null;
-			view.node.fy = null;
-			view.container.cursor = 'pointer';
-		}
-		if (dragActive) simulation?.alphaTarget(0);
-		dragActive = false;
-	}
-
-	function onNodePointerUp(event: PointerEvent) {
-		if (event.pointerId !== dragPointerId) return;
-		endNodeDrag();
-	}
-
-	function syncPositions() {
-		for (const view of nodeViews.values()) {
-			const radius = nodeRadius(view.node);
-			view.container.position.set(view.node.x ?? 0, view.node.y ?? 0);
-			view.label.position.set((view.node.x ?? 0) + radius + 5, (view.node.y ?? 0) - view.fontSize * 0.45);
-		}
-	}
-
-	function fit() {
-		if (!simNodes.length) return;
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-		for (const node of simNodes) {
-			const x = node.x ?? 0;
-			const y = node.y ?? 0;
-			minX = Math.min(minX, x);
-			maxX = Math.max(maxX, x);
-			minY = Math.min(minY, y);
-			maxY = Math.max(maxY, y);
-		}
-		const viewWidth = Math.max(1, host.clientWidth);
-		const viewHeight = Math.max(1, host.clientHeight);
-		const spanX = Math.max(220, maxX - minX + 260);
-		const spanY = Math.max(220, maxY - minY + 260);
-		const scale = Math.min(1.6, Math.max(0.35, Math.min(viewWidth / spanX, viewHeight / spanY)));
-		viewport.setZoom(scale, true);
-		viewport.moveCenter((minX + maxX) / 2, (minY + maxY) / 2);
-	}
-
-	function build(nodes: GraphNode[], edges: GraphEdge[]) {
-		if (dragPointerId !== null) endNodeDrag();
-		simulation?.stop();
-		for (const layer of [nodesLayer, labelsLayer]) {
-			for (const child of layer.removeChildren()) child.destroy({ children: true });
-		}
-		nodeViews.clear();
-		hoverId = null;
-		if (selectedId && !nodes.some((node) => node.id === selectedId)) {
-			selectedId = null;
+		if (focus.selectedId && !nodes.some((node) => node.id === focus.selectedId)) {
+			focus.selectedId = null;
 			onselect(null);
 		}
+		if (focus.hoveredId && !nodes.some((node) => node.id === focus.hoveredId)) focus.hoveredId = null;
 
-		simNodes = nodes.map((node) => ({ ...node }));
-		simLinks = edges.map((edge) => ({
-			id: edge.id,
-			kind: edge.kind,
-			source: edge.source,
-			target: edge.target,
-		}));
+		retarget();
+		// Snap to the settled values so a rebuild never animates in from nothing.
+		appearance.settle(scene, nodes, links);
+		appearanceDirty = false;
 
-		// One anchor per folder spreads the graph into clusters, like the
-		// reference demo's per-group anchors.
-		const anchors = new Map<string, { x: number; y: number }>();
-		const folderKeys = [...new Set(simNodes.map((node) => node.folder))];
-		folderKeys.forEach((folder, index) => {
-			const angle = (index / Math.max(1, folderKeys.length)) * Math.PI * 2 - Math.PI / 2;
-			anchors.set(folder, {
-				x: worldWidth * 0.5 + Math.cos(angle) * worldWidth * 0.24,
-				y: worldHeight * 0.5 + Math.sin(angle) * worldHeight * 0.24,
-			});
-		});
-		const rand = seededRandom(42);
-		for (const node of simNodes) {
-			const anchor = anchors.get(node.folder) ?? { x: worldWidth * 0.5, y: worldHeight * 0.5 };
-			node.x = anchor.x + (rand() - 0.5) * worldWidth * 0.12;
-			node.y = anchor.y + (rand() - 0.5) * worldHeight * 0.12;
-		}
-
-		for (const node of simNodes) {
-			const radius = nodeRadius(node);
-			const container = new PIXI.Container();
-			container.position.set(node.x ?? 0, node.y ?? 0);
-			container.eventMode = 'static';
-			container.cursor = 'pointer';
-			container.hitArea = new PIXI.Circle(0, 0, Math.max(radius + 7, 12));
-
-			const halo = new PIXI.Sprite(circleTexture);
-			halo.anchor.set(0.5);
-			halo.tint = graphNodeColor(node);
-			halo.alpha = 0.07;
-			halo.width = radius * 3.3;
-			halo.height = radius * 3.3;
-
-			const circle = new PIXI.Sprite(circleTexture);
-			circle.anchor.set(0.5);
-			circle.tint = graphNodeColor(node);
-			circle.alpha = 0.95;
-			circle.width = radius * 2;
-			circle.height = radius * 2;
-
-			container.addChild(halo, circle);
-
-			const fontSize = node.degree >= 4 ? 14 : node.degree >= 1 ? 12 : 11;
-			const label = new PIXI.Text({
-				text: node.title,
-				style: labelStyle(fontSize, node.degree),
-			});
-			label.resolution = 2;
-			label.position.set((node.x ?? 0) + radius + 5, (node.y ?? 0) - fontSize * 0.45);
-			labelsLayer.addChild(label);
-
-			const view: NodeView = { container, halo, circle, label, fontSize, node };
-			nodeViews.set(node.id, view);
-
-			container.on('pointerover', () => {
-				hoverId = node.id;
-				refreshFocus();
-				onfocus?.(node);
-			});
-			container.on('pointerout', () => {
-				hoverId = null;
-				refreshFocus();
-				onfocus?.(null);
-			});
-			container.on('pointerdown', (event) => beginNodeDrag(view, event));
-			container.on('pointertap', () => {
-				if (dragging || dragMoved) return;
-				selectedId = node.id;
-				refreshFocus();
-				onselect(node);
-			});
-			nodesLayer.addChild(container);
-		}
-
-		simulation = d3
-			.forceSimulation<SimNode>(simNodes)
-			.force(
-				'link',
-				d3
-					.forceLink<SimNode, SimLink>(simLinks)
-					.id((node) => node.id)
-					.distance((link) => (link.kind === 'dependency' ? 120 : link.kind === 'link' ? 80 : 95))
-					.strength(0.55),
-			)
-			.force('charge', d3.forceManyBody<SimNode>().strength((node) => (node.degree >= 4 ? -380 : -140)))
-			.force('collide', d3.forceCollide<SimNode>().radius((node) => nodeRadius(node) + 6).iterations(2))
-			.force('x', d3.forceX<SimNode>((node) => anchors.get(node.folder)?.x ?? worldWidth / 2).strength(0.08))
-			.force('y', d3.forceY<SimNode>((node) => anchors.get(node.folder)?.y ?? worldHeight / 2).strength(0.08))
-			.force('center', d3.forceCenter(worldWidth / 2, worldHeight / 2));
-		simulation.stop();
-		simulation.tick(340);
-		// Live ticks only happen while a node is being dragged (reheat below).
-		simulation.on('tick', () => {
-			syncPositions();
-			drawLinks();
-		});
-
-		syncPositions();
-		drawLinks();
-		applyDimming();
-		if (!fitted && simNodes.length) {
-			fitted = true;
-			fit();
-		}
+		// Only the initial build positions the camera; a later rebuild (a new note,
+		// a renamed title) must leave the user's viewpoint alone.
+		if (isFirstBuild) firstResize = true;
+		resize();
 	}
 
-	const resizeObserver = new ResizeObserver(() => {
-		const nextWidth = Math.max(1, host.clientWidth);
-		const nextHeight = Math.max(1, host.clientHeight);
-		app.renderer.resize(nextWidth, nextHeight);
-		viewport.resize(nextWidth, nextHeight, worldWidth, worldHeight);
+	// ── Camera framing ───────────────────────────────────────────────────────
+
+	/** Viewport description the framing helpers need. */
+	function viewport(): { width: number; height: number; fov: number } {
+		return { width: Math.max(1, host.clientWidth), height: Math.max(1, host.clientHeight), fov: camera.fov };
+	}
+
+	/**
+	 * Fly to `anchor` at a distance derived from the graph's own extent.
+	 *
+	 * A fraction of the extent rather than an absolute distance: point sprites
+	 * keep a fixed pixel size, so their apparent size never changes with distance,
+	 * and framing is really about how much of the layout stays in view. A fixed
+	 * distance would be too close on a small graph and too far on a large one.
+	 */
+	function frameSubject(anchor: THREE.Vector3, fraction: number): void {
+		const current = scene;
+		if (!current) return;
+
+		const direction = camera.position.clone().sub(controls.target).normalize();
+		if (direction.lengthSq() === 0) direction.copy(HOME_DIRECTION);
+
+		const extent = Math.max(40, sceneExtent(current.layout));
+		const distance = THREE.MathUtils.clamp(extent * clampFraming(fraction), 50, camera.far * 0.5);
+		const position = anchor.clone().addScaledVector(direction, distance);
+
+		// Compute the offset against the *destination* camera, so it is correct for
+		// the final framing rather than the one we are leaving.
+		const view = viewport();
+		const probe = camera.clone();
+		probe.position.copy(position);
+		probe.lookAt(anchor);
+		probe.updateMatrixWorld();
+		position.add(centerOffset(probe, anchor, view));
+
+		rig.flyTo(anchor, position);
+	}
+
+	function focusNode(id: string): void {
+		const current = scene;
+		const index = current ? current.ids.indexOf(id) : -1;
+		if (!current || index < 0) return;
+
+		// Close enough that the node dominates, wide enough that its neighbours —
+		// the links the user is inspecting — stay on screen.
+		frameSubject(current.layout.positions[index], 0.6);
+		setHovered(null);
+	}
+
+	/**
+	 * Frame an edge's full span, centred between its endpoints and pulled back far
+	 * enough that the whole link, plus the nodes it joins, is in view.
+	 */
+	function focusEdge(edgeId: string): void {
+		const current = scene;
+		if (!current) return;
+		const index = links.findIndex((edge) => edge.id === edgeId);
+		const curve = index >= 0 ? current.edgeCurves[index] : undefined;
+		if (!curve || curve.length === 0) return;
+
+		const from = curve[0];
+		const to = curve[curve.length - 1];
+		const span = from.distanceTo(to);
+		const extent = Math.max(40, sceneExtent(current.layout));
+		// Never closer than the node framing; back off as the edge gets longer.
+		frameSubject(centroid([from, to]), Math.max(0.6, (span * 1.6) / extent));
+		setHovered(null);
+	}
+
+	// ── Render loop ──────────────────────────────────────────────────────────
+
+	let lastTime = performance.now();
+
+	function animate(now: number): void {
+		if (disposed) return;
+		frame = requestAnimationFrame(animate);
+
+		const current = scene;
+		const delta = Math.min((now - lastTime) / 1000, 0.05);
+		lastTime = now;
+		if (!current || document.hidden || contextLost) return;
+
+		const cameraChanged = rig.step(delta, now);
+
+		if (appearanceDirty) appearanceDirty = appearance.step(current, nodes, links, delta, reducedMotion);
+
+		if (input?.canHover() && !rig.flight && (input.pointerDirty || cameraChanged)) {
+			setHovered(pick(input.x, input.y));
+			input.markHovered();
+		}
+
+		renderer.render(current.scene, camera);
+	}
+
+	// ── Wiring ───────────────────────────────────────────────────────────────
+
+	input = attachGraphInput({
+		canvas,
+		rig,
+		handlers: {
+			onclick(x, y) {
+				const node = nodeById(pick(x, y));
+				const wasSelected = node !== null && node.id === focus.selectedId;
+
+				// Pin the selection here rather than waiting for the drawer's effect,
+				// so the "second click opens" check below is against current state.
+				focus.selectedId = node?.id ?? null;
+				onselect(node);
+				retarget();
+
+				// Clicking a node focuses it exactly like picking from the search
+				// list: the drawer opens *and* the camera moves in. Clicking empty
+				// space clears the selection and leaves the viewpoint alone.
+				if (!node) return;
+
+				focusNode(node.id);
+
+				// A second click on the already-pinned node opens it. Comparing
+				// against the selection rather than timing keeps this independent of
+				// click speed.
+				if (onopen && wasSelected) onopen(node);
+			},
+			onhover(x, y) {
+				if (rig.flight) return;
+				setHovered(pick(x, y));
+			},
+			onclear() {
+				setHovered(null);
+			},
+			oncontext(lost) {
+				contextLost = lost;
+				if (!lost) input?.markHovered();
+			},
+		},
 	});
+
+	function onMotionChange(event: MediaQueryListEvent): void {
+		reducedMotion = event.matches;
+		rig.duration = reducedMotion ? 0 : 1100;
+		if (!reducedMotion) return;
+		rig.cancel();
+		if (rig.flight) rig.flight.duration = 0;
+	}
+
+	motionPreference?.addEventListener('change', onMotionChange);
+
+	const resizeObserver = new ResizeObserver(resize);
 	resizeObserver.observe(host);
 
-	viewport.on('drag-start', () => {
-		dragging = true;
-	});
-	viewport.on('drag-end', () => {
-		dragging = false;
-	});
-	viewport.on('clicked', (event) => {
-		// Clicks that land on a node are handled by the node's own tap handler.
-		if (nodeAt(event.world)) return;
-		if (selectedId === null) return;
-		selectedId = null;
-		refreshFocus();
-		onselect(null);
-	});
+	frame = requestAnimationFrame(animate);
 
 	return {
 		update: build,
-		setHighlight(next) {
-			highlight = next;
-			drawLinks();
-			applyDimming();
+		setHighlight(ids) {
+			focus.highlight = ids;
+			retarget();
 		},
-		setVisibleKinds(next) {
-			visibleKinds = next;
-			drawLinks();
+		setVisibleKinds(kinds) {
+			visibleKinds = kinds;
+			retarget();
 		},
-		setSelected,
-		refreshTheme,
-		fit,
+		setSelected(id) {
+			focus.selectedId = id;
+			retarget();
+		},
+		focusNode,
+		focusEdge,
+		setAutoRotate(enabled) {
+			rig.setAutoRotate(enabled);
+		},
+		refreshTheme() {
+			// The palette caches against the DOM theme key, so it must be dropped
+			// before any token is resolved again.
+			refreshGraphPalette();
+			if (scene) retintGraphScene(scene, nodes, links);
+		},
+		setGuidesVisible(visible) {
+			if (scene) scene.guides.visible = visible;
+		},
+		fit() {
+			rig.fit();
+		},
 		destroy() {
-			simulation?.stop();
-			simulation = null;
+			disposed = true;
+			cancelAnimationFrame(frame);
 			resizeObserver.disconnect();
-			window.removeEventListener('pointermove', onNodePointerMove);
-			window.removeEventListener('pointerup', onNodePointerUp);
-			window.removeEventListener('pointercancel', onNodePointerUp);
-			app.destroy(true, { children: true, texture: true });
+			input?.destroy();
+			scene?.dispose();
+			scene = null;
+			rig.dispose();
+			renderer.dispose();
+			motionPreference?.removeEventListener('change', onMotionChange);
+			canvas.remove();
 		},
 	};
 }

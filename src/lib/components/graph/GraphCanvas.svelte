@@ -12,8 +12,14 @@
 		kinds,
 		highlight = null,
 		selectedId = null,
+		focusId = null,
+		focusToken = 0,
+		focusEdgeId = null,
 		fitToken = 0,
+		spinning = true,
+		guides = false,
 		onselect,
+		onopen,
 		onfocus,
 	}: {
 		nodes: GraphNode[];
@@ -21,9 +27,21 @@
 		kinds: Record<GraphEdgeKind, boolean>;
 		highlight?: Set<string> | null;
 		selectedId?: string | null;
+		/** When set, the camera flies to that node. */
+		focusId?: string | null;
+		/** Bumping this re-applies `focusId`, so re-picking the same node re-frames. */
+		focusToken?: number;
+		/** When set, the camera frames that edge's full span. */
+		focusEdgeId?: string | null;
 		fitToken?: number;
+		/** Idle auto-rotation around the layout. */
+		spinning?: boolean;
+		/** Show the decorative orbital rings. Off by default: they are not data. */
+		guides?: boolean;
 		onselect: (node: GraphNode | null) => void;
-		onfocus?: (node: GraphNode | null) => void;
+		/** Double-clicking a node opens it. */
+		onopen?: (node: GraphNode) => void;
+		onfocus?: (node: GraphNode | null, screen: { x: number; y: number } | null) => void;
 	} = $props();
 
 	let host = $state<HTMLDivElement | null>(null);
@@ -35,7 +53,7 @@
 		let disposed = false;
 		let created: GraphEngine | null = null;
 		refreshGraphPalette();
-		void createGraphEngine({ host: host!, onselect, onfocus })
+		void createGraphEngine({ host: host!, onselect, onopen, onfocus })
 			.then((next) => {
 				if (disposed) {
 					next.destroy();
@@ -73,6 +91,27 @@
 
 	$effect(() => {
 		engine?.setSelected(selectedId);
+	});
+
+	// A new `focusId` flies the camera; `undefined` is inert so clearing the
+	// search does not move the view. `focusToken` makes a repeated pick re-frame.
+	$effect(() => {
+		void focusToken;
+		if (focusId) engine?.focusNode(focusId);
+	});
+
+	// Framing an edge is a separate intent from selecting a node: it takes in the
+	// whole span rather than one endpoint.
+	$effect(() => {
+		if (focusEdgeId) engine?.focusEdge(focusEdgeId);
+	});
+
+	$effect(() => {
+		engine?.setAutoRotate(spinning);
+	});
+
+	$effect(() => {
+		engine?.setGuidesVisible(guides);
 	});
 
 	$effect(() => {
