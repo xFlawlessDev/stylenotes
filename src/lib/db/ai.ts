@@ -20,6 +20,9 @@ const DEFAULT_SETTINGS: AiSettings = {
 	hasKey: false,
 	access: 'read',
 	scopes: [],
+	searchProvider: '',
+	hasSearchKey: false,
+	searchFallbacks: [],
 	updatedAt: ''
 };
 
@@ -34,6 +37,9 @@ type AiSettingsRow = {
 	api_key: string;
 	access: string;
 	scopes: string;
+	search_provider?: string | null;
+	search_api_key?: string | null;
+	search_fallbacks?: string | null;
 	updated_at: string;
 };
 
@@ -109,8 +115,25 @@ function toSettings(row: AiSettingsRow): AiSettings {
 		hasKey: row.api_key.trim().length > 0,
 		access: row.access === 'write' ? 'write' : 'read',
 		scopes: parseScopes(row.scopes),
+		searchProvider: row.search_provider ?? '',
+		// The search key is ciphertext too; only its presence is exposed.
+		hasSearchKey: (row.search_api_key ?? '').trim().length > 0,
+		searchFallbacks: parseStringList(row.search_fallbacks),
 		updatedAt: row.updated_at
 	};
+}
+
+/** Parses a JSON string array column, dropping anything not a usable name. */
+function parseStringList(raw: string | null | undefined): string[] {
+	if (!raw) return [];
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return Array.isArray(parsed)
+			? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+			: [];
+	} catch {
+		return [];
+	}
 }
 
 function toThread(row: AiThreadRow): AiThread {
@@ -178,50 +201,84 @@ export const aiRepo = {
 	},
 
 	/**
+	 * Reads the encrypted search key. Like `loadKey`, only Rust can make sense
+	 * of it, so it never feeds the UI directly.
+	 */
+	async loadSearchKey(): Promise<string> {
+		try {
+			const db = await getDb();
+			await ensureRow(db);
+			const rows = await db.select<{ search_api_key: string }[]>(
+				'SELECT search_api_key FROM ai_settings WHERE id = 1'
+			);
+			return rows[0]?.search_api_key ?? '';
+		} catch {
+			return '';
+		}
+	},
+
+	/**
 	 * Saves settings. `key` is `{ value, hasKey }` where `value` is already
 	 * ciphertext from `ai_encrypt_key`; omit it to leave the stored key alone.
+	 * `searchKey` works the same way for the web search key.
 	 */
 	async saveSettings(
 		settings: AiSettings,
-		key?: { value: string; hasKey: boolean }
+		key?: { value: string; hasKey: boolean },
+		searchKey?: { value: string; hasKey: boolean }
 	): Promise<boolean> {
 		try {
 			const db = await getDb();
 			await ensureRow(db);
-			if (key) {
+			const base = [
+				settings.enabled ? 1 : 0,
+				settings.provider,
+				settings.baseUrl,
+				settings.model,
+				settings.temperature,
+				settings.maxTokens,
+				settings.access,
+				JSON.stringify(settings.scopes),
+				settings.searchProvider,
+				JSON.stringify(settings.searchFallbacks)
+			];
+			// Each optional key needs its own statement: a parameter cannot
+			// stand in for a column that should keep its current value.
+			if (key && searchKey) {
 				await db.execute(
 					`UPDATE ai_settings SET enabled = $1, provider = $2, base_url = $3, model = $4,
-					 temperature = $5, max_tokens = $6, api_key = $7, access = $8, scopes = $9,
+					 temperature = $5, max_tokens = $6, access = $7, scopes = $8,
+					 search_provider = $9, search_fallbacks = $10, api_key = $11, search_api_key = $12,
 					 updated_at = datetime('now')
 					 WHERE id = 1`,
-					[
-						settings.enabled ? 1 : 0,
-						settings.provider,
-						settings.baseUrl,
-						settings.model,
-						settings.temperature,
-						settings.maxTokens,
-						key.value,
-						settings.access,
-						JSON.stringify(settings.scopes)
-					]
+					[...base, key.value, searchKey.value]
+				);
+			} else if (key) {
+				await db.execute(
+					`UPDATE ai_settings SET enabled = $1, provider = $2, base_url = $3, model = $4,
+					 temperature = $5, max_tokens = $6, access = $7, scopes = $8,
+					 search_provider = $9, search_fallbacks = $10, api_key = $11,
+					 updated_at = datetime('now')
+					 WHERE id = 1`,
+					[...base, key.value]
+				);
+			} else if (searchKey) {
+				await db.execute(
+					`UPDATE ai_settings SET enabled = $1, provider = $2, base_url = $3, model = $4,
+					 temperature = $5, max_tokens = $6, access = $7, scopes = $8,
+					 search_provider = $9, search_fallbacks = $10, search_api_key = $11,
+					 updated_at = datetime('now')
+					 WHERE id = 1`,
+					[...base, searchKey.value]
 				);
 			} else {
 				await db.execute(
 					`UPDATE ai_settings SET enabled = $1, provider = $2, base_url = $3, model = $4,
 					 temperature = $5, max_tokens = $6, access = $7, scopes = $8,
+					 search_provider = $9, search_fallbacks = $10,
 					 updated_at = datetime('now')
 					 WHERE id = 1`,
-					[
-						settings.enabled ? 1 : 0,
-						settings.provider,
-						settings.baseUrl,
-						settings.model,
-						settings.temperature,
-						settings.maxTokens,
-						settings.access,
-						JSON.stringify(settings.scopes)
-					]
+					base
 				);
 			}
 			return true;

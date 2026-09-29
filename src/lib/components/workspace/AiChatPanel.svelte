@@ -6,8 +6,10 @@
 	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import AiReasoning from '$lib/components/ai/AiReasoning.svelte';
 	import AiToolTrace from '$lib/components/ai/AiToolTrace.svelte';
+	import AiQuestionCard from '$lib/components/ai/AiQuestionCard.svelte';
 	import type { AiMessage, AiMessageRecord, AiToolCall } from '$lib/content/ai-types';
 	import type { WikiSource, WikiClick } from '$lib/content/wiki-links';
+	import type { AnsweredQuestion, QuestionItem } from '$lib/content/ai-questions';
 	import { mentionPool, mentionedIds } from '$lib/content/ai-mentions';
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
 	import { AI_TOOLS, toolDefinitions } from '$lib/content/ai-tool-schema';
@@ -57,6 +59,11 @@
 	let toolCalls = $state<ToolTraceEntry[]>([]);
 	/** Set while a write call waits for the user to allow or decline it. */
 	let pendingWrite = $state<{ call: AiToolCall; resolve: (ok: boolean) => void } | null>(null);
+	/** Set while `ask_user_question` waits for the user to answer. */
+	let pendingAsk = $state<{
+		questions: QuestionItem[];
+		resolve: (answers: AnsweredQuestion[]) => void;
+	} | null>(null);
 
 	const ready = $derived(aiReady());
 	const turnCount = $derived(aiStore.messages.length);
@@ -95,6 +102,20 @@
 		pending?.resolve(allow);
 	}
 
+	/** Hands the model's questions to the card and waits for the answers. */
+	function requestUserAnswers(
+		questions: QuestionItem[],
+		resolve: (answers: AnsweredQuestion[]) => void
+	) {
+		pendingAsk = { questions, resolve };
+	}
+
+	function answerQuestions(answers: AnsweredQuestion[]) {
+		const pending = pendingAsk;
+		pendingAsk = null;
+		pending?.resolve(answers);
+	}
+
 	async function send(question: string) {
 		if (sending) return;
 		error = null;
@@ -108,7 +129,7 @@
 		toolCalls = [];
 		const startedThinkingAt = Date.now();
 		try {
-			const context = await loadToolContext();
+			const context = { ...(await loadToolContext()), ask: requestUserAnswers };
 			const history = buildHistory(question);
 			const output = await streamCompletion({
 				messages: history,
@@ -149,6 +170,7 @@
 			toolCalls = [];
 			sending = false;
 			pendingWrite = null;
+			pendingAsk = null;
 		}
 	}
 
@@ -374,6 +396,10 @@
 						{/if}
 					</div>
 				</div>
+			{/if}
+
+			{#if pendingAsk}
+				<AiQuestionCard questions={pendingAsk.questions} onsubmit={answerQuestions} />
 			{/if}
 
 			{#if pendingWrite}

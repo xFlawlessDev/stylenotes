@@ -12,12 +12,17 @@ import type { ToolContext } from '$lib/content/ai-tools';
 import type { WriteContext } from '$lib/content/mcp-write-actions';
 import { listAllNotes } from '$lib/stores/notes';
 import { listAllTasks } from '$lib/stores/tasks.svelte';
+import { loadWebHooks } from '$lib/stores/ai-web.svelte';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
 import { dependenciesRepo } from '$lib/db';
 
 /** Loads notes, tasks, dependencies and workspaces into a tool context. */
 export async function loadToolContext(): Promise<ToolContext> {
-	const [notes, tasks] = await Promise.all([listAllNotes(), listAllTasks()]);
+	const [notes, tasks, web] = await Promise.all([
+		listAllNotes(),
+		listAllTasks(),
+		loadWebHooks().catch(() => undefined)
+	]);
 	const dependencies = workspaceStore.items.length
 		? (
 				await Promise.all(
@@ -46,5 +51,5 @@ export async function loadToolContext(): Promise<ToolContext> {
 		generatedAt: new Date().toISOString()
 	});
 
-	return { snapshot, write };
+	return { snapshot, write, web };
 }

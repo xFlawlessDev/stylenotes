@@ -17,6 +17,7 @@ vi.mock('$lib/content/mcp-write-actions', () => ({
 
 import { executeToolCall, describeToolCall, type ToolContext } from '$lib/content/ai-tools';
 import { toolDefinitions, toolLabel } from '$lib/content/ai-tool-schema';
+import type { AnsweredQuestion, QuestionItem } from '$lib/content/ai-questions';
 import type { McpSnapshot } from '$lib/content/mcp-types';
 
 function snapshot(): McpSnapshot {
@@ -198,8 +199,156 @@ describe('describeToolCall', () => {
 		expect(describeToolCall('create_task', '{"title":"Ship"}')).toContain('Ship');
 	});
 
+	it('names a web search with its query', () => {
+		expect(describeToolCall('web_search', '{"query":"svelte 5"}')).toContain('svelte 5');
+	});
+
+	it('names a web fetch with its url', () => {
+		expect(describeToolCall('web_fetch', '{"url":"https://example.com"}')).toContain(
+			'https://example.com'
+		);
+	});
+
 	it('falls back to the raw name for unknown tools', () => {
 		expect(describeToolCall('mystery', '{}')).toBe('mystery');
+	});
+});
+
+describe('web tools', () => {
+	it('reports search as unavailable without hooks', async () => {
+		const result = await executeToolCall(context(), 'web_search', '{"query":"x"}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(false);
+	});
+
+	it('requires a query before calling out', async () => {
+		const search = vi.fn();
+		const result = await executeToolCall(
+			{ ...context(), web: { search, fetch: vi.fn() } },
+			'web_search',
+			'{}',
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(false);
+		expect(search).not.toHaveBeenCalled();
+	});
+
+	it('forwards a search to the web hooks', async () => {
+		const search = vi.fn(async () => ({ ok: true as const, data: { count: 1 } }));
+		const result = await executeToolCall(
+			{ ...context(), web: { search, fetch: vi.fn() } },
+			'web_search',
+			'{"query":"svelte","limit":3}',
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(true);
+		expect(search).toHaveBeenCalledWith('svelte', 3);
+	});
+
+	/** Search defaults must reach the hook even when the model omits them. */
+	it('defaults the search limit to 5', async () => {
+		const search = vi.fn(async () => ({ ok: true as const, data: {} }));
+		await executeToolCall(
+			{ ...context(), web: { search, fetch: vi.fn() } },
+			'web_search',
+			'{"query":"x"}',
+			{ confirmed: false }
+		);
+		expect(search).toHaveBeenCalledWith('x', 5);
+	});
+
+	it('forwards a fetch with its url', async () => {
+		const fetch = vi.fn(async () => ({ ok: true as const, data: { text: 'hi' } }));
+		const result = await executeToolCall(
+			{ ...context(), web: { search: vi.fn(), fetch } },
+			'web_fetch',
+			'{"url":"https://example.com"}',
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(true);
+		expect(fetch).toHaveBeenCalledWith('https://example.com', 12_000);
+	});
+
+	/** Web tools are reads: they must never wait for a write confirmation. */
+	it('runs without a write confirmation', async () => {
+		const search = vi.fn(async () => ({ ok: true as const, data: {} }));
+		const result = await executeToolCall(
+			{ ...context(), web: { search, fetch: vi.fn() } },
+			'web_search',
+			'{"query":"x"}',
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(true);
+	});
+});
+
+describe('ask_user_question', () => {
+	it('reports the tool as unavailable without an ask hook', async () => {
+		const result = await executeToolCall(
+			context(),
+			'ask_user_question',
+			JSON.stringify({
+				questions: [
+					{ question: 'q', header: 'H', options: [{ label: 'a' }, { label: 'b' }] }
+				]
+			}),
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(false);
+	});
+
+	it('returns a validation error for malformed questions', async () => {
+		const ask = vi.fn();
+		const result = await executeToolCall(
+			{ ...context(), ask },
+			'ask_user_question',
+			'{"questions":[]}',
+			{ confirmed: false }
+		);
+		expect(result.ok).toBe(false);
+		expect(ask).not.toHaveBeenCalled();
+	});
+
+	/** The call must not resolve until the user answers. */
+	it('blocks until the answers arrive, then reports them', async () => {
+		let settle: ((answers: AnsweredQuestion[]) => void) | undefined;
+		const ask = vi.fn((_questions: QuestionItem[], resolve: (answers: AnsweredQuestion[]) => void) => {
+			settle = resolve;
+		});
+
+		const pending = executeToolCall(
+			{ ...context(), ask },
+			'ask_user_question',
+			JSON.stringify({
+				questions: [
+					{ question: 'Which?', header: 'Pick', options: [{ label: 'A' }, { label: 'B' }] }
+				]
+			}),
+			{ confirmed: false }
+		);
+
+		// Nothing is returned while the card is still open.
+		const raced = await Promise.race([pending, Promise.resolve('pending' as const)]);
+		expect(raced).toBe('pending');
+
+		settle?.([
+			{
+				question: 'Which?',
+				header: 'Pick',
+				options: [{ label: 'A' }, { label: 'B' }],
+				multiSelect: false,
+				answer: { kind: 'option', answer: 'A' }
+			}
+		]);
+
+		const result = await pending;
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as { answered: number; results: { answer: string }[] };
+			expect(data.answered).toBe(1);
+			expect(data.results[0].answer).toBe('A');
+		}
 	});
 });
 

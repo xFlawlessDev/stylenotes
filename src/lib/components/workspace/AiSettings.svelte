@@ -5,6 +5,7 @@
 		Check,
 		Eye,
 		EyeOff,
+		Globe,
 		KeyRound,
 		ShieldAlert,
 		ShieldCheck,
@@ -31,13 +32,18 @@
 		testAiConnection,
 		toggleAiScope,
 		updateAiGrant,
-		updateAiSettings
+		updateAiSettings,
+		updateSearchKey,
+		updateSearchSettings
 	} from '$lib/stores/ai.svelte';
+	import { loadSearchProviders, searchProviderList } from '$lib/stores/ai-web.svelte';
 
 	let keyField = $state('');
 	let revealKey = $state(false);
 	let testing = $state(false);
 	let test = $state<AiTestResult | null>(null);
+	let searchKeyField = $state('');
+	let revealSearchKey = $state(false);
 	// Text fields keep a local draft and commit on blur/Enter: writing to the
 	// database on every keystroke would be needlessly chatty.
 	let baseUrlDraft = $state('');
@@ -65,7 +71,15 @@
 
 	onMount(() => {
 		void hydrateAi();
+		void loadSearchProviders();
 	});
+
+	const searchProviderOptions = $derived(
+		searchProviderList.items.map((item) => ({ value: item.id, label: item.label }))
+	);
+	const searchProviderHint = $derived(
+		searchProviderList.items.find((item) => item.id === aiStore.settings.searchProvider)?.hint ?? ''
+	);
 
 	async function pickProvider(id: AiProviderId) {
 		test = null;
@@ -121,6 +135,20 @@
 		} finally {
 			testing = false;
 		}
+	}
+
+	async function saveSearchKey() {
+		if (!searchKeyField.trim()) return;
+		const ok = await updateSearchKey(searchKeyField.trim());
+		if (ok) {
+			searchKeyField = '';
+			revealSearchKey = false;
+		}
+	}
+
+	async function removeSearchKey() {
+		await updateSearchKey('');
+		searchKeyField = '';
 	}
 </script>
 
@@ -321,6 +349,72 @@
 				{/each}
 			</div>
 		{/if}
+
+		<Field label="Web search" legend class="gap-2.5">
+			<div class="flex items-start gap-2 rounded-2xl bg-surface-container-lowest/30 p-3">
+				<Globe size={15} class="mt-0.5 shrink-0 text-outline" />
+				<span class="text-label-sm font-label leading-relaxed text-outline">
+					Lets the assistant search the web and read pages when a question is not answerable
+					from your notes. It uses its own API key, stored encrypted on this device.
+				</span>
+			</div>
+
+			<Field label="Provider">
+				<Select
+					label="Search provider"
+					value={aiStore.settings.searchProvider}
+					options={[{ value: '', label: 'Off' }, ...searchProviderOptions]}
+					onchange={(value) => void updateSearchSettings({ searchProvider: value })}
+				/>
+			</Field>
+			{#if searchProviderHint}
+				<span class="text-label-sm font-label text-outline">{searchProviderHint}</span>
+			{/if}
+
+			{#if aiStore.settings.searchProvider}
+				<Field label="Search API key">
+					<div class="flex items-center gap-2">
+						<div class="relative flex-1">
+							<Input
+								type={revealSearchKey ? 'text' : 'password'}
+								placeholder={aiStore.settings.hasSearchKey ? '•••••••• (stored)' : 'Paste the key'}
+								bind:value={searchKeyField}
+								onkeydown={(event) => {
+									if (event.key === 'Enter') void saveSearchKey();
+								}}
+							/>
+							<Button
+								size="icon-sm"
+								variant="ghost"
+								class="absolute top-0.5 right-0.5"
+								aria-label={revealSearchKey ? 'Hide key' : 'Show key'}
+								onclick={() => (revealSearchKey = !revealSearchKey)}
+							>
+								{#if revealSearchKey}<EyeOff size={14} />{:else}<Eye size={14} />{/if}
+							</Button>
+						</div>
+						<Button
+							variant="secondary"
+							size="md"
+							disabled={!searchKeyField.trim()}
+							onclick={() => void saveSearchKey()}
+						>
+							Save
+						</Button>
+						{#if aiStore.settings.hasSearchKey}
+							<Button variant="danger-ghost" size="md" onclick={() => void removeSearchKey()}>
+								Remove
+							</Button>
+						{/if}
+					</div>
+				</Field>
+				{#if !aiStore.settings.hasSearchKey}
+					<span class="text-label-sm font-label text-outline">
+						Without a key, the assistant answers from your notes only.
+					</span>
+				{/if}
+			{/if}
+		</Field>
 
 		<div class="flex flex-col gap-2">
 			<Button

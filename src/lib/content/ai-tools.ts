@@ -24,6 +24,23 @@ import {
 	type WriteOutcome
 } from '$lib/content/mcp-write-actions';
 import { findAiTool } from '$lib/content/ai-tool-schema';
+import { parseQuestions, answerSummary, type AnsweredQuestion, type QuestionItem } from '$lib/content/ai-questions';
+import {
+	bareId,
+	bool,
+	findByTitle,
+	findNote,
+	findTask,
+	matchesQuery,
+	noteSummary,
+	notesOf,
+	num,
+	ref,
+	sortTasks,
+	str,
+	taskSummary,
+	tasksOf
+} from '$lib/content/ai-read-helpers';
 
 /** Result handed back to the model as the tool message content. */
 export type ToolResult = { ok: true; data: unknown } | { ok: false; error: string };
@@ -32,129 +49,25 @@ export type ToolResult = { ok: true; data: unknown } | { ok: false; error: strin
 export type ToolContext = {
 	snapshot: McpSnapshot;
 	write: WriteContext;
+	/**
+	 * Web access hooks, injected so this module stays free of Tauri imports.
+	 * Absent outside the desktop app or when search is not configured.
+	 */
+	web?: WebHooks;
+	/**
+	 * Puts a question to the user and resolves with their answers. Supplied by
+	 * the chat panel, which renders the choice card inline.
+	 */
+	ask?: (questions: QuestionItem[], resolve: (answers: AnsweredQuestion[]) => void) => void;
+};
+
+/** The two network calls the web tools need, provided by the store. */
+export type WebHooks = {
+	search: (query: string, limit: number) => Promise<ToolResult>;
+	fetch: (url: string, maxChars?: number) => Promise<ToolResult>;
 };
 
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
-
-function num(args: Record<string, unknown>, key: string, fallback: number): number {
-	const value = args[key];
-	const parsed = typeof value === 'number' ? value : Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-	return Math.min(Math.floor(parsed), MAX_LIMIT);
-}
-
-function str(args: Record<string, unknown>, key: string): string | undefined {
-	const value = args[key];
-	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function bool(args: Record<string, unknown>, key: string): boolean | undefined {
-	const value = args[key];
-	return typeof value === 'boolean' ? value : undefined;
-}
-
-/** `<workspaceId>/<entityId>` — the ref every id in a response carries. */
-function ref(item: { id: string; workspaceId: string }): string {
-	return `${item.workspaceId}/${item.id}`;
-}
-
-function inWorkspace(item: { workspaceId: string }, workspace?: string): boolean {
-	return !workspace || item.workspaceId === workspace;
-}
-
-/** Strips a `<workspaceId>/` prefix, returning the bare id. */
-function bareId(raw: string): string {
-	const slash = raw.indexOf('/');
-	return slash > 0 ? raw.slice(slash + 1) : raw;
-}
-
-function notesOf(ctx: ToolContext, workspace?: string): McpSnapshotNote[] {
-	return ctx.snapshot.notes.filter((note) => inWorkspace(note, workspace));
-}
-
-function tasksOf(ctx: ToolContext, workspace?: string): McpSnapshotTask[] {
-	return ctx.snapshot.tasks.filter((task) => inWorkspace(task, workspace));
-}
-
-/** Substring search over titles, tags and bodies, case-insensitive. */
-function matchesQuery(note: McpSnapshotNote, query: string): boolean {
-	const needle = query.toLowerCase();
-	return (
-		note.title.toLowerCase().includes(needle) ||
-		note.tags.some((tag) => tag.toLowerCase().includes(needle)) ||
-		(note.body ?? '').toLowerCase().includes(needle) ||
-		note.excerpt.toLowerCase().includes(needle)
-	);
-}
-
-/** Finds one note by bare id or prefixed ref; ambiguous ids are errors. */
-function findNote(ctx: ToolContext, raw: string, workspace?: string): McpSnapshotNote | null {
-	const id = bareId(raw);
-	const matches = notesOf(ctx).filter(
-		(note) => note.id === id && (!workspace || note.workspaceId === workspace)
-	);
-	return matches.length === 1 ? matches[0] : null;
-}
-
-function findTask(ctx: ToolContext, raw: string, workspace?: string): McpSnapshotTask | null {
-	const id = bareId(raw);
-	const matches = tasksOf(ctx).filter(
-		(task) => task.id === id && (!workspace || task.workspaceId === workspace)
-	);
-	return matches.length === 1 ? matches[0] : null;
-}
-
-/**
- * Falls back to a case-insensitive title match, so a model that passes a title
- * instead of an id still gets a useful result rather than a dead end. Only an
- * unambiguous match resolves.
- */
-function findByTitle<T extends { title: string }>(items: T[], raw: string): T | null {
-	const wanted = raw.trim().toLowerCase();
-	const matches = items.filter((item) => item.title.trim().toLowerCase() === wanted);
-	return matches.length === 1 ? matches[0] : null;
-}
-
-/** A compact note view — bodies are only included for `get_note`. */
-function noteSummary(note: McpSnapshotNote) {
-	return {
-		ref: ref(note),
-		title: note.title,
-		folder: note.folder,
-		tags: note.tags,
-		pinned: note.pinned,
-		excerpt: note.excerpt,
-		updatedAt: note.updatedAt
-	};
-}
-
-function taskSummary(task: McpSnapshotTask) {
-	return {
-		ref: ref(task),
-		title: task.title,
-		status: task.status,
-		priority: task.priority,
-		folder: task.folder,
-		dueAt: task.dueAt,
-		blocked: task.blocked,
-		noteIds: task.noteIds
-	};
-}
-
-/** Priority high-first, then due date, then board position. */
-const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
-function sortTasks(tasks: McpSnapshotTask[]): McpSnapshotTask[] {
-	return [...tasks].sort((a, b) => {
-		const rank = (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1);
-		if (rank !== 0) return rank;
-		const dueA = a.dueAt ?? '9999-12-31';
-		const dueB = b.dueAt ?? '9999-12-31';
-		if (dueA !== dueB) return dueA < dueB ? -1 : 1;
-		return a.position - b.position;
-	});
-}
-
 // --- read tools -------------------------------------------------------------
 
 function listNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
@@ -164,7 +77,7 @@ function listNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResult 
 	const pinnedOnly = bool(args, 'pinnedOnly') ?? false;
 	const limit = num(args, 'limit', DEFAULT_LIMIT);
 
-	const notes = notesOf(ctx, workspace).filter(
+	const notes = notesOf(ctx.snapshot, workspace).filter(
 		(note) =>
 			(!folder || note.folder === folder) &&
 			(!tag || note.tags.includes(tag)) &&
@@ -181,7 +94,7 @@ function searchNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResul
 	if (!query) return { ok: false, error: '`query` is required.' };
 	const workspace = str(args, 'workspace');
 	const limit = num(args, 'limit', 20);
-	const notes = notesOf(ctx, workspace).filter((note) => matchesQuery(note, query));
+	const notes = notesOf(ctx.snapshot, workspace).filter((note) => matchesQuery(note, query));
 	return {
 		ok: true,
 		data: { total: notes.length, notes: notes.slice(0, limit).map(noteSummary) }
@@ -191,7 +104,7 @@ function searchNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResul
 function getNote(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const raw = str(args, 'id');
 	if (!raw) return { ok: false, error: '`id` is required.' };
-	const note = findNote(ctx, raw, str(args, 'workspace')) ?? findByTitle(notesOf(ctx), raw);
+	const note = findNote(ctx.snapshot, raw, str(args, 'workspace')) ?? findByTitle(notesOf(ctx.snapshot), raw);
 	if (!note) {
 		return { ok: false, error: `No note with id \`${raw}\`. Use list_notes or search_notes first.` };
 	}
@@ -216,7 +129,7 @@ function listTasks(ctx: ToolContext, args: Record<string, unknown>): ToolResult 
 	const includeDone = bool(args, 'includeDone') ?? true;
 	const limit = num(args, 'limit', DEFAULT_LIMIT);
 
-	const tasks = tasksOf(ctx, workspace).filter(
+	const tasks = tasksOf(ctx.snapshot, workspace).filter(
 		(task) =>
 			(!status || task.status === status) &&
 			(!priority || task.priority === priority) &&
@@ -233,7 +146,7 @@ function listTasks(ctx: ToolContext, args: Record<string, unknown>): ToolResult 
 function getTask(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const raw = str(args, 'id');
 	if (!raw) return { ok: false, error: '`id` is required.' };
-	const task = findTask(ctx, raw, str(args, 'workspace')) ?? findByTitle(tasksOf(ctx), raw);
+	const task = findTask(ctx.snapshot, raw, str(args, 'workspace')) ?? findByTitle(tasksOf(ctx.snapshot), raw);
 	if (!task) {
 		return { ok: false, error: `No task with id \`${raw}\`. Use list_tasks first.` };
 	}
@@ -251,7 +164,7 @@ function getTask(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 function taskBoard(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const workspace = str(args, 'workspace');
 	const columns = ['todo', 'doing', 'review', 'done'].map((status) => {
-		const tasks = tasksOf(ctx, workspace)
+		const tasks = tasksOf(ctx.snapshot, workspace)
 			.filter((task) => task.status === status)
 			.sort((a, b) => a.position - b.position);
 		return { status, count: tasks.length, tasks: tasks.map((task) => ({ ref: ref(task), title: task.title })) };
@@ -261,12 +174,12 @@ function taskBoard(ctx: ToolContext, args: Record<string, unknown>): ToolResult 
 
 function dailySummary(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const workspace = str(args, 'workspace');
-	const tasks = tasksOf(ctx, workspace);
+	const tasks = tasksOf(ctx.snapshot, workspace);
 	const inProgress = tasks
 		.filter((task) => task.status === 'doing')
 		.sort((a, b) => a.position - b.position)
 		.map(taskSummary);
-	const recentNotes = [...notesOf(ctx, workspace)]
+	const recentNotes = [...notesOf(ctx.snapshot, workspace)]
 		.sort((a, b) => b.updatedAt - a.updatedAt)
 		.slice(0, 10)
 		.map(noteSummary);
@@ -381,10 +294,59 @@ async function runWrite(
 	}
 }
 
+// --- assistant-only tools ---------------------------------------------------
+
+/** Web search, or a clear message when it is not configured. */
+async function webSearch(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	if (!ctx.web) {
+		return { ok: false, error: 'Web access is only available in the desktop app.' };
+	}
+	const query = str(args, 'query');
+	if (!query) return { ok: false, error: '`query` is required.' };
+	return ctx.web.search(query, num(args, 'limit', 5));
+}
+
+async function webFetch(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	if (!ctx.web) {
+		return { ok: false, error: 'Web access is only available in the desktop app.' };
+	}
+	const url = str(args, 'url');
+	if (!url) return { ok: false, error: '`url` is required.' };
+	const maxChars = num(args, 'maxChars', 12_000);
+	return ctx.web.fetch(url, maxChars);
+}
+
+/**
+ * Puts the model's questions to the user and waits for their answers.
+ *
+ * The wait is what makes this a real tool: the turn parks here until the card
+ * is answered, and the answers become the tool result the model reads next.
+ */
+function askUserQuestion(
+	ctx: ToolContext,
+	rawArgs: string
+): Promise<ToolResult> | ToolResult {
+	if (!ctx.ask) {
+		return { ok: false, error: 'Asking the user is not available here.' };
+	}
+	const parsed = parseQuestions(rawArgs);
+	if ('error' in parsed) return { ok: false, error: parsed.error };
+
+	return new Promise<ToolResult>((resolve) => {
+		ctx.ask?.(parsed.questions, (answered) => {
+			const summary = answerSummary(answered);
+			resolve({ ok: true, data: summary });
+		});
+	});
+}
+
 /**
  * Executes one tool call. Read tools run immediately; write tools run only when
  * `confirmed` is true, so an unconfirmed write returns a refusal the model can
  * relay instead of mutating anything.
+ *
+ * `ask_user_question` is a read tool that blocks on the user rather than on
+ * data, so it is awaited like a write.
  */
 export async function executeToolCall(
 	ctx: ToolContext,
@@ -395,6 +357,10 @@ export async function executeToolCall(
 	const spec = findAiTool(name);
 	if (!spec) return { ok: false, error: `Unknown tool \`${name}\`.` };
 
+	if (spec.interactive) {
+		return await askUserQuestion(ctx, rawArgs);
+	}
+
 	let args: Record<string, unknown>;
 	try {
 		args = rawArgs.trim() ? (JSON.parse(rawArgs) as Record<string, unknown>) : {};
@@ -403,6 +369,8 @@ export async function executeToolCall(
 	}
 
 	if (spec.kind === 'read') {
+		if (name === 'web_search') return webSearch(ctx, args);
+		if (name === 'web_fetch') return webFetch(ctx, args);
 		return runRead(ctx, name, args) ?? { ok: false, error: `Unknown tool \`${name}\`.` };
 	}
 	if (!options.confirmed) {
@@ -420,6 +388,8 @@ export function describeToolCall(name: string, rawArgs: string): string {
 		/* fall through to the generic label */
 	}
 	const title = typeof args.title === 'string' ? args.title : undefined;
+	const query = typeof args.query === 'string' ? args.query : undefined;
+	const url = typeof args.url === 'string' ? args.url : undefined;
 	switch (name) {
 		case 'create_note':
 			return `Create a note${title ? ` “${title}”` : ''}`;
@@ -435,6 +405,12 @@ export function describeToolCall(name: string, rawArgs: string): string {
 			return 'Delete a note';
 		case 'delete_task':
 			return 'Delete a task';
+		case 'web_search':
+			return `Search the web${query ? ` for “${query}”` : ''}`;
+		case 'web_fetch':
+			return `Read ${url ?? 'a web page'}`;
+		case 'ask_user_question':
+			return 'Ask you a question';
 		default:
 			return name;
 	}

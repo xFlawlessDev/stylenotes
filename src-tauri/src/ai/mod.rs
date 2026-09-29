@@ -15,3 +15,6 @@ pub mod prompts;
 pub mod provider;
 pub mod sse;
 pub mod types;
+pub mod web;
+pub mod web_commands;
+pub mod web_html;

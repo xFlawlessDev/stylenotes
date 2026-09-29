@@ -19,6 +19,16 @@ export type AiToolSpec = {
 	/** Human label for the confirmation card and the tool-call chip. */
 	label: string;
 	definition: AiToolDefinition;
+	/**
+	 * True for tools that are not part of the MCP registry and run only for the
+	 * in-app assistant. The registry cross-check test skips these.
+	 */
+	aiOnly?: boolean;
+	/**
+	 * True when the tool needs a live user choice at call time. The chat pauses
+	 * and shows the tool's own card instead of running it unattended.
+	 */
+	interactive?: boolean;
 };
 
 function tool(
@@ -27,13 +37,16 @@ function tool(
 	scope: McpScope,
 	kind: 'read' | 'write',
 	description: string,
-	parameters: Record<string, unknown>
+	parameters: Record<string, unknown>,
+	options: { aiOnly?: boolean; interactive?: boolean } = {}
 ): AiToolSpec {
 	return {
 		name,
 		label,
 		scope,
 		kind,
+		aiOnly: options.aiOnly,
+		interactive: options.interactive,
 		definition: {
 			type: 'function',
 			function: { name, description, parameters }
@@ -208,7 +221,66 @@ export const AI_TOOLS: AiToolSpec[] = [
 				workspace
 			},
 			required: ['id', 'confirm']
-		})
+		}),
+	// --- assistant-only tools (not part of the local MCP registry) ------------
+	// These need either a live user choice or the network, so they run inside
+	// the app and are deliberately absent from `mcp-tools.ts` / the shim.
+	tool('ask_user_question', 'Ask you a question', 'notes', 'read',
+		'Ask the user to choose between options when their request is ambiguous and you cannot resolve it from their notes and tasks. Prefer this over guessing: the answer comes back as the tool result. Ask at most 4 questions at once, each with 2-4 short options. Do not use it to ask permission or to make small talk.',
+		{
+			type: 'object',
+			properties: {
+				questions: {
+					type: 'array',
+					description: 'Questions to put to the user, in order.',
+					items: {
+						type: 'object',
+						properties: {
+							question: { type: 'string', description: 'The question itself, in the user’s language.' },
+							header: { type: 'string', description: 'Short label for the card, 16 characters or fewer.' },
+							multiSelect: { type: 'boolean', description: 'Allow choosing more than one option.' },
+							options: {
+								type: 'array',
+								description: 'Between 2 and 4 options.',
+								items: {
+									type: 'object',
+									properties: {
+										label: { type: 'string', description: 'Short choice text, 60 characters or fewer.' },
+										description: { type: 'string', description: 'One line explaining the trade-off.' }
+									},
+									required: ['label']
+								}
+							}
+						},
+						required: ['question', 'header', 'options']
+					}
+				}
+			},
+			required: ['questions']
+		},
+		{ aiOnly: true, interactive: true }),
+	tool('web_search', 'Search the web', 'notes', 'read',
+		'Search the web for current information that is not in the user’s notes: recent events, library or API documentation, facts you are unsure about. Returns titles, URLs and snippets. Follow up with web_fetch on the most promising result when you need the full text.',
+		{
+			type: 'object',
+			properties: {
+				query: { type: 'string', description: 'The search query.' },
+				limit: { type: 'integer', description: 'Max results to return (default 5).' }
+			},
+			required: ['query']
+		},
+		{ aiOnly: true }),
+	tool('web_fetch', 'Read a web page', 'notes', 'read',
+		'Fetch one web page and return its readable text. Use it on a URL from web_search, or one the user gave you. Local and private addresses are refused.',
+		{
+			type: 'object',
+			properties: {
+				url: { type: 'string', description: 'Absolute http or https URL.' },
+				maxChars: { type: 'integer', description: 'Text budget in characters (default 12000).' }
+			},
+			required: ['url']
+		},
+		{ aiOnly: true })
 ];
 
 export function findAiTool(name: string): AiToolSpec | undefined {

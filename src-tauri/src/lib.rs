@@ -579,6 +579,19 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Web search for the assistant (BYOK, like the model provider). The key
+        // uses the same `enc:v1:` envelope as the model key and is never read
+        // back into the UI; `provider = ''` means search is off.
+        Migration {
+            version: 17,
+            description: "add_ai_web_search",
+            sql: "
+                ALTER TABLE ai_settings ADD COLUMN search_provider TEXT NOT NULL DEFAULT '';
+                ALTER TABLE ai_settings ADD COLUMN search_api_key TEXT NOT NULL DEFAULT '';
+                ALTER TABLE ai_settings ADD COLUMN search_fallbacks TEXT NOT NULL DEFAULT '[]';
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -612,7 +625,10 @@ pub fn run() {
             ai::commands::ai_encrypt_key,
             ai::commands::ai_decrypt_key,
             ai::commands::ai_stream,
-            ai::commands::ai_test_connection
+            ai::commands::ai_test_connection,
+            ai::web_commands::ai_web_search,
+            ai::web_commands::ai_web_fetch,
+            ai::web_commands::ai_search_providers
         ])
         .setup(|app| {
             // Lays down `mcp/`, clears stale jobs, and writes the first

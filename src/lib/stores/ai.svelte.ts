@@ -21,10 +21,30 @@ import type { ToolResult } from '$lib/content/ai-tools';
 import { aiRepo } from '$lib/db/ai';
 import { sanitizeThreadTitle, titlePrompt } from '$lib/content/ai-assistant';
 import { isTauri } from '$lib/windows';
+import {
+	AI_CHANGED,
+	aiReady,
+	providerConfig,
+	updateAiGrant,
+	updateAiSettings
+} from '$lib/stores/ai-settings.svelte';
 
-/** Event telling the other windows the AI settings changed. */
-export const AI_CHANGED = 'ai:changed';
-
+// Re-exported so callers keep importing settings helpers from the AI store.
+export {
+	AI_CHANGED,
+	aiReady,
+	clearAiKey,
+	notifyChanged,
+	resolveKey,
+	providerConfig,
+	toggleAiScope,
+	updateAiGrant,
+	updateAiSettings,
+	updateSearchKey,
+	updateSearchSettings,
+	webSearchReady
+} from '$lib/stores/ai-settings.svelte';
+/** Row defaults for a first run, before the Settings page is ever opened. */
 const DEFAULT_SETTINGS: AiSettings = {
 	enabled: false,
 	provider: 'openai-compatible',
@@ -35,9 +55,17 @@ const DEFAULT_SETTINGS: AiSettings = {
 	hasKey: false,
 	access: 'read',
 	scopes: [],
+	searchProvider: '',
+	hasSearchKey: false,
+	searchFallbacks: [],
 	updatedAt: ''
 };
 
+/**
+ * The single AI store every window shares: settings, threads, and the open
+ * conversation. Settings persistence lives in `ai-settings.svelte.ts`; this
+ * module owns the conversation and streaming.
+ */
 export const aiStore = $state<{
 	settings: AiSettings;
 	threads: AiThread[];
@@ -64,17 +92,6 @@ export const aiStore = $state<{
 /** The provider descriptor for the active provider. */
 export function activeProvider() {
 	return AI_PROVIDERS.find((item) => item.id === aiStore.settings.provider) ?? AI_PROVIDERS[0];
-}
-
-/** True when a request can be made: enabled, a model, and a stored key. */
-export function aiReady(): boolean {
-	const { enabled, model, hasKey } = aiStore.settings;
-	return enabled && model.trim().length > 0 && hasKey;
-}
-
-function notifyChanged() {
-	if (!browser || !isTauri) return;
-	void emit(AI_CHANGED, { enabled: aiStore.settings.enabled }).catch(() => undefined);
 }
 
 let hydrated = false;
@@ -107,102 +124,6 @@ export function stopAiSync(): void {
 	unlisten?.();
 	unlisten = undefined;
 	started = false;
-}
-
-/**
- * Persists settings. A new `apiKey` (plaintext, from the field the user typed
- * into) is encrypted by Rust before it is stored; passing `undefined` leaves
- * the stored key untouched.
- */
-export async function updateAiSettings(
-	patch: Partial<Omit<AiSettings, 'hasKey'>>,
-	apiKey?: string
-): Promise<boolean> {
-	const next: AiSettings = { ...aiStore.settings, ...patch };
-	const previous = aiStore.settings;
-	aiStore.settings = next;
-
-	if (!browser) return true;
-
-	let keyUpdate: { value: string; hasKey: boolean } | undefined;
-	if (apiKey !== undefined) {
-		try {
-			const encrypted = await invoke<string>('ai_encrypt_key', { key: apiKey });
-			keyUpdate = { value: encrypted, hasKey: apiKey.trim().length > 0 };
-		} catch (error) {
-			aiStore.settings = previous;
-			aiStore.error = error instanceof Error ? error.message : String(error);
-			return false;
-		}
-	}
-
-	const ok = await aiRepo.saveSettings(next, keyUpdate);
-	if (!ok) {
-		aiStore.settings = previous;
-		aiStore.error = 'Could not save the AI settings';
-		return false;
-	}
-	if (keyUpdate) aiStore.settings.hasKey = keyUpdate.hasKey;
-	aiStore.error = null;
-	notifyChanged();
-	return true;
-}
-
-/** Clears the stored API key without touching the other settings. */
-export async function clearAiKey(): Promise<boolean> {
-	const ok = await updateAiSettings({}, '');
-	if (ok) aiStore.settings.hasKey = false;
-	return ok;
-}
-
-/**
- * Updates the AI tool grant. Opening write access starts with no scopes, so the
- * user opts in explicitly; dropping back to read clears them.
- */
-export async function updateAiGrant(patch: {
-	access?: 'read' | 'write';
-	scopes?: McpScope[];
-}): Promise<boolean> {
-	const nextAccess = patch.access ?? aiStore.settings.access;
-	const nextScopes = patch.scopes ?? aiStore.settings.scopes;
-	return updateAiSettings({
-		access: nextAccess,
-		scopes: nextAccess === 'read' ? [] : nextScopes
-	});
-}
-
-/** Toggles one write scope on the AI grant. */
-export function toggleAiScope(scope: McpScope, enabled: boolean): Promise<boolean> {
-	const scopes = enabled
-		? [...new Set([...aiStore.settings.scopes, scope])]
-		: aiStore.settings.scopes.filter((item) => item !== scope);
-	return updateAiGrant({ scopes });
-}
-
-/**
- * Decrypts the stored key for a single request. Returns an empty string when
- * nothing is stored, and throws when decryption fails.
- */
-async function resolveKey(): Promise<string> {
-	if (!isTauri) throw new Error('AI requests need the desktop app');
-	const stored = await aiRepo.loadKey();
-	if (!stored) return '';
-	return invoke<string>('ai_decrypt_key', { stored });
-}
-
-/** Builds the provider config Rust needs, with the key resolved just-in-time. */
-async function providerConfig() {
-	const key = await resolveKey();
-	const settings = aiStore.settings;
-	return {
-		provider: settings.provider,
-		baseUrl: settings.baseUrl.trim() || activeProvider().defaultBaseUrl,
-		model: settings.model.trim() || activeProvider().defaultModel,
-		apiKey: key,
-		temperature: settings.temperature,
-		maxTokens: settings.maxTokens,
-		tools: [] as AiToolDefinition[]
-	};
 }
 
 /** Probes the provider with the current settings; does not touch history. */

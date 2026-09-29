@@ -102,7 +102,24 @@ export type AiSettings = {
 	access: McpAccess;
 	/** Scopes a write tool may touch, when `access` is `write`. */
 	scopes: McpScope[];
+	/**
+	 * Web search provider, or `''` when search is off. Also `combo` to try
+	 * `searchFallbacks` in order.
+	 */
+	searchProvider: string;
+	/** Whether a search key is stored; never read back, like `hasKey`. */
+	hasSearchKey: boolean;
+	/** Providers tried in order when `searchProvider` is `combo`. */
+	searchFallbacks: string[];
 	updatedAt: string;
+};
+
+/** One web search provider the app supports, as reported by Rust. */
+export type AiSearchProvider = {
+	id: string;
+	label: string;
+	/** Where the user gets a key. */
+	hint: string;
 };
 
 /** Request the frontend sends to the `ai_stream` command. */

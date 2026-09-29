@@ -51,18 +51,30 @@ describe('MCP tool registry', () => {
 });
 
 describe('AI chat tool surface', () => {
-	it('only exposes tools that exist in the MCP registry', () => {
+	it('only exposes tools that exist in the MCP registry, unless they are AI-only', () => {
 		for (const spec of AI_TOOLS) {
+			if (spec.aiOnly) {
+				// AI-only tools must not leak into the MCP registry.
+				expect(findTool(spec.name), `AI-only tool ${spec.name} is in the MCP registry`).toBeUndefined();
+				continue;
+			}
 			expect(findTool(spec.name), `unknown tool ${spec.name}`).toBeDefined();
 		}
 	});
 
 	it('agrees with the registry on kind and scope', () => {
 		for (const spec of AI_TOOLS) {
+			if (spec.aiOnly) continue;
 			const registry = findTool(spec.name)!;
 			expect(spec.kind, spec.name).toBe(registry.kind);
 			expect(spec.scope, spec.name).toBe(registry.scope);
 		}
+	});
+
+	it('marks interactive tools so the chat pauses for the user', () => {
+		const ask = AI_TOOLS.find((tool) => tool.name === 'ask_user_question')!;
+		expect(ask.interactive).toBe(true);
+		expect(ask.kind).toBe('read');
 	});
 
 	it('has unique tool names', () => {

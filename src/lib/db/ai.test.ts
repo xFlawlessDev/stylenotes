@@ -10,6 +10,7 @@ vi.mock('@tauri-apps/plugin-sql', () => ({
 vi.mock('$lib/windows', () => ({ isTauri: true }));
 
 import { aiRepo } from '$lib/db/ai';
+import type { AiSettings } from '$lib/content/ai-types';
 
 beforeEach(() => {
 	execute.mockReset().mockResolvedValue({ rowsAffected: 1 });
@@ -68,59 +69,64 @@ describe('aiRepo.loadSettings', () => {
 });
 
 describe('aiRepo.saveSettings', () => {
+	/** A complete settings row; individual tests override what they exercise. */
+	const settings = (patch: Partial<AiSettings> = {}): AiSettings => ({
+		enabled: true,
+		provider: 'openai-compatible',
+		baseUrl: '',
+		model: 'gpt-4o-mini',
+		temperature: 0.7,
+		maxTokens: 1024,
+		hasKey: true,
+		access: 'read',
+		scopes: [],
+		searchProvider: '',
+		hasSearchKey: false,
+		searchFallbacks: [],
+		updatedAt: '',
+		...patch
+	});
+
 	it('writes the key column only when a key is supplied', async () => {
-		await aiRepo.saveSettings(
-			{
-				enabled: true,
-				provider: 'openai-compatible',
-				baseUrl: '',
-				model: 'gpt-4o-mini',
-				temperature: 0.7,
-				maxTokens: 1024,
-				hasKey: true,
-				access: 'read',
-				scopes: [],
-				updatedAt: ''
-			},
-			{ value: 'enc:v1:cipher', hasKey: true }
-		);
+		await aiRepo.saveSettings(settings(), { value: 'enc:v1:cipher', hasKey: true });
 
 		const statements = execute.mock.calls.map((call) => String(call[0]));
 		expect(statements.some((sql) => sql.includes('api_key'))).toBe(true);
 	});
 
 	it('omits the key column when no key is supplied', async () => {
-		await aiRepo.saveSettings({
-			enabled: true,
-			provider: 'openai-compatible',
-			baseUrl: '',
-			model: 'gpt-4o-mini',
-			temperature: 0.7,
-			maxTokens: 1024,
-			hasKey: true,
-			access: 'read',
-			scopes: [],
-			updatedAt: ''
-		});
+		await aiRepo.saveSettings(settings());
 
 		const update = execute.mock.calls.find((call) => String(call[0]).includes('UPDATE ai_settings'));
 		expect(String(update?.[0])).not.toContain('api_key');
 	});
 
+	it('writes the search key independently of the model key', async () => {
+		await aiRepo.saveSettings(settings({ searchProvider: 'tavily' }), undefined, {
+			value: 'enc:v1:search',
+			hasKey: true
+		});
+
+		const update = execute.mock.calls.find((call) => String(call[0]).includes('UPDATE ai_settings'));
+		const sql = String(update?.[0]);
+		expect(sql).toContain('search_api_key');
+		// The model key must survive a search-only save.
+		expect(sql).not.toMatch(/\bapi_key = \$\d+/);
+	});
+
+	it('persists the search provider and fallbacks', async () => {
+		await aiRepo.saveSettings(
+			settings({ searchProvider: 'combo', searchFallbacks: ['tavily', 'brave'] })
+		);
+
+		const update = execute.mock.calls.find((call) => String(call[0]).includes('UPDATE ai_settings'));
+		expect(String(update?.[0])).toContain('search_provider');
+		expect(update?.[1]).toContain(JSON.stringify(['tavily', 'brave']));
+	});
+
 	it('returns false when the database write fails', async () => {
 		execute.mockRejectedValue(new Error('disk full'));
-		const ok = await aiRepo.saveSettings({
-			enabled: true,
-			provider: 'openai-compatible',
-			baseUrl: '',
-			model: '',
-			temperature: 0.7,
-			maxTokens: 1024,
-			hasKey: false,
-			access: 'read',
-			scopes: [],
-			updatedAt: ''
-		});
+		const ok = await aiRepo.saveSettings(settings({ model: '', hasKey: false }));
 		expect(ok).toBe(false);
 	});
 });
