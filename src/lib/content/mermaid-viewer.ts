@@ -2,6 +2,7 @@ import { createMermaidCanvas } from '$lib/content/mermaid-canvas';
 import { createExportMenu } from '$lib/content/mermaid-export-menu';
 import { el, iconButton, onActivate } from '$lib/content/mermaid-dom';
 import { openMermaidFullscreen } from '$lib/content/mermaid-fullscreen';
+import { currentLocale, tFor } from '$lib/i18n/index.svelte';
 
 /**
  * Wires the interactive Mermaid viewer (header actions, pan/zoom canvas and a
@@ -38,10 +39,12 @@ function diagramSvg(diagram: HTMLElement): SVGSVGElement | null {
 function createHeader(svg: SVGSVGElement): HTMLElement {
 	const header = el('div', 'mermaid-diagram-header');
 	const title = el('span', 'mermaid-diagram-title');
-	title.textContent = 'Diagram';
+	// Plain DOM, outside any Svelte component: the label is resolved once from
+	// the locale that was active when the preview rendered.
+	title.textContent = tFor(currentLocale(), 'editor.mermaid.title');
 
 	const actions = el('div', 'mermaid-header-actions');
-	const fullscreen = iconButton('maximize', 'Open diagram full screen');
+	const fullscreen = iconButton('maximize', tFor(currentLocale(), 'editor.mermaid.openFullscreen'));
 	onActivate(fullscreen, () => openMermaidFullscreen(svg));
 	actions.append(fullscreen, createExportMenu(svg));
 

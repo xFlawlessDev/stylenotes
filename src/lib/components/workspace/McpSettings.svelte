@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import { Copy, ShieldCheck, ShieldAlert, PlugZap, TriangleAlert } from '@lucide/svelte';
 	import { Button, ChoiceTile, Field, Select, Switch } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { MCP_SCOPES, toolsByKind } from '$lib/content/mcp-tools';
-	import { buildMcpConfig, configLocationHint, defaultInstanceId, MCP_CONFIG_TARGETS, type McpConfigTarget } from '$lib/content/mcp-config';
+	import { buildMcpConfig, defaultInstanceId, MCP_CONFIG_TARGETS, type McpConfigTarget } from '$lib/content/mcp-config';
 	import type { McpAccess, McpScope } from '$lib/content/mcp-types';
 	import {
 		hydrateMcp,
@@ -30,10 +31,17 @@
 	const binaryMissing = $derived(mcpStore.appInfo !== null && !binaryPath);
 
 	const workspaceOptions = $derived([
-		{ value: '', label: 'All workspaces' },
+		{ value: '', label: t('settings.mcp.allWorkspaces') },
 		...workspaceStore.items.map((workspace) => ({ value: workspace.id, label: workspace.name })),
 	]);
 	const selectedWorkspace = $derived(mcpStore.settings.workspaces[0] ?? '');
+
+	// The danger note mixes a bold scope name and a code path into one sentence;
+	// split the translated string so both can stay real elements.
+	const DANGER_MARK = '\u0000';
+	const dangerParts = $derived(
+		t('settings.mcp.danger', { notes: DANGER_MARK, path: DANGER_MARK }).split(DANGER_MARK)
+	);
 
 	const config = $derived.by(() =>
 		Object.fromEntries(
@@ -76,7 +84,9 @@
 
 <div class="flex min-w-0 flex-col gap-6">
 	<div class="flex flex-col gap-2.5">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">Local MCP</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+			>{t('settings.mcp.title')}</span
+		>
 
 		<div class="glass-well flex items-center gap-3 rounded-2xl p-3">
 			<div
@@ -88,31 +98,33 @@
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col">
 				<span class="text-headline-sm font-headline text-on-surface">
-					{mcpStore.enabled ? 'MCP is on' : 'MCP is off'}
+					{mcpStore.enabled ? t('settings.mcp.on') : t('settings.mcp.off')}
 				</span>
 				<span class="truncate text-label-sm font-label text-outline">
 					{mcpStore.enabled
-						? `${mcpStore.clients.length} client(s) · ${access === 'write' ? 'read & write' : 'read only'}`
-						: 'AI agents cannot reach your notes'}
+						? t('settings.mcp.clients', {
+								count: mcpStore.clients.length,
+								access: access === 'write' ? t('settings.mcp.readWrite') : t('settings.mcp.readOnly')
+							})
+						: t('settings.mcp.offHint')}
 				</span>
 			</div>
 			<Switch
 				checked={mcpStore.enabled}
-				label="Enable local MCP server"
+				label={t('settings.mcp.enableLabel')}
 				onchange={(checked) => void setMcpEnabled(checked)}
 			/>
 		</div>
 
 		<p class="text-label-sm font-label leading-relaxed text-outline">
-			Runs a local server on this device only — no port, no account, no internet. Agents reach it
-			through the config below.
+			{t('settings.mcp.byline')}
 		</p>
 
 		{#if binaryMissing}
 			<div class="flex items-start gap-2 rounded-2xl bg-error-container/30 p-3">
 				<TriangleAlert size={15} class="mt-0.5 shrink-0 text-error" />
 				<span class="text-body-sm font-body text-on-error-container">
-					The server binary was not found. Reinstall StyleNotes, then reopen this page.
+					{t('settings.mcp.binaryMissing')}
 				</span>
 			</div>
 		{/if}
@@ -120,12 +132,14 @@
 
 	{#if mcpStore.enabled}
 		<div class="flex flex-col gap-2.5">
-			<span class="text-label-sm font-label tracking-wider text-outline uppercase">Access</span>
+			<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+				>{t('settings.mcp.access')}</span
+			>
 			<div class="grid grid-cols-2 gap-2">
 				<ChoiceTile
 					layout="stack"
 					icon={ShieldCheck}
-					label="Read only"
+					label={t('settings.mcp.readOnly')}
 					class="py-3"
 					active={access === 'read'}
 					onclick={() => void pickAccess('read')}
@@ -133,7 +147,7 @@
 				<ChoiceTile
 					layout="stack"
 					icon={ShieldAlert}
-					label="Allow writes"
+					label={t('settings.mcp.allowWrites')}
 					class="py-3"
 					active={writeEnabled}
 					onclick={() => void pickAccess('write')}
@@ -142,31 +156,36 @@
 
 			{#if writeEnabled}
 				<div class="flex flex-col gap-2">
-					<span class="text-label-sm font-label text-outline">What agents may change</span>
+					<span class="text-label-sm font-label text-outline">{t('settings.mcp.whatMayChange')}</span>
 					{#each MCP_SCOPES as scope (scope.id)}
 						<div class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3">
 							<span class="flex flex-col">
-								<span class="text-body-md font-body text-on-surface">{scope.label}</span>
-								<span class="text-label-sm font-label text-outline">{scope.description}</span>
+								<span class="text-body-md font-body text-on-surface"
+									>{t('settings.mcp.scope.' + scope.id)}</span
+								>
+								<span class="text-label-sm font-label text-outline"
+									>{t('settings.mcp.scopeDescription.' + scope.id)}</span
+								>
 							</span>
 							<Switch
 								checked={mcpScopeEnabled(scope.id)}
-								label="Allow {scope.label}"
+								label={t('settings.mcp.allowScope', { scope: t('settings.mcp.scope.' + scope.id) })}
 								onchange={(checked) => void toggleMcpScope(scope.id as McpScope, checked)}
 							/>
 						</div>
 					{/each}
 					<p class="text-label-sm font-label leading-relaxed text-error">
-						Allowing <strong>Notes</strong> lets an agent rewrite or permanently delete note content.
-						StyleNotes keeps a copy of the previous body under <code class="font-code">mcp/backups/notes</code
-							>.
+						{dangerParts[0]}<strong>{t('settings.mcp.scope.notes')}</strong>{dangerParts[1]}<code class="font-code">mcp/backups/notes</code>{dangerParts[2]}
 					</p>
 				</div>
 			{/if}
 
-			<Field label="Workspace scope" description="Limit agents to a single workspace, or leave open for all.">
+			<Field
+				label={t('settings.mcp.workspaceScope')}
+				description={t('settings.mcp.workspaceScopeHint')}
+			>
 				<Select
-					label="MCP workspace scope"
+					label={t('settings.mcp.workspaceScopeLabel')}
 					options={workspaceOptions}
 					value={selectedWorkspace}
 					onchange={(next) => void updateMcpSettings({ workspaces: next ? [next] : [] })}
@@ -175,35 +194,42 @@
 
 			<div class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3">
 				<span class="flex flex-col">
-					<span class="text-body-md font-body text-on-surface">Record activity</span>
-					<span class="text-label-sm font-label text-outline">Log every tool call below</span>
+					<span class="text-body-md font-body text-on-surface">{t('settings.mcp.recordActivity')}</span>
+					<span class="text-label-sm font-label text-outline"
+						>{t('settings.mcp.recordActivityHint')}</span
+					>
 				</span>
 				<Switch
 					checked={mcpStore.settings.audit}
-					label="Record activity"
+					label={t('settings.mcp.recordActivity')}
 					onchange={(checked) => void updateMcpSettings({ audit: checked })}
 				/>
 			</div>
 		</div>
 
 		<div class="flex flex-col gap-2.5">
-			<span class="text-label-sm font-label tracking-wider text-outline uppercase">Connect a client</span>
+			<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+				>{t('settings.mcp.connectClient')}</span
+			>
 			{#each MCP_CONFIG_TARGETS as target (target.id)}
 				<div class="flex flex-col gap-1.5 rounded-2xl bg-surface-container-lowest/30 p-2.5">
 					<div class="flex items-center justify-between gap-2">
 						<span class="text-body-md font-body text-on-surface">{target.label}</span>
 						<Button variant="secondary" size="xs" shape="pill" onclick={() => void copyConfig(target.id)}>
 							<Copy size={13} />
-							{copied === target.id ? 'Copied' : 'Copy config'}
+							{copied === target.id ? t('settings.mcp.copied') : t('settings.mcp.copyConfig')}
 						</Button>
 					</div>
 					<pre class="glass-well max-h-40 overflow-auto rounded-xl p-2.5 font-code text-code-sm text-on-surface-variant">{config[target.id]}</pre>
-					<span class="text-label-sm font-label text-outline">{configLocationHint(target.id)}</span>
+					<span class="text-label-sm font-label text-outline"
+						>{target.id === 'cursor'
+							? t('settings.mcp.configHintCursor')
+							: t('settings.mcp.configHintClaude')}</span
+					>
 				</div>
 			{/each}
 			<span class="text-label-sm font-label leading-relaxed text-outline">
-				Paste the block into each client's config, restart the client, and it can use the
-				{toolCount} tools listed below.
+				{t('settings.mcp.connectHint', { count: toolCount })}
 			</span>
 		</div>
 
@@ -214,9 +240,9 @@
 
 <ConfirmDialog
 	open={confirmOpen}
-	title="Allow agents to write?"
-	description="An agent will be able to change your notes and tasks using the tools you enable next. This is off by default and can be turned back off at any time."
-	confirmLabel="Allow & enable writes"
+	title={t('settings.mcp.confirmTitle')}
+	description={t('settings.mcp.confirmDescription')}
+	confirmLabel={t('settings.mcp.confirmLabel')}
 	confirmVariant="danger"
 	onconfirm={() => void grantWrite()}
 	oncancel={() => (confirmOpen = false)}

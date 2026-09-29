@@ -37,6 +37,7 @@
 		type WikiSuggestion,
 		type WikiSuggestionSet
 	} from '$lib/content/wiki-autocomplete';
+	import { t } from '$lib/i18n/index.svelte';
 
 	type Patch = Partial<Pick<Note, 'title' | 'body' | 'tags' | 'folder' | 'pinned' | 'overlay'>>;
 
@@ -440,8 +441,8 @@
 			<EmptyState
 				size="lg"
 				icon={PenLine}
-				heading="No note selected"
-				title="Create a new note or pick one from the list to begin."
+				heading={t('notes.editor.noNoteSelected')}
+				title={t('notes.editor.noNoteSelectedHint')}
 			/>
 		{/if}
 			</div>

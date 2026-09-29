@@ -12,6 +12,7 @@ import { mcpRepo } from '$lib/db/mcp';
 import { MCP_SCOPE_IDS } from '$lib/content/mcp-types';
 import { metaRepo } from '$lib/db';
 import { isTauri } from '$lib/windows';
+import { t } from '$lib/i18n/index.svelte';
 
 /** Master switch lives in `meta` so Rust can read it before spawning (#D7). */
 export const MCP_ENABLED_KEY = 'mcp/enabled';
@@ -89,7 +90,7 @@ export async function setMcpEnabled(enabled: boolean): Promise<boolean> {
 	try {
 		await metaRepo.set(MCP_ENABLED_KEY, enabled ? '1' : '0');
 	} catch {
-		mcpStore.error = 'Could not save the MCP switch';
+		mcpStore.error = t('settings.mcp.error.saveSwitch');
 		mcpStore.enabled = !enabled;
 		return false;
 	}
@@ -118,7 +119,7 @@ export async function updateMcpSettings(patch: Partial<McpSettings>): Promise<bo
 	if (!browser) return true;
 	const ok = await mcpRepo.saveSettings(next);
 	if (!ok) {
-		mcpStore.error = 'Could not save the MCP settings';
+		mcpStore.error = t('settings.mcp.error.saveSettings');
 		return false;
 	}
 	mcpStore.error = null;
@@ -144,7 +145,7 @@ export async function refreshMcpAudit(): Promise<void> {
 export async function clearMcpAudit(): Promise<boolean> {
 	const ok = await mcpRepo.clearAudit();
 	if (ok) mcpStore.audit = [];
-	else mcpStore.error = 'Could not clear the MCP log';
+	else mcpStore.error = t('settings.mcp.error.clearLog');
 	return ok;
 }
 

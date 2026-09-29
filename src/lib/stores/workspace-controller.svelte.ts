@@ -1,4 +1,5 @@
 import { tick } from 'svelte';
+import { t } from '$lib/i18n/index.svelte';
 import { createNote as makeNote } from '$lib/content/content';
 import { createNoteActions } from '$lib/content/note-actions';
 import type { Note } from '$lib/content/content';
@@ -178,7 +179,7 @@ export function createWorkspaceController() {
 			// The dock, Kanban and detail windows follow the selection.
 			notifyWorkspacesChanged();
 		} else {
-			showToast('Could not save the workspace choice — it may reset on restart');
+			showToast(t('editor.actions.workspaceSaveFailed'));
 		}
 		workspaceLoading = false;
 	}
@@ -187,7 +188,7 @@ export function createWorkspaceController() {
 	async function createWorkspaceByName(name: string) {
 		const workspace = await createWorkspace(name);
 		if (!workspace) {
-			showToast('Could not create workspace');
+			showToast(t('editor.actions.workspaceCreateFailed'));
 			return false;
 		}
 		await changeWorkspace(workspace.id);
@@ -196,23 +197,23 @@ export function createWorkspaceController() {
 
 	async function renameWorkspaceById(id: string, name: string) {
 		if (!(await renameWorkspace(id, name))) {
-			showToast('Could not rename workspace');
+			showToast(t('editor.actions.workspaceRenameFailed'));
 			return false;
 		}
 		notifyWorkspacesChanged();
-		showToast('Workspace renamed');
+		showToast(t('editor.actions.workspaceRenamed'));
 		return true;
 	}
 
 	async function deleteWorkspaceById(id: string) {
 		const wasActive = id === workspaceStore.activeId;
 		if (!(await deleteWorkspace(id))) {
-			showToast('Could not delete workspace');
+			showToast(t('editor.actions.workspaceDeleteFailed'));
 			return false;
 		}
 		if (wasActive) await changeWorkspace(workspaceStore.activeId);
 		else notifyWorkspacesChanged();
-		showToast('Workspace deleted');
+		showToast(t('editor.actions.workspaceDeleted'));
 		return true;
 	}
 
@@ -222,7 +223,7 @@ export function createWorkspaceController() {
 
 	async function persistNoteOrToast(note: Note) {
 		const ok = await persistNote(note);
-		if (!ok) showToast('Could not save note — changes may be lost');
+		if (!ok) showToast(t('editor.actions.noteSaveFailed'));
 	}
 
 	async function commitNewNote(data: { title: string; folder: string; body: string }) {
@@ -237,7 +238,7 @@ export function createWorkspaceController() {
 		state.activeTag = null;
 		state.newNoteToken += 1;
 		state.section = 'notes';
-		showToast('Note created');
+		showToast(t('editor.actions.noteCreated'));
 		await persistNoteOrToast(note);
 	}
 
@@ -325,7 +326,7 @@ export function createWorkspaceController() {
 		state.items = state.items.filter((note) => note.id !== id);
 		if (state.selectedId === id) state.selectedId = state.items[0]?.id ?? '';
 		void removeNote(id);
-		showToast('Note deleted');
+		showToast(t('editor.actions.noteDeleted'));
 	}
 
 	function selectFolder(id: string) {
@@ -379,7 +380,7 @@ export function createWorkspaceController() {
 		state.tasks = [];
 		state.activeFolder = 'all';
 		state.activeTag = null;
-		showToast('Data reset to samples');
+		showToast(t('editor.actions.dataReset'));
 	}
 
 	function markRead(id: string) {

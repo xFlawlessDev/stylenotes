@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Brain, ChevronDown } from '@lucide/svelte';
-	import { reasoningLabel } from '$lib/content/ai-trace';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * Collapsible "chain of thought" block.
@@ -38,7 +38,15 @@
 		}
 	});
 
-	const label = $derived(reasoningLabel(streaming, seconds));
+	const label = $derived(
+		streaming
+			? t('ai.reasoning.thinking')
+			: seconds <= 0
+				? t('ai.reasoning.quickly')
+				: seconds === 1
+					? t('ai.reasoning.oneSecond')
+					: t('ai.reasoning.seconds', { count: seconds })
+	);
 </script>
 
 {#if content}

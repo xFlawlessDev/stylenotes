@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Check, Circle } from '@lucide/svelte';
 	import { Button, Input } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { AnsweredQuestion, QuestionAnswer, QuestionItem } from '$lib/content/ai-questions';
 	import { canSubmit } from '$lib/content/ai-questions';
 
@@ -90,7 +91,7 @@
 
 <div class="flex flex-col gap-3 rounded-xl bg-tertiary-container/30 p-3">
 	<span class="text-label-sm font-label text-on-surface">
-		The assistant needs your input
+		{t('ai.questionTitle')}
 	</span>
 
 	{#each questions as item, index (item.header + index)}
@@ -102,7 +103,7 @@
 					{item.header}
 				</span>
 				{#if item.multiSelect}
-					<span class="text-label-sm font-label text-outline">Choose any</span>
+					<span class="text-label-sm font-label text-outline">{t('ai.chooseAny')}</span>
 				{/if}
 			</div>
 			<span class="text-body-sm font-body text-on-surface">{item.question}</span>
@@ -136,14 +137,14 @@
 					<div class="flex items-center gap-2">
 						<Input
 							size="sm"
-							placeholder="Type your answer"
+							placeholder={t('ai.typeAnswer')}
 							bind:value={customDraft}
 							onkeydown={(event) => {
 								if (event.key === 'Enter') commitCustom(index);
 							}}
 						/>
 						<Button size="xs" shape="pill" variant="primary" onclick={() => commitCustom(index)}>
-							Use
+							{t('ai.use')}
 						</Button>
 					</div>
 				{:else}
@@ -161,7 +162,7 @@
 							<span class="truncate">{customAnswerAt(index)}</span>
 						{:else}
 							<Circle size={13} class="shrink-0" />
-							Type something…
+							{t('ai.typeAnything')}
 						{/if}
 					</button>
 				{/if}
@@ -171,10 +172,10 @@
 
 	<div class="flex items-center gap-2">
 		<Button variant="primary" size="xs" shape="pill" disabled={!allAnswered} onclick={submit}>
-			Send answers
+			{t('ai.sendAnswers')}
 		</Button>
 		<Button variant="secondary" size="xs" shape="pill" onclick={decideForMe}>
-			Decide for me
+			{t('ai.decideForMe')}
 		</Button>
 	</div>
 </div>

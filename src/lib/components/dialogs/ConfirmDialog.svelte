@@ -2,13 +2,14 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button, type ButtonVariant } from '$lib/components/base';
 	import type { Snippet } from 'svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		open = $bindable(false),
 		title,
 		description,
-		confirmLabel = 'Confirm',
-		cancelLabel = 'Cancel',
+		confirmLabel = t('dialogs.confirm.confirm'),
+		cancelLabel = t('dialogs.confirm.cancel'),
 		confirmVariant = 'danger',
 		icon,
 		onconfirm,

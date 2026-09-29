@@ -19,6 +19,7 @@ import {
 	slugifyHeading,
 	type WikiRenderContext,
 } from '$lib/content/wiki-links';
+import { t } from '$lib/i18n/index.svelte';
 
 /** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset protocol. */
 const ALLOWED_URI =
@@ -305,7 +306,7 @@ export async function exportNotesToFolder(
 		directory: true,
 		multiple: false,
 		recursive: true,
-		title: 'Choose a folder to export into',
+		title: t('editor.actions.chooseFolder'),
 	});
 	const dir = typeof picked === 'string' ? picked : null;
 	if (!dir) return null;
@@ -339,22 +340,22 @@ export function createNoteActions(notify: (message: string) => void) {
 	return {
 		async copy(note: Note) {
 			const ok = await copyNoteToClipboard(note);
-			notify(ok ? 'Note copied to clipboard' : 'Could not copy note');
+			notify(ok ? t('editor.actions.noteCopied') : t('editor.actions.noteCopyFailed'));
 		},
 		print(note: Note) {
 			const rendered = renderNoteHtml(note.body)
 				.then(renderNotePreviewHtml)
 				.catch(() => renderNoteHtml(note.body));
 			if (!printNoteDocument(note, rendered)) {
-				notify('Could not open print view');
+				notify(t('editor.actions.printFailed'));
 			}
 		},
 		async export(note: Note) {
 			try {
 				const name = await exportNoteMarkdown(note);
-				if (name) notify(`Exported ${name}`);
+				if (name) notify(t('editor.actions.exported', { name }));
 			} catch {
-				notify('Could not export note');
+				notify(t('editor.actions.exportFailed'));
 			}
 		},
 		async exportAll(notes: Note[], folders: FolderRef[]) {
@@ -363,12 +364,18 @@ export function createNoteActions(notify: (message: string) => void) {
 				if (!result) return;
 				if (result.failed.length > 0) {
 					const total = result.written + result.failed.length;
-					notify(`Exported ${result.written} of ${total} notes, ${result.failed.length} failed`);
+					notify(
+						t('editor.actions.exportedSome', {
+							written: result.written,
+							total,
+							failed: result.failed.length,
+						})
+					);
 				} else {
-					notify(`Exported ${result.written} notes to ${lastSegment(result.dir)}`);
+					notify(t('editor.actions.exportedAll', { written: result.written, dir: lastSegment(result.dir) }));
 				}
 			} catch {
-				notify('Could not export notes');
+				notify(t('editor.actions.exportFailedPlural'));
 			}
 		},
 	};

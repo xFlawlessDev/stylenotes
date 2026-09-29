@@ -19,6 +19,7 @@
 	import { Check, Copy, Loader2, RotateCcw, Sparkles, Wand2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { Button, Textarea } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		AI_QUICK_ACTIONS,
 		availableApplyModes,
@@ -70,7 +71,7 @@
 
 	async function run(next: AiQuickAction) {
 		if (!ready) {
-			error = 'Configure the AI provider in Settings first.';
+			error = t('ai.notConfigured');
 			return;
 		}
 		action = next.id;
@@ -120,11 +121,11 @@
 	bind:this={popoverEl}
 	class="glass-solid fixed z-[70] flex max-h-[420px] w-[360px] flex-col gap-3 overflow-y-auto rounded-2xl border border-outline-variant/30 p-3 shadow-xl"
 	role="dialog"
-	aria-label="AI assistant"
+	aria-label={t('ai.title')}
 >
 	<div class="flex items-center justify-between gap-2">
 		<span class="flex items-center gap-1.5 text-label-md font-label text-on-surface">
-			<Sparkles size={14} class="text-primary" /> AI assistant
+			<Sparkles size={14} class="text-primary" /> {t('ai.title')}
 		</span>
 		<Button size="icon" shape="pill" variant="ghost" aria-label="Close" onclick={onclose}>
 			<span class="text-outline">✕</span>
@@ -133,7 +134,7 @@
 
 	{#if !ready}
 		<p class="rounded-xl bg-error-container/30 p-2.5 text-label-sm font-label text-on-error-container">
-			The AI assistant is off. Enable it and add a key in Settings → AI.
+			{t('ai.offNotice')}
 		</p>
 	{:else if !action}
 		<div class="flex flex-col gap-1.5">
@@ -143,8 +144,10 @@
 					class="flex cursor-pointer flex-col items-start rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-container/60"
 					onclick={() => void run(item)}
 				>
-					<span class="text-body-md font-body text-on-surface">{item.label}</span>
-					<span class="text-label-sm font-label text-outline">{item.description}</span>
+					<span class="text-body-md font-body text-on-surface">{t('ai.quickAction.' + item.id)}</span>
+					<span class="text-label-sm font-label text-outline"
+						>{t('ai.quickAction.' + item.id + 'Description')}</span
+					>
 				</button>
 			{/each}
 		</div>
@@ -152,8 +155,8 @@
 		{#if action === 'custom' && !output && !running}
 			<Textarea
 				variant="well"
-				placeholder="e.g. Turn this into a checklist"
-				aria-label="Custom instruction"
+				placeholder={t('ai.customPlaceholder')}
+				aria-label={t('ai.customLabel')}
 				class="min-h-[64px] text-body-md"
 				bind:value={instruction}
 			/>
@@ -166,7 +169,7 @@
 				disabled={!instruction.trim()}
 				onclick={() => void run(AI_QUICK_ACTIONS[3])}
 			>
-				<Wand2 size={14} /> Generate
+				<Wand2 size={14} /> {t('ai.generate')}
 			</Button>
 		{/if}
 
@@ -174,7 +177,7 @@
 			<div class="glass-well flex flex-col gap-2 rounded-xl p-2.5">
 				{#if running && !output}
 					<span class="flex items-center gap-1.5 text-label-sm font-label text-outline">
-						<Loader2 size={13} class="animate-spin" /> Thinking…
+						<Loader2 size={13} class="animate-spin" /> {t('ai.thinking')}
 					</span>
 				{:else if error}
 					<span class="text-label-sm font-label text-error">{error}</span>
@@ -198,11 +201,17 @@
 					onclick={() => void apply(mode)}
 				>
 					{#if mode === 'copy' && copied}<Check size={12} />{:else if mode === 'copy'}<Copy size={12} />{/if}
-					{mode === 'replace' ? 'Replace' : mode === 'insert' ? 'Insert' : copied ? 'Copied' : 'Copy'}
+					{mode === 'replace'
+						? t('ai.applyMode.replace')
+						: mode === 'insert'
+							? t('ai.applyMode.insert')
+							: copied
+								? t('ai.applyMode.copied')
+								: t('ai.applyMode.copy')}
 				</Button>
 			{/each}
 			<Button variant="ghost" size="xs" shape="pill" onclick={reset}>
-				<RotateCcw size={12} /> Start over
+				<RotateCcw size={12} /> {t('ai.startOver')}
 			</Button>
 		</div>
 	{/if}

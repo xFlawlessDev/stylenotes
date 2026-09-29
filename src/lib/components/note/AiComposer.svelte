@@ -3,6 +3,7 @@
 	import { Loader2, Send } from '@lucide/svelte';
 	import { Button, Textarea } from '$lib/components/base';
 	import MentionPopover from '$lib/components/note/MentionPopover.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { WikiSource } from '$lib/content/wiki-links';
 	import {
 		applyMention,
@@ -96,8 +97,8 @@
 	<Textarea
 		bind:ref={el}
 		variant="well"
-		placeholder={ready ? 'Ask anything… use @ to add a note or task' : 'Enable AI in Settings first'}
-		aria-label="Message the assistant"
+		placeholder={ready ? t('ai.composerReady') : t('ai.composerDisabled')}
+		aria-label={t('ai.composerLabel')}
 		class="min-h-[40px] leading-6 text-body-sm"
 		disabled={!ready}
 		bind:value={input}
@@ -115,7 +116,7 @@
 		size="icon"
 		shape="pill"
 		variant="primary"
-		aria-label="Send"
+		aria-label={t('ai.send')}
 		class="mt-2 self-start"
 		disabled={!ready || sending || !input.trim()}
 		onclick={submit}

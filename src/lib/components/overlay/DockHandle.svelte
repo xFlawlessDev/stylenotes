@@ -8,6 +8,7 @@
 		PanelTopOpen
 	} from '@lucide/svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { t } from '$lib/i18n/index.svelte';
 	import { dockAxis, dockTooltipSide, type DockEdge } from '$lib/dock';
 	import { edgeDrag } from '$lib/drag';
 
@@ -42,7 +43,7 @@
 	};
 
 	const Icon = $derived((collapsed ? openIcons : closeIcons)[edge]);
-	const label = $derived(collapsed ? 'Expand dock' : 'Click to minimize · drag to move');
+	const label = $derived(collapsed ? t('over.expand') : t('over.handle'));
 	// Stays a native button: the drag action cannot attach to a component.
 	const classes = $derived(
 		collapsed

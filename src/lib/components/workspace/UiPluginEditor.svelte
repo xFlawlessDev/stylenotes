@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Check, RotateCcw } from '@lucide/svelte';
 	import { Button, ColorField, Field, Input, Select, Slider, Textarea } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeColor, type UiPluginColorKey } from '$lib/content/ui-plugin-css';
 	import {
 		previewUiPlugin,
@@ -13,30 +14,47 @@
 	type ColorKey = UiPluginColorKey;
 	type SizeKey = 'radius' | 'glassBlur';
 
-	const colors: { key: ColorKey; label: string; vars: string[] }[] = [
-		{ key: 'primary', label: 'Accent', vars: ['--primary'] },
-		{ key: 'background', label: 'Background', vars: ['--background'] },
-		{ key: 'surface', label: 'Surface', vars: ['--color-surface-container'] },
-		{ key: 'foreground', label: 'Text', vars: ['--foreground'] },
+	const colors: { key: ColorKey; vars: string[] }[] = [
+		{ key: 'primary', vars: ['--primary'] },
+		{ key: 'background', vars: ['--background'] },
+		{ key: 'surface', vars: ['--color-surface-container'] },
+		{ key: 'foreground', vars: ['--foreground'] },
 	];
 
 	const sizes: {
 		key: SizeKey;
-		label: string;
 		vars: string;
 		fallback: number;
 		max: number;
 	}[] = [
-		{ key: 'radius', label: 'Corner radius', vars: '--radius', fallback: 10, max: 24 },
-		{ key: 'glassBlur', label: 'Glass blur', vars: '--glass-blur', fallback: 32, max: 48 },
+		{ key: 'radius', vars: '--radius', fallback: 10, max: 24 },
+		{ key: 'glassBlur', vars: '--glass-blur', fallback: 32, max: 48 },
 	];
 
-	const fonts: { value: string; label: string }[] = [
-		{ value: '', label: 'Theme default (Inter)' },
-		{ value: "system-ui, -apple-system, 'Segoe UI', sans-serif", label: 'System UI' },
-		{ value: "Georgia, 'Times New Roman', serif", label: 'Serif' },
-		{ value: "ui-monospace, 'Cascadia Mono', 'Courier New', monospace", label: 'Monospace' },
+	const fonts: { value: string }[] = [
+		{ value: '' },
+		{ value: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
+		{ value: "Georgia, 'Times New Roman', serif" },
+		{ value: "ui-monospace, 'Cascadia Mono', 'Courier New', monospace" },
 	];
+
+	const colorKeys: Record<ColorKey, string> = {
+		primary: 'settings.plugins.color.accent',
+		background: 'settings.plugins.color.background',
+		surface: 'settings.plugins.color.surface',
+		foreground: 'settings.plugins.color.text',
+	};
+	const sizeKeys: Record<SizeKey, string> = {
+		radius: 'settings.plugins.radius',
+		glassBlur: 'settings.plugins.glassBlur',
+	};
+	const fontKeys = [
+		'settings.plugins.typefaceDefault',
+		'settings.plugins.typefaceSystem',
+		'settings.plugins.typefaceSerif',
+		'settings.plugins.typefaceMono',
+	];
+	const fontOptions = $derived(fonts.map((font, index) => ({ ...font, label: t(fontKeys[index]) })));
 
 	/** Reads a theme variable as pixels so sliders can show the current default. */
 	function readPx(name: string, fallback: number): number {
@@ -99,26 +117,26 @@
 <div class="glass-well flex min-w-0 w-full flex-col gap-4 rounded-2xl p-3.5">
 	<div class="flex min-w-0 items-center justify-between gap-2">
 		<span class="min-w-0 flex-1 truncate text-label-md font-label text-on-surface"
-			>Editing “{plugin.name}”</span
+			>{t('settings.plugins.editing', { name: plugin.name })}</span
 		>
-		<span class="shrink-0 text-label-sm font-label text-outline">Applies live</span>
+		<span class="shrink-0 text-label-sm font-label text-outline">{t('settings.plugins.appliesLive')}</span>
 	</div>
 
-	<Field label="Name">
+	<Field label={t('settings.plugins.name')}>
 		<Input
 			size="lg"
 			value={plugin.name}
 			maxlength={80}
-			placeholder="Untitled plugin"
+			placeholder={t('settings.plugins.namePlaceholder')}
 			oninput={(event) => previewUiPlugin(plugin.id, { name: event.currentTarget.value })}
 		/>
 	</Field>
 
-	<Field label="Colors" legend class="gap-2">
+	<Field label={t('settings.plugins.colors')} legend class="gap-2">
 		<div class="flex flex-col gap-1.5">
 			{#each colors as color (color.key)}
 				<ColorField
-					label={color.label}
+					label={t(colorKeys[color.key])}
 					value={colorValue(color.key, color.vars)}
 					hex={plugin.tokens[color.key] ?? ''}
 					dirty={Boolean(plugin.tokens[color.key])}
@@ -129,28 +147,28 @@
 		</div>
 	</Field>
 
-	<Field label={'Shape & glass'} legend class="gap-2">
+	<Field label={t('settings.plugins.shape')} legend class="gap-2">
 		<div class="flex flex-col gap-3">
 			{#each sizes as size (size.key)}
 				{@const current = sizeValue(size.key, size.vars, size.fallback)}
 				<div class="flex flex-col gap-1.5">
 					<div class="flex items-center gap-2">
 						<span class="min-w-0 flex-1 truncate text-body-md font-body text-on-surface"
-							>{size.label}</span
+							>{t(sizeKeys[size.key])}</span
 						>
 						<span class="shrink-0 text-label-sm font-label text-outline">{current}px</span>
 						<Button
 							size="icon-sm"
 							shape="pill"
 							disabled={plugin.tokens[size.key] === undefined}
-							aria-label="Reset {size.label}"
+							aria-label={t('settings.plugins.resetSize', { name: t(sizeKeys[size.key]) })}
 							onclick={() => clearToken(size.key)}
 						>
 							<RotateCcw size={13} />
 						</Button>
 					</div>
 					<Slider
-						label={size.label}
+						label={t(sizeKeys[size.key])}
 						min={0}
 						max={size.max}
 						value={current}
@@ -161,30 +179,30 @@
 		</div>
 	</Field>
 
-	<Field label="Typeface">
+	<Field label={t('settings.plugins.typeface')}>
 		<Select
-			label="Typeface"
+			label={t('settings.plugins.typeface')}
 			size="lg"
-			options={fonts}
+			options={fontOptions}
 			value={plugin.tokens.fontFamily ?? ''}
 			onchange={setFont}
 		/>
 	</Field>
 
 	<Field
-		label="Custom CSS"
-		description="Applied as-is, after the tokens above. Remote @import is stripped."
+		label={t('settings.plugins.customCss')}
+		description={t('settings.plugins.customCssDescription')}
 	>
 		<Textarea
 			class="h-32 resize-y font-code text-code-sm leading-relaxed"
 			spellcheck="false"
-			placeholder="/* your CSS */"
+			placeholder={t('settings.plugins.customCssPlaceholder')}
 			value={plugin.css}
 			oninput={(event) => previewUiPlugin(plugin.id, { css: event.currentTarget.value })}
 		/>
 	</Field>
 
 	<Button variant="primary" size="lg" shape="tile" block onclick={ondone}>
-		<Check size={15} /> Done
+		<Check size={15} /> {t('settings.plugins.done')}
 	</Button>
 </div>

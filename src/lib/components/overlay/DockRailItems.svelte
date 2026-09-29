@@ -7,6 +7,7 @@
 	import { workspaceChipClass } from '$lib/workspace';
 	import type { WorkspaceNameLookup } from '$lib/workspace-sync.svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import DockNoteButton from '$lib/components/overlay/DockNoteButton.svelte';
 	import DockTaskButton from '$lib/components/overlay/DockTaskButton.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -102,7 +103,7 @@
 						variant="secondary"
 						size="icon-lg"
 						class="shrink-0 text-on-surface-variant"
-						aria-label={docked > 0 ? 'No docked items match the dock filters' : 'Dock is empty'}
+						aria-label={docked > 0 ? t('over.noMatchTitle') : t('over.empty')}
 						onclick={openWorkspace}
 					>
 						<ListTodo size={18} />
@@ -110,7 +111,7 @@
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content side={tooltipSide}>
-				{docked > 0 ? 'No items match the dock filters' : 'Dock is empty'}
+				{docked > 0 ? t('over.noMatch') : t('over.empty')}
 			</Tooltip.Content>
 		</Tooltip.Root>
 	{/if}
@@ -127,7 +128,7 @@
 	size="icon-lg"
 	shape="tile"
 	class="shrink-0 shadow-md hover:scale-105"
-	aria-label="Quick capture: new note or task"
+	aria-label={t('over.quickCapture')}
 	onclick={onplus}
 	onmouseenter={onplusenter}
 >

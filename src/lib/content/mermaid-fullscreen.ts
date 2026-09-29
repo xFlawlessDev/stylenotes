@@ -1,20 +1,22 @@
 import { createMermaidCanvas } from '$lib/content/mermaid-canvas';
 import { el, iconButton, onActivate } from '$lib/content/mermaid-dom';
+import { currentLocale, tFor } from '$lib/i18n/index.svelte';
 
 /**
  * Roomier canvas for one diagram, layered over the whole window. Built as plain
  * DOM so it can be opened from any preview surface without a portal.
  */
 export function openMermaidFullscreen(svg: SVGSVGElement): () => void {
+	const locale = currentLocale();
 	const overlay = el('div', 'mermaid-fullscreen-overlay');
 	overlay.setAttribute('role', 'dialog');
 	overlay.setAttribute('aria-modal', 'true');
-	overlay.setAttribute('aria-label', 'Mermaid diagram');
+	overlay.setAttribute('aria-label', tFor(locale, 'editor.mermaid.overlayLabel'));
 
 	const holder = el('div', 'mermaid-fullscreen-body');
 	let destroyed = false;
 
-	const closeButton = iconButton('close', 'Close full screen');
+	const closeButton = iconButton('close', tFor(locale, 'editor.mermaid.closeFullscreen'));
 	closeButton.classList.add('mermaid-fullscreen-close');
 
 	const destroy = () => {

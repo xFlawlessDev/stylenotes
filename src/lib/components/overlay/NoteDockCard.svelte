@@ -2,6 +2,7 @@
 	import { ArrowUpRight, FileText, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import type { Note } from '$lib/content/content';
+	import { t } from '$lib/i18n/index.svelte';
 	import { workspaceLookup } from '$lib/workspace-sync.svelte';
 	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -34,16 +35,18 @@
 			class="flex items-center gap-1.5 text-label-sm font-label font-semibold tracking-wider text-tertiary uppercase"
 		>
 			<FileText size={12} />
-			Quick note
+			{t('notes.badge.quickNote')}
 		</span>
 		<span class="flex items-center gap-1 text-code-sm font-code text-on-surface-variant">
-			{note.words} {note.words === 1 ? 'word' : 'words'}
+			{note.words === 1
+				? t('common.wordsOne', { count: note.words })
+				: t('common.words', { count: note.words })}
 		</span>
 	</div>
 
 	<div class="flex flex-col gap-1">
 		<h2 class="text-headline-sm font-headline leading-tight text-on-surface">
-			{note.title || 'Untitled note'}
+			{note.title || t('common.untitledNote')}
 		</h2>
 		{#if note.excerpt}
 			<p class="line-clamp-2 text-body-sm font-body leading-relaxed text-on-surface-variant">
@@ -58,7 +61,7 @@
 		</span>
 		<WorkspaceBadge name={workspace.name} color={workspace.color} />
 		{#if note.pinned}
-			<span class="rounded-md px-1.5 py-px text-code-sm font-code text-tertiary">Pinned</span>
+			<span class="rounded-md px-1.5 py-px text-code-sm font-code text-tertiary">{t('notes.badge.pinned')}</span>
 		{/if}
 	</div>
 
@@ -71,14 +74,14 @@
 						variant="secondary"
 						size="icon-sm"
 						class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
-						aria-label="Remove from dock"
+						aria-label={t('over.noteCard.removeFromDock')}
 						onclick={() => onremove(note)}
 					>
 						<X size={15} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Remove from dock</Tooltip.Content>
+			<Tooltip.Content>{t('over.noteCard.removeFromDock')}</Tooltip.Content>
 		</Tooltip.Root>
 	</div>
 
@@ -90,7 +93,7 @@
 		class="gap-1.5 px-3 py-1.5 font-headline text-headline-sm active:scale-[0.99]"
 		onclick={onopen}
 	>
-		<span class="relative">Edit note</span>
+		<span class="relative">{t('over.noteCard.edit')}</span>
 		<ArrowUpRight size={14} />
 	</Button>
 </div>

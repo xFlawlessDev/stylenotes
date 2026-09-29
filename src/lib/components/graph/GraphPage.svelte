@@ -2,7 +2,7 @@
 	import { Network, ScanSearch } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
-	import { statusMeta, type Task, type TaskDependency, type TaskStatus } from '$lib/stores/tasks';
+	import { type Task, type TaskDependency, type TaskStatus } from '$lib/stores/tasks';
 	import { buildWorkspaceGraph, type GraphEdgeKind, type GraphNode } from '$lib/content/workspace-graph';
 	import {
 		GRAPH_TOKENS,
@@ -12,6 +12,7 @@
 		graphTokenHex,
 	} from '$lib/components/graph/graph-palette';
 	import { settings } from '$lib/stores/settings.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, EmptyState, Input } from '$lib/components/base';
 	import GraphCanvas from '$lib/components/graph/GraphCanvas.svelte';
 	import GraphDrawer from '$lib/components/graph/GraphDrawer.svelte';
@@ -52,10 +53,18 @@
 	const themeToken = $derived(`${settings.mode}:${settings.accent}`);
 	const statusText = $derived(
 		active
-			? `${active.kind === 'note' ? 'Note' : 'Task'} · ${active.title} · ${active.degree} ${
-					active.degree === 1 ? 'link' : 'links'
-				}`
-			: 'Hover a node to inspect links · drag nodes to move · scroll to zoom',
+			? active.degree === 1
+				? t('graph.statusActive', {
+						kind: active.kind === 'note' ? t('graph.node.note') : t('graph.node.task'),
+						title: active.title,
+						count: active.degree
+					})
+				: t('graph.statusActivePlural', {
+						kind: active.kind === 'note' ? t('graph.node.note') : t('graph.node.task'),
+						title: active.title,
+						count: active.degree
+					})
+			: t('graph.statusIdle'),
 	);
 	const statusColor = $derived.by(() => {
 		void themeToken;
@@ -65,17 +74,17 @@
 	});
 
 	const nodeLegend: { label: string; token: string }[] = [
-		{ label: 'Note', token: GRAPH_TOKENS.note },
+		{ label: t('graph.node.note'), token: GRAPH_TOKENS.note },
 		...(['todo', 'doing', 'review', 'done'] as TaskStatus[]).map((status) => ({
-			label: statusMeta[status].label,
+			label: t('tasks.statusLabel.' + status),
 			token: GRAPH_TOKENS.task[status],
 		})),
 	];
 
 	const edgeLegend: { id: GraphEdgeKind; label: string; token: string }[] = [
-		{ id: 'wiki', label: 'Wiki links', token: GRAPH_TOKENS.edges.wiki },
-		{ id: 'link', label: 'Linked note', token: GRAPH_TOKENS.edges.link },
-		{ id: 'dependency', label: 'Dependencies', token: GRAPH_TOKENS.edges.dependency },
+		{ id: 'wiki', label: t('graph.edge.wiki'), token: GRAPH_TOKENS.edges.wiki },
+		{ id: 'link', label: t('graph.edge.link'), token: GRAPH_TOKENS.edges.link },
+		{ id: 'dependency', label: t('graph.edge.dependency'), token: GRAPH_TOKENS.edges.dependency },
 	];
 
 	/** Resolve a theme token to a hex colour, re-evaluated on theme changes. */
@@ -94,8 +103,8 @@
 		<EmptyState
 			size="md"
 			icon={Network}
-			heading="Nothing to graph yet"
-			title="Create a note or task in this workspace to see it here."
+			heading={t('graph.emptyHeading')}
+			title={t('graph.emptyTitle')}
 			class="m-auto"
 		/>
 	{:else}
@@ -116,17 +125,21 @@
 				class="glass-chip flex items-center gap-2 rounded-full px-3 py-1.5 text-on-surface"
 			>
 				<Network size={14} class="shrink-0 text-primary" />
-				<span class="text-label-md font-medium">Workspace graph</span>
+				<span class="text-label-md font-medium">{t('graph.pageTitle')}</span>
 				<span class="hidden text-label-sm text-on-surface-variant sm:inline">
-					{notes.length} notes · {tasks.length} tasks · {graph.edges.length} links
+					{t('graph.pageStats', {
+						notes: notes.length,
+						tasks: tasks.length,
+						links: graph.edges.length
+					})}
 				</span>
 			</div>
 			<Input
 				variant="well"
 				size="sm"
 				class="h-8 w-40 rounded-full px-3 sm:w-52"
-				aria-label="Highlight graph nodes"
-				placeholder="Highlight nodes"
+				aria-label={t('graph.highlightLabel')}
+				placeholder={t('graph.highlightPlaceholder')}
 				bind:value={query}
 			>
 			</Input>
@@ -150,7 +163,7 @@
 				: 'right-3'}"
 		>
 			<p class="mb-2 text-label-sm font-bold tracking-[0.14em] text-on-surface-variant uppercase">
-				Nodes
+				{t('graph.nodes')}
 			</p>
 			<div class="grid gap-2">
 				{#each nodeLegend as item (item.label)}
@@ -165,7 +178,7 @@
 			</div>
 
 			<p class="mt-3 mb-1.5 text-label-sm font-bold tracking-[0.14em] text-on-surface-variant uppercase">
-				Links
+				{t('graph.links')}
 			</p>
 			<div class="grid gap-0.5">
 				{#each edgeLegend as item (item.id)}
@@ -196,7 +209,7 @@
 				class="mt-3 w-full justify-center gap-1.5"
 				onclick={() => (fitToken += 1)}
 			>
-				<ScanSearch size={13} /> Fit view
+				<ScanSearch size={13} /> {t('graph.fitView')}
 			</Button>
 		</div>
 

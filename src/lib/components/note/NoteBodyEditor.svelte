@@ -22,6 +22,7 @@
 	import FileDropZone from '$lib/components/workspace/FileDropZone.svelte';
 	import MarkdownGuideDialog from '$lib/components/dialogs/MarkdownGuideDialog.svelte';
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		applyWikilink,
 		moveSuggestion,
@@ -297,7 +298,7 @@
 				class="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-surface-container/40 backdrop-blur-[2px]"
 			>
 				<div class="glass-solid rounded-full px-4 py-2 text-label-md font-label text-on-surface">
-					Drop files to attach
+					{t('notes.editor.dropFiles')}
 				</div>
 			</div>
 		{/if}
@@ -322,7 +323,7 @@
 					spellcheck={settings.spellcheck}
 					variant="bare"
 					size="md"
-					placeholder="Start writing. Use the toolbar or shortcuts to format..."
+					placeholder={t('notes.editor.writePlaceholder')}
 					class="scrollbar-none h-full w-full px-4 py-3 leading-relaxed text-on-surface-variant"
 				></Textarea>
 			{:else if view === 'split'}
@@ -341,7 +342,7 @@
 						spellcheck={settings.spellcheck}
 						variant="bare"
 						size="sm"
-						placeholder="Write here..."
+						placeholder={t('notes.editor.splitPlaceholder')}
 						class="scrollbar-none h-full w-full overflow-y-auto px-3 py-3 leading-relaxed text-on-surface-variant"
 						onscroll={onEditorScroll}
 					></Textarea>
@@ -356,7 +357,7 @@
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
 						{:else}
-							<p class="text-body-sm font-body text-outline">Preview appears here.</p>
+							<p class="text-body-sm font-body text-outline">{t('notes.editor.previewHere')}</p>
 						{/if}
 					</div>
 				</div>
@@ -372,7 +373,7 @@
 						<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
 					{:else}
 						<p class="text-body-md font-body text-outline">
-							This note is empty. Switch to Write to start composing.
+							{t('notes.editor.emptyPreview')}
 						</p>
 					{/if}
 				</div>

@@ -2,6 +2,7 @@
 	/** Connected MCP clients (docs/design/mcp-local-free.md #D7, #D10). */
 	import { Plug, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { mcpStore, refreshMcpClients } from '$lib/stores/mcp.svelte';
 	import { mcpRepo } from '$lib/db/mcp';
 
@@ -14,12 +15,13 @@
 </script>
 
 <div class="flex flex-col gap-2.5">
-	<span class="text-label-sm font-label tracking-wider text-outline uppercase">Clients</span>
+	<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+		>{t('settings.mcp.clientsTitle')}</span
+	>
 
 	{#if clients.length === 0}
 		<div class="glass-well rounded-2xl p-3 text-body-sm font-body text-outline">
-			No client has connected yet. Paste the config below into Claude Desktop or Cursor, then restart
-			it — the client appears here.
+			{t('settings.mcp.clientsEmpty')}
 		</div>
 	{:else}
 		<div class="flex flex-col gap-1.5">
@@ -40,7 +42,7 @@
 						variant="danger-ghost"
 						size="icon-xs"
 						shape="pill"
-						aria-label="Forget {client.name}"
+						aria-label={t('settings.mcp.forgetClient', { name: client.name })}
 						onclick={() => void forget(client.instanceId)}
 					>
 						<Trash2 size={14} />

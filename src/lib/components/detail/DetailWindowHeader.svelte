@@ -4,6 +4,7 @@
 	import { openWorkspace } from '$lib/windows';
 	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		title,
@@ -46,9 +47,9 @@
 			{title || fallbackTitle}
 		</span>
 		{#if saving}
-			<span class="shrink-0 text-code-sm font-code text-outline">Saving…</span>
+			<span class="shrink-0 text-code-sm font-code text-outline">{t('editor.header.saving')}</span>
 		{:else if saveFailed}
-			<span class="shrink-0 text-code-sm font-code text-error">Not saved</span>
+			<span class="shrink-0 text-code-sm font-code text-error">{t('editor.header.notSaved')}</span>
 		{/if}
 	</div>
 
@@ -62,14 +63,14 @@
 						{...props}
 						bare
 						class="size-6 rounded-md {docked ? 'text-primary' : 'text-on-surface-variant'}"
-						aria-label={docked ? 'Remove from dock' : 'Add to dock'}
+						aria-label={docked ? t('editor.header.removeFromDock') : t('editor.header.addToDock')}
 						onclick={ontoggledock}
 					>
 						<PictureInPicture2 size={13} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>{docked ? 'Remove from dock' : 'Add to dock'}</Tooltip.Content>
+			<Tooltip.Content>{docked ? t('editor.header.removeFromDock') : t('editor.header.addToDock')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		<Tooltip.Root>
@@ -81,7 +82,7 @@
 						class="size-6 rounded-md {alwaysOnTop
 							? 'text-primary'
 							: 'text-on-surface-variant'}"
-						aria-label={alwaysOnTop ? 'Unpin window' : 'Keep window on top'}
+						aria-label={alwaysOnTop ? t('editor.header.unpinWindow') : t('editor.header.pinWindow')}
 						onclick={ontoggletop}
 					>
 						{#if alwaysOnTop}
@@ -92,7 +93,7 @@
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>{alwaysOnTop ? 'Unpin window' : 'Keep window on top'}</Tooltip.Content>
+			<Tooltip.Content>{alwaysOnTop ? t('editor.header.unpinWindow') : t('editor.header.pinWindow')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		<Tooltip.Root>
@@ -102,14 +103,14 @@
 						{...props}
 						bare
 						class="size-6 rounded-md {buttonClass}"
-						aria-label="Open in Workspace"
+						aria-label={t('editor.header.openWorkspace')}
 						onclick={() => void openWorkspace()}
 					>
 						<ArrowUpRight size={13} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Open in Workspace</Tooltip.Content>
+			<Tooltip.Content>{t('editor.header.openWorkspace')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		<span class="mx-0.5 h-4 w-px bg-hairline/70"></span>
@@ -117,7 +118,7 @@
 		<Button
 			bare
 			class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
-			aria-label="Minimize"
+			aria-label={t('editor.header.minimize')}
 			onclick={onminimize}
 		>
 			<Minus size={13} />
@@ -125,7 +126,7 @@
 		<Button
 			bare
 			class="size-6 rounded-md text-on-surface-variant hover:bg-window-close/20 hover:text-on-surface"
-			aria-label="Close window"
+			aria-label={t('editor.header.close')}
 			onclick={onclose}
 		>
 			<X size={13} />

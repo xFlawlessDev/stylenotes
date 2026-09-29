@@ -18,6 +18,7 @@
 		Plug,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		settings,
 		updateSettings,
@@ -49,33 +50,33 @@
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
-		{ id: 'appearance', label: 'Appearance', icon: Sun },
-		{ id: 'editor', label: 'Editor', icon: Type },
-		{ id: 'dock', label: 'Overlay', icon: PictureInPicture2 },
-		{ id: 'ai', label: 'AI', icon: Bot },
-		{ id: 'mcp', label: 'MCP', icon: Plug },
-		{ id: 'data', label: 'Data', icon: HardDrive },
-		{ id: 'about', label: 'About', icon: Sparkles },
+		{ id: 'appearance', label: t('settings.nav.appearance'), icon: Sun },
+		{ id: 'editor', label: t('settings.nav.editor'), icon: Type },
+		{ id: 'dock', label: t('settings.nav.dock'), icon: PictureInPicture2 },
+		{ id: 'ai', label: t('settings.nav.ai'), icon: Bot },
+		{ id: 'mcp', label: t('settings.nav.mcp'), icon: Plug },
+		{ id: 'data', label: t('settings.nav.data'), icon: HardDrive },
+		{ id: 'about', label: t('settings.nav.about'), icon: Sparkles },
 	];
 
 	const views: { id: EditorView; label: string; icon: typeof Eye }[] = [
-		{ id: 'write', label: 'Write', icon: PenLine },
-		{ id: 'split', label: 'Split', icon: Columns2 },
-		{ id: 'preview', label: 'Preview', icon: Eye },
+		{ id: 'write', label: t('settings.editor.view.write'), icon: PenLine },
+		{ id: 'split', label: t('settings.editor.view.split'), icon: Columns2 },
+		{ id: 'preview', label: t('settings.editor.view.preview'), icon: Eye },
 	];
 
 	const taskViews: { id: TaskView; label: string; icon: typeof Eye }[] = [
-		{ id: 'write', label: 'Write', icon: PenLine },
-		{ id: 'split', label: 'Split', icon: Columns2 },
-		{ id: 'preview', label: 'Preview', icon: Eye },
+		{ id: 'write', label: t('settings.editor.view.write'), icon: PenLine },
+		{ id: 'split', label: t('settings.editor.view.split'), icon: Columns2 },
+		{ id: 'preview', label: t('settings.editor.view.preview'), icon: Eye },
 	];
 
 	const shortcuts = [
-		{ keys: 'Ctrl K', label: 'Open command palette' },
-		{ keys: 'Ctrl N', label: 'Create a new note' },
-		{ keys: 'Ctrl ,', label: 'Open settings' },
-		{ keys: 'Ctrl /', label: 'Toggle light and dark' },
-		{ keys: 'Esc', label: 'Close the active panel' },
+		{ keys: 'Ctrl K', label: t('settings.editor.shortcut.palette') },
+		{ keys: 'Ctrl N', label: t('settings.editor.shortcut.newNote') },
+		{ keys: 'Ctrl ,', label: t('settings.editor.shortcut.openSettings') },
+		{ keys: 'Ctrl /', label: t('settings.editor.shortcut.toggleMode') },
+		{ keys: 'Esc', label: t('settings.editor.shortcut.close') },
 	];
 </script>
 
@@ -83,7 +84,7 @@
 	<div class="fixed inset-0 z-50 flex items-stretch justify-end">
 		<button
 			class="absolute inset-0 cursor-default bg-scrim backdrop-blur-sm"
-			aria-label="Close settings"
+			aria-label={t('settings.close')}
 			onclick={onclose}
 		></button>
 
@@ -92,15 +93,15 @@
 		>
 			<div class="flex items-center justify-between px-5 py-4">
 				<div class="flex flex-col">
-					<span class="text-headline-md font-headline text-on-surface">Settings</span>
-					<span class="text-label-sm font-label text-outline">Personalize StyleNotes</span>
+					<span class="text-headline-md font-headline text-on-surface">{t('settings.title')}</span>
+					<span class="text-label-sm font-label text-outline">{t('settings.subtitle')}</span>
 				</div>
 				<Button
 					size="icon"
 					shape="pill"
 					variant="secondary"
 					class="text-on-surface-variant"
-					aria-label="Close"
+					aria-label={t('settings.closeShort')}
 					onclick={onclose}
 				>
 					<X size={16} />
@@ -137,7 +138,7 @@
 					{#if section === 'editor'}
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Default view</span
+								>{t('settings.editor.defaultView')}</span
 							>
 							<div class="grid grid-cols-3 gap-2">
 								{#each views as item (item.id)}
@@ -155,7 +156,7 @@
 
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Task window</span
+								>{t('settings.editor.taskWindow')}</span
 							>
 							<div class="grid grid-cols-3 gap-2">
 								{#each taskViews as item (item.id)}
@@ -172,17 +173,17 @@
 						</div>
 
 						<div class="flex flex-col gap-2">
-							{#each [{ k: 'spellcheck' as const, t: 'Check spelling', d: 'Underline misspelled words while writing' }, { k: 'showWordCount' as const, t: 'Show word count', d: 'Display live counts in the editor header' }, { k: 'confirmDelete' as const, t: 'Confirm before deleting', d: 'Ask before a note is permanently removed' }, { k: 'versioningEnabled' as const, t: 'Keep version history', d: 'Save local snapshots so edits can be restored' }] as row (row.k)}
+							{#each [{ k: 'spellcheck' as const, t: 'settings.editor.spellcheck', d: 'settings.editor.spellcheckHint' }, { k: 'showWordCount' as const, t: 'settings.editor.showWordCount', d: 'settings.editor.showWordCountHint' }, { k: 'confirmDelete' as const, t: 'settings.editor.confirmDelete', d: 'settings.editor.confirmDeleteHint' }, { k: 'versioningEnabled' as const, t: 'settings.editor.versioningEnabled', d: 'settings.editor.versioningEnabledHint' }] as row (row.k)}
 								<div
 									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 								>
 									<span class="flex flex-col">
-										<span class="text-body-md font-body text-on-surface">{row.t}</span>
-										<span class="text-label-sm font-label text-outline">{row.d}</span>
+										<span class="text-body-md font-body text-on-surface">{t(row.t)}</span>
+										<span class="text-label-sm font-label text-outline">{t(row.d)}</span>
 									</span>
 									<Switch
 										checked={settings[row.k]}
-										label={row.t}
+										label={t(row.t)}
 										onchange={(checked) => updateSettings({ [row.k]: checked })}
 									/>
 								</div>
@@ -191,7 +192,7 @@
 
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Shortcuts</span
+								>{t('settings.editor.shortcuts')}</span
 							>
 							<div class="flex flex-col gap-1 rounded-2xl bg-surface-container-lowest/30 p-2">
 								{#each shortcuts as item (item.keys)}
@@ -224,7 +225,7 @@
 					{#if section === 'data'}
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Local storage</span
+								>{t('settings.data.localStorage')}</span
 							>
 							<div class="glass-well flex items-center gap-3 rounded-2xl p-3">
 								<div
@@ -234,10 +235,10 @@
 								</div>
 								<div class="flex flex-col">
 									<span class="text-headline-sm font-headline text-on-surface"
-										>{notecount} notes stored</span
+										>{t('settings.data.notesStored', { count: notecount })}</span
 									>
 									<span class="text-label-sm font-label text-outline"
-										>Kept on this device, no account required</span
+										>{t('settings.data.keptLocally')}</span
 									>
 								</div>
 							</div>
@@ -250,14 +251,14 @@
 									class="justify-center text-label-md"
 									onclick={onexport}
 								>
-									<Download size={15} /> Export to folder
+									<Download size={15} /> {t('settings.data.exportFolder')}
 								</Button>
 							</div>
 						</div>
 
 						<div class="flex flex-col gap-2.5">
 							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
-								>Reset</span
+								>{t('settings.data.reset')}</span
 							>
 							<div class="flex flex-col gap-2">
 								<Button
@@ -269,9 +270,11 @@
 									onclick={resetSettings}
 								>
 									<span class="flex flex-col">
-										<span class="text-body-md font-body text-on-surface">Reset preferences</span>
+										<span class="text-body-md font-body text-on-surface"
+											>{t('settings.data.resetPreferences')}</span
+										>
 										<span class="text-label-sm font-label text-outline"
-											>Return appearance and editor options to defaults</span
+											>{t('settings.data.resetPreferencesHint')}</span
 										>
 									</span>
 									<RotateCcw size={15} class="shrink-0 text-outline" />
@@ -285,9 +288,9 @@
 									onclick={onresetdata}
 								>
 									<span class="flex flex-col">
-										<span class="text-body-md font-body text-error">Reset all data</span>
+										<span class="text-body-md font-body text-error">{t('settings.data.resetData')}</span>
 										<span class="text-label-sm font-label text-outline"
-											>Restore the sample notes and clear local changes</span
+											>{t('settings.data.resetDataHint')}</span
 										>
 									</span>
 									<Trash2 size={15} class="shrink-0 text-error" />
@@ -305,7 +308,9 @@
 							/>
 							<div class="flex flex-col gap-1">
 								<span class="text-headline-md font-headline text-on-surface">{appInfo.name}</span>
-								<span class="text-label-sm font-label text-outline">Version {appInfo.version}</span>
+								<span class="text-label-sm font-label text-outline"
+									>{t('settings.about.version', { version: appInfo.version })}</span
+								>
 							</div>
 							<p class="max-w-[300px] text-body-sm font-body leading-relaxed text-on-surface-variant">
 								{appInfo.description}
@@ -314,7 +319,7 @@
 								class="glass-chip flex items-center gap-2 rounded-full px-3 py-1.5 text-label-sm font-label text-on-surface-variant"
 							>
 								<ShieldCheck size={14} class="text-tertiary" />
-								Private by default, stored on your device
+								{t('settings.about.private')}
 							</div>
 						</div>
 					{/if}

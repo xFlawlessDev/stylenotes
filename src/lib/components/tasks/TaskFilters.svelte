@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { RotateCcw } from '@lucide/svelte';
 	import { Button, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		TASK_PRIORITIES,
-		priorityMeta,
-		dueFilterLabels,
 		TASK_DUE_FILTERS,
 		type TaskDueFilter,
 		type TaskPriorityFilter
@@ -27,13 +26,13 @@
 	} = $props();
 
 	const priorityItems: { value: TaskPriorityFilter; label: string }[] = [
-		{ value: 'all', label: 'All priorities' },
-		...TASK_PRIORITIES.map((value) => ({ value: value as TaskPriorityFilter, label: priorityMeta[value].label }))
+		{ value: 'all', label: t('tasks.filters.allPriorities') },
+		...TASK_PRIORITIES.map((value) => ({ value: value as TaskPriorityFilter, label: t('tasks.priorityLabel.' + value) }))
 	];
 
 	const dueItems: { value: TaskDueFilter; label: string }[] = TASK_DUE_FILTERS.map((value) => ({
 		value,
-		label: dueFilterLabels[value]
+		label: t('tasks.filters.due.' + value)
 	}));
 </script>
 
@@ -41,8 +40,8 @@
 	<Select
 		variant="chip"
 		size="sm"
-		label="Filter by priority"
-		placeholder="All priorities"
+		label={t('tasks.filters.byPriority')}
+		placeholder={t('tasks.filters.allPriorities')}
 		options={priorityItems}
 		value={priority}
 		onchange={(value) => value && onchangepriority(value as TaskPriorityFilter)}
@@ -51,8 +50,8 @@
 	<Select
 		variant="chip"
 		size="sm"
-		label="Filter by due date"
-		placeholder="Any date"
+		label={t('tasks.filters.byDue')}
+		placeholder={t('tasks.filters.anyDate')}
 		options={dueItems}
 		value={due}
 		onchange={(value) => value && onchangedue(value as TaskDueFilter)}
@@ -65,7 +64,7 @@
 			class="gap-1.5 px-2.5 text-outline"
 			onclick={onreset}
 		>
-			<RotateCcw size={13} /> Reset
+			<RotateCcw size={13} /> {t('common.reset')}
 		</Button>
 	{/if}
 </div>

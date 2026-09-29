@@ -91,6 +91,16 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - `cn` comes from `src/lib/cn.ts`, which registers the `layout.css` type scale (`text-body-md`, `text-label-sm`, …) as font sizes. Without that, the class merger treats them as text colours and drops them. Build variants with `tv` from `src/lib/components/base/variants.ts`.
 - Markdown rendering uses `marked` + `dompurify`; sanitize any HTML output.
 
+## Internationalization (i18n)
+
+- **Every user-facing string goes through `t()`.** Import from `$lib/i18n/index.svelte` and call `t('settings.title')` in markup or script. `t()` reads `settings.language`, so any template that uses it re-renders on a language change — never cache a translated string in a non-reactive variable.
+- **Locales live in per-language directories.** `src/lib/i18n/locales/en/<feature>.ts` and `.../id/<feature>.ts`, one module per feature area (`shell`, `notes`, `tasks`, `settings`, `ai`, `dialogs`, `editor`, `graph`, `palette`, `over`, `common`), merged by each locale's `index.ts`. Add a language by creating a directory and one entry in `LOCALES` (`$lib/i18n/catalog.ts`) — never by touching components.
+- **The English bundle is the schema.** `Messages` is `DeepString<typeof en>`, so `id/` is typed against it: a missing or renamed key fails `bun run check`. Each `id/*.ts` imports its section type from `./messages`.
+- **Placeholders are `{name}`** and are filled by `t('key', { count: 3 })`. `i18n.test.ts` asserts both locales use the same placeholders per key, so a translation cannot drop a `{count}`.
+- **`t()` for UI, `tFor(locale, …)` for plain DOM.** Modules that build DOM outside Svelte (the Mermaid toolbar in `content/mermaid-*.ts`) resolve `tFor(currentLocale(), …)` once; components always use `t()`.
+- **Persisted text is never translated.** Values written into SQLite (`'Untitled note'`, `'Untitled task'`, `'Just now'`, seed notification titles, `'New chat'`) stay English and are localised for display instead (see `content/notification-text.ts`). Protocol copy returned to an agent/model — MCP tool errors, `ai-questions.ts` validation errors — also stays English.
+- **`settings.language`** is the source of truth, mirrored pre-paint in `app.html` (`stylenotes.locale.v1`) and applied as `<html lang>` by `applySettings`. The Settings picker is `workspace/LanguageSettings.svelte`, rendered at the top of the Appearance section. Locale-aware date formatting uses `localeTag()` from `$lib/i18n/catalog`.
+
 ## Svelte best practices
 
 - **Runes only.** No Svelte 4 syntax: no `export let`, `$:`, `on:event`, `createEventDispatcher`, or `<slot>`. Use `$props`, `$derived`, `$effect`, `onclick={...}`, callback props, and snippets (`{@render}`).

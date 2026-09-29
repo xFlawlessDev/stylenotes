@@ -4,6 +4,7 @@
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
 	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
 	import type { WikiSuggestion, WikiSuggestionSet } from '$lib/content/wiki-autocomplete';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * The editing surface: write, split, or preview. Owns the textarea and
@@ -66,7 +67,7 @@
 			{spellcheck}
 			variant="bare"
 			size="lg"
-			placeholder="Start writing. Use the toolbar or shortcuts to format..."
+			placeholder={t('notes.editor.writePlaceholder')}
 			class="scrollbar-none h-full w-full px-6 py-4 text-on-surface-variant"
 		></Textarea>
 	{:else if view === 'split'}
@@ -82,7 +83,7 @@
 				{spellcheck}
 				variant="bare"
 				size="md"
-				placeholder="Write here..."
+				placeholder={t('notes.editor.splitPlaceholder')}
 				class="scrollbar-none h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
 				onscroll={oneditorscroll}
 			></Textarea>
@@ -97,7 +98,7 @@
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div class="markdown-body" use:hydrateMermaid>{@html html}</div>
 				{:else}
-					<p class="text-body-sm font-body text-outline">Preview appears here.</p>
+					<p class="text-body-sm font-body text-outline">{t('notes.editor.previewHere')}</p>
 				{/if}
 			</div>
 		</div>
@@ -113,7 +114,7 @@
 				<div class="markdown-body mx-auto max-w-2xl" use:hydrateMermaid>{@html html}</div>
 			{:else}
 				<p class="text-body-lg font-body text-outline">
-					This note is empty. Switch to Write to start composing.
+					{t('notes.editor.emptyPreview')}
 				</p>
 			{/if}
 		</div>

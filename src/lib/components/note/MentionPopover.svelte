@@ -17,7 +17,7 @@
 
 <script lang="ts">
 	import type { MentionSuggestion } from '$lib/content/ai-mentions';
-	import { kindLabel } from '$lib/content/wiki-autocomplete';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		open = false,
@@ -60,7 +60,7 @@
 		class="glass-solid fixed z-[70] max-h-60 w-72 overflow-y-auto rounded-xl border border-outline-variant/30 p-1 shadow-xl"
 		role="listbox"
 		tabindex="-1"
-		aria-label="Mention a note or task"
+		aria-label={t('ai.mentionLabel')}
 	>
 		{#each items as item, position (item.entity.kind + ':' + item.entity.id)}
 			<li
@@ -88,13 +88,13 @@
 					{/if}
 				</span>
 				<span class="shrink-0 text-code-sm font-code text-outline"
-					>{kindLabel(item.entity.kind)}</span
+					>{t(item.entity.kind === 'task' ? 'graph.node.task' : 'graph.node.note')}</span
 				>
 			</li>
 		{/each}
 
 		{#if !items.length}
-			<li class="px-2 py-1.5 text-body-sm font-body text-outline">No notes or tasks match.</li>
+			<li class="px-2 py-1.5 text-body-sm font-body text-outline">{t('ai.noMatches')}</li>
 		{/if}
 	</ul>
 {/if}

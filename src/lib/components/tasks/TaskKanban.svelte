@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
 	import { kanbanDrag } from '$lib/content/kanban-drag';
 	import {
@@ -62,7 +63,7 @@
 			{@const column = groups[status]}
 			<div
 				role="list"
-				aria-label={statusMeta[status].label}
+				aria-label={t('tasks.statusLabel.' + status)}
 				data-task-status={status}
 				class="glass-panel flex min-h-0 min-w-0 flex-col gap-2.5 rounded-2xl p-2.5 transition-all {overColumn ===
 				status
@@ -72,7 +73,7 @@
 				<div class="flex items-center justify-between px-1 pt-0.5">
 					<div class="flex items-center gap-2">
 						<span class="text-label-md font-label font-semibold {statusMeta[status].tone}">
-							{statusMeta[status].label}
+							{t('tasks.statusLabel.' + status)}
 						</span>
 						<span
 							class="rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code text-outline"
@@ -83,7 +84,7 @@
 					<Button
 						bare
 						class="size-6 rounded-md text-outline hover:bg-surface-container/60 hover:text-on-surface"
-						aria-label="Add task to {statusMeta[status].label}"
+						aria-label={t('tasks.kanban.addTask', { column: t('tasks.statusLabel.' + status) })}
 						onclick={() => onadd(status)}
 					>
 						<Plus size={15} />
@@ -111,7 +112,7 @@
 
 					{#if column.length === 0}
 						<p class="px-2 py-6 text-center text-code-sm font-code text-outline/70">
-							Drop tasks here
+							{t('tasks.kanban.dropHere')}
 						</p>
 					{/if}
 				</div>

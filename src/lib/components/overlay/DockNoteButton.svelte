@@ -2,6 +2,7 @@
 	import { FileText } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import type { Note } from '$lib/content/content';
+	import { t } from '$lib/i18n/index.svelte';
 	import { dockItemBar, type DockEdge } from '$lib/dock';
 
 	let {
@@ -24,7 +25,8 @@
 
 	const bar = $derived(dockItemBar(edge, active));
 	const label = $derived(
-		`${note.title || 'Untitled note'} — double-click to open note window${workspace ? ` (${workspace})` : ''}`
+		t('over.openNote', { title: note.title || t('common.untitledNote') }) +
+			(workspace ? ` (${workspace})` : '')
 	);
 </script>
 

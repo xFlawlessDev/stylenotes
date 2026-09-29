@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Field, Input } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		startDate = $bindable(''),
@@ -30,7 +31,7 @@
 
 <div class="flex flex-col gap-1.5">
 	<div class={grid}>
-		<Field label="Start" for="{idPrefix}-start" class={group} {labelClass}>
+		<Field label={t('tasks.form.start')} for="{idPrefix}-start" class={group} {labelClass}>
 			<Input
 				id="{idPrefix}-start"
 				type="date"
@@ -40,7 +41,7 @@
 			/>
 		</Field>
 
-		<Field label="Due" for="{idPrefix}-due" class={group} {labelClass}>
+		<Field label={t('tasks.form.due')} for="{idPrefix}-due" class={group} {labelClass}>
 			<Input
 				id="{idPrefix}-due"
 				type="date"
@@ -52,6 +53,6 @@
 	</div>
 
 	{#if dateError}
-		<p class="text-label-sm font-label text-error">The due date cannot precede the start date.</p>
+		<p class="text-label-sm font-label text-error">{t('tasks.form.dateError')}</p>
 	{/if}
 </div>

@@ -2,6 +2,7 @@
 	import { Check, GripVertical, Pencil, Trash2, X } from '@lucide/svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { folderIcons } from '$lib/content/folder-icons';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, Input } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -70,7 +71,7 @@
 				<Button
 					size="icon-sm"
 					class="shrink-0 text-primary"
-					aria-label="Choose icon"
+					aria-label={t('notes.chooseIcon')}
 					onclick={() => (iconOpen = !iconOpen)}
 				>
 					<Icon size={16} />
@@ -96,14 +97,14 @@
 								{...props}
 								size="icon-sm"
 								class="shrink-0 text-primary"
-								aria-label="Save folder"
+								aria-label={t('notes.saveFolder')}
 								onclick={commit}
 							>
 								<Check size={15} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Save</Tooltip.Content>
+					<Tooltip.Content>{t('common.save')}</Tooltip.Content>
 				</Tooltip.Root>
 				{#if deletable}
 					{@render removeFolder()}
@@ -115,14 +116,14 @@
 								{...props}
 								size="icon-sm"
 								class="shrink-0 text-outline"
-								aria-label="Cancel"
+								aria-label={t('common.cancel')}
 								onclick={onedit}
 							>
 								<X size={15} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Cancel</Tooltip.Content>
+					<Tooltip.Content>{t('common.cancel')}</Tooltip.Content>
 				</Tooltip.Root>
 			</div>
 
@@ -187,7 +188,7 @@
 										{...props}
 										size="icon-xs"
 										class="text-outline"
-										aria-label="Edit folder"
+										aria-label={t('notes.editFolder')}
 										onclick={(event) => {
 											event.stopPropagation();
 											onedit?.();
@@ -197,7 +198,7 @@
 									</Button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content>Edit folder</Tooltip.Content>
+							<Tooltip.Content>{t('notes.editFolder')}</Tooltip.Content>
 						</Tooltip.Root>
 					</span>
 				{/if}
@@ -223,13 +224,13 @@
 					variant="danger-ghost"
 					size="icon-sm"
 					class="shrink-0"
-					aria-label="Delete folder"
+					aria-label={t('notes.deleteFolder')}
 					onclick={ondelete}
 				>
 					<Trash2 size={15} />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Delete folder</Tooltip.Content>
+		<Tooltip.Content>{t('notes.deleteFolder')}</Tooltip.Content>
 	</Tooltip.Root>
 {/snippet}

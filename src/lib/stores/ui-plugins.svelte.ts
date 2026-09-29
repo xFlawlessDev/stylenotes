@@ -11,6 +11,7 @@ import {
 } from '$lib/content/ui-plugin-css';
 import { uiPluginsRepo } from '$lib/db/ui-plugins';
 import { isTauri } from '$lib/windows';
+import { t } from '$lib/i18n/index.svelte';
 
 export type { UiPlugin, UiPluginPatch, UiPluginTokens } from '$lib/content/ui-plugin-css';
 
@@ -148,7 +149,7 @@ export async function flushUiPluginsSave(): Promise<boolean> {
 		plugin.name = name || 'Untitled plugin';
 	}
 	const ok = isTauri ? await uiPluginsRepo.replaceAll(plain()) : true;
-	await afterWrite(ok, 'Could not save your plugin changes');
+	await afterWrite(ok, t('settings.plugins.error.saveChanges'));
 	return ok;
 }
 
@@ -170,7 +171,7 @@ export async function createUiPlugin(): Promise<UiPlugin | null> {
 	uiPlugins.push(plugin);
 	applyUiPlugins();
 	const ok = isTauri ? await uiPluginsRepo.save(plugin) : true;
-	await afterWrite(ok, 'Could not save the new plugin');
+	await afterWrite(ok, t('settings.plugins.error.saveNew'));
 	return ok ? plugin : null;
 }
 
@@ -183,7 +184,7 @@ export async function toggleUiPlugin(id: string, enabled: boolean): Promise<bool
 	applyUiPlugins();
 	const ok = isTauri ? await uiPluginsRepo.save(plugin) : true;
 	if (!ok) plugin.enabled = wasEnabled;
-	await afterWrite(ok, 'Could not update the plugin');
+	await afterWrite(ok, t('settings.plugins.error.update'));
 	return ok;
 }
 
@@ -194,7 +195,7 @@ export async function removeUiPlugin(id: string): Promise<boolean> {
 	applyUiPlugins();
 	const ok = isTauri ? await uiPluginsRepo.remove(id) : true;
 	if (!ok && removed) uiPlugins.splice(index, 0, removed);
-	await afterWrite(ok, 'Could not delete the plugin');
+	await afterWrite(ok, t('settings.plugins.error.delete'));
 	return ok;
 }
 
@@ -206,7 +207,7 @@ export async function moveUiPlugin(id: string, direction: -1 | 1): Promise<boole
 	uiPlugins.forEach((plugin, position) => (plugin.position = position));
 	applyUiPlugins();
 	const ok = isTauri ? await uiPluginsRepo.replaceAll(plain()) : true;
-	await afterWrite(ok, 'Could not reorder the plugins');
+	await afterWrite(ok, t('settings.plugins.error.reorder'));
 	return ok;
 }
 
@@ -215,7 +216,7 @@ export async function clearUiPlugins(): Promise<boolean> {
 	uiPlugins.splice(0, uiPlugins.length);
 	applyUiPlugins();
 	const ok = isTauri ? await uiPluginsRepo.clear() : true;
-	await afterWrite(ok, 'Could not clear the plugins');
+	await afterWrite(ok, t('settings.plugins.error.clear'));
 	return ok;
 }
 

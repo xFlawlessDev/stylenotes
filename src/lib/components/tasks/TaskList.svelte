@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { FolderClosed, Inbox, Pencil, PictureInPicture2 } from '@lucide/svelte';
 	import { Button, EmptyState, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import {
-		statusMeta,
 		priorityMeta,
 		taskStatus,
 		taskPriority,
@@ -39,7 +39,7 @@
 
 	const columns: { id: TaskStatus; label: string }[] = TASK_STATUSES.map((status) => ({
 		id: status,
-		label: statusMeta[status].label
+		label: t('tasks.statusLabel.' + status)
 	}));
 
 	let listEl = $state<HTMLElement>();
@@ -61,6 +61,7 @@
 		{#each ordered as task (task.id)}
 			{@const status = taskStatus(task)}
 			{@const priority = priorityMeta[taskPriority(task)]}
+			{@const priorityLabel = t('tasks.priorityLabel.' + taskPriority(task))}
 			{@const folder = folderLabels[task.folder] ?? task.folder}
 			<div
 				data-task-id={task.id}
@@ -85,7 +86,7 @@
 				<div onclick={(event) => event.stopPropagation()} role="presentation">
 					<Select
 						size="sm"
-						label="Status"
+						label={t('tasks.status')}
 						class="w-[130px] px-2 font-code text-code-sm"
 						options={columns.map((column) => ({ value: column.id, label: column.label }))}
 						value={status}
@@ -102,7 +103,7 @@
 
 				<div class="hidden items-center gap-1.5 sm:flex">
 					<span class="rounded-md px-1.5 py-px text-code-sm font-code {priority.tone}">
-						{priority.label}
+						{priorityLabel}
 					</span>
 					<span
 						class="flex max-w-[120px] items-center gap-1 rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code text-tertiary"
@@ -133,7 +134,7 @@
 									class="rounded-md {task.overlay
 										? 'text-primary'
 										: 'text-outline hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100'}"
-									aria-label={task.overlay ? 'Remove from dock' : 'Add to dock'}
+									aria-label={task.overlay ? t('over.taskCard.removeFromDock') : t('over.taskCard.addToDock')}
 									aria-pressed={task.overlay}
 									onclick={(event) => {
 										event.stopPropagation();
@@ -145,7 +146,7 @@
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>
-							{task.overlay ? 'Remove from dock' : 'Add to dock'}
+							{task.overlay ? t('over.taskCard.removeFromDock') : t('over.taskCard.addToDock')}
 						</Tooltip.Content>
 					</Tooltip.Root>
 
@@ -153,7 +154,7 @@
 						size="icon-xs"
 						variant="ghost"
 						class="rounded-md text-outline hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-						aria-label="Edit task"
+						aria-label={t('tasks.list.edit')}
 						onclick={(event) => {
 							event.stopPropagation();
 							onedit(task);
@@ -166,7 +167,7 @@
 		{/each}
 
 		{#if ordered.length === 0}
-			<EmptyState icon={Inbox} title="No tasks match this view." class="py-12" />
+			<EmptyState icon={Inbox} title={t('tasks.list.empty')} class="py-12" />
 		{/if}
 	</div>
 </section>

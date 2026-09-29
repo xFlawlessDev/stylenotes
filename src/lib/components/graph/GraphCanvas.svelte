@@ -3,6 +3,7 @@
 	import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
 	import { createGraphEngine, type GraphEngine } from '$lib/components/graph/graph-engine';
 	import { refreshGraphPalette } from '$lib/components/graph/graph-palette';
+	import { t } from '$lib/i18n/index.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 
 	let {
@@ -88,9 +89,9 @@
 	});
 </script>
 
-<div bind:this={host} class="absolute inset-0" aria-label="Force-directed graph canvas"></div>
+<div bind:this={host} class="absolute inset-0" aria-label={t('graph.canvas.ariaLabel')}></div>
 {#if !ready}
 	<p class="absolute inset-0 grid place-items-center text-[12px] text-on-surface-variant">
-		{failed ? 'Could not render the graph on this device.' : 'Laying out the graph…'}
+		{failed ? t('graph.failed') : t('graph.layingOut')}
 	</p>
 {/if}

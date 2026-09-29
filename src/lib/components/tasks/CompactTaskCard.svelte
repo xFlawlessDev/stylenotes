@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CalendarClock, Link2, Pencil } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		formatTaskDate,
 		isTaskOverdue,
@@ -40,7 +41,7 @@
 		: 'bg-surface-container/40 hover:bg-surface-container/70'}"
 	role="button"
 	tabindex="0"
-	aria-label="Select task: {task.title}"
+	aria-label={t('tasks.selectTask', { title: task.title })}
 	onclick={onselect}
 	onkeydown={(event) => {
 		if (event.key === 'Enter' || event.key === ' ') {
@@ -52,7 +53,7 @@
 	<div class="flex items-start gap-1.5">
 		<span
 			class="mt-[5px] size-1.5 shrink-0 rounded-full {priority.dot}"
-			title="Priority: {priority.label}"
+			title={t('tasks.priorityWith', { label: t('tasks.priorityLabel.' + taskPriority(task)) })}
 		></span>
 		<h3 class="line-clamp-2 min-w-0 flex-1 text-body-sm font-body leading-snug text-on-surface">
 			{task.title}
@@ -60,7 +61,7 @@
 		<Button
 			bare
 			class="shrink-0 rounded p-0.5 text-outline opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-primary"
-			aria-label="Edit task"
+			aria-label={t('tasks.list.edit')}
 			onclick={(event) => {
 				event.stopPropagation();
 				onedit();

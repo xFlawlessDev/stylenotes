@@ -1,4 +1,5 @@
 import { el, iconButton, onActivate } from '$lib/content/mermaid-dom';
+import { currentLocale, tFor } from '$lib/i18n/index.svelte';
 import {
 	formatZoom,
 	fitView,
@@ -89,11 +90,12 @@ export function createMermaidCanvas(
 	};
 
 	const controls = el('div', 'mermaid-canvas-controls');
-	const out = iconButton('minus', 'Zoom out');
+	const locale = currentLocale();
+	const out = iconButton('minus', tFor(locale, 'editor.mermaid.zoomOut'));
 	onActivate(out, () => zoomCenter(1 / MERMAID_ZOOM_STEP));
 	const zoomReset = el('button', 'mermaid-zoom-label-button');
 	zoomReset.type = 'button';
-	zoomReset.title = 'Reset zoom to 100%';
+	zoomReset.title = tFor(locale, 'editor.mermaid.zoomReset');
 	zoomReset.append(label);
 	onActivate(zoomReset, () => {
 		const box = rect();
@@ -102,14 +104,14 @@ export function createMermaidCanvas(
 		apply();
 		syncLabel();
 	});
-	const zin = iconButton('plus', 'Zoom in');
+	const zin = iconButton('plus', tFor(locale, 'editor.mermaid.zoomIn'));
 	onActivate(zin, () => zoomCenter(MERMAID_ZOOM_STEP));
-	const fitBtn = iconButton('fit', 'Fit to view');
+	const fitBtn = iconButton('fit', tFor(locale, 'editor.mermaid.fit'));
 	onActivate(fitBtn, () => {
 		touched = false;
 		fit();
 	});
-	const resetBtn = iconButton('reset', 'Reset view');
+	const resetBtn = iconButton('reset', tFor(locale, 'editor.mermaid.resetView'));
 	onActivate(resetBtn, () => {
 		touched = true;
 		view = { ...INITIAL_MERMAID_VIEW };

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { Input } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		title = $bindable(''),
@@ -29,6 +30,6 @@
 	variant="bare"
 	size="sm"
 	class="shrink-0 px-1.5 font-headline text-headline-sm font-bold tracking-tight placeholder:text-outline/60"
-	placeholder="Untitled task"
-	aria-label="Task title"
+	placeholder={t('tasks.form.titlePlaceholder')}
+	aria-label={t('tasks.form.titleLabel')}
 />

@@ -3,6 +3,7 @@
 	import type { Folder } from '$lib/stores/notes';
 	import { defaultFolderIcons, resolveFolderIcon } from '$lib/content/folder-icons';
 	import { isCustomFolder } from '$lib/stores/notes';
+	import { t } from '$lib/i18n/index.svelte';
 	import { pointerReorder } from '$lib/content/pointer-reorder';
 	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -94,13 +95,13 @@
 				<NotebookPen size={16} />
 			</div>
 			<div class="flex min-w-0 flex-col">
-				<span class="text-headline-sm font-headline leading-tight text-on-surface">Notes</span>
-				<span class="text-label-sm font-label truncate text-outline">Your private notebook</span>
+				<span class="text-headline-sm font-headline leading-tight text-on-surface">{t('notes.railTitle')}</span>
+				<span class="text-label-sm font-label truncate text-outline">{t('notes.railSubtitle')}</span>
 			</div>
 			<Button
 				size="icon-sm"
 				class="ml-auto text-outline lg:hidden"
-				aria-label="Close folders"
+				aria-label={t('notes.closeFolders')}
 				onclick={onclose}
 			>
 				<X size={16} />
@@ -117,7 +118,7 @@
 		>
 			<span class="flex items-center gap-2">
 				<PencilLine size={16} />
-				<span class="text-label-md font-label font-semibold">New Note</span>
+				<span class="text-label-md font-label font-semibold">{t('common.newNote')}</span>
 			</span>
 			<kbd class="rounded-md bg-surface-container-lowest/40 px-1.5 py-0.5 text-code-sm font-code"
 				>Ctrl N</kbd
@@ -126,7 +127,7 @@
 
 		<div class="flex min-h-0 flex-col gap-1">
 			<div class="mb-1 flex items-center justify-between px-1">
-				<span class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</span>
+				<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('notes.folders')}</span>
 				<div class="flex items-center gap-0.5">
 					<Tooltip.Root>
 						<Tooltip.Trigger>
@@ -135,20 +136,20 @@
 									{...props}
 									size="icon-xs"
 									class="text-outline"
-									aria-label="New folder"
+									aria-label={t('notes.folderNew')}
 									onclick={onaddfolder}
 								>
 									<FolderPlus size={15} />
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>New folder</Tooltip.Content>
+						<Tooltip.Content>{t('notes.folderNew')}</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
 			</div>
 			<nav
 				class="scrollbar-none flex min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
-				aria-label="Folders"
+				aria-label={t('notes.folders')}
 				use:reorder
 			>
 				{#each folders as folder (folder.id)}
@@ -183,7 +184,7 @@
 		{#if tags.length}
 			<div class="flex flex-col gap-2 border-t border-hairline px-1 pt-3">
 				<div class="flex items-center justify-between">
-					<span class="text-label-sm font-label tracking-wider text-outline uppercase">Tags</span>
+					<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('notes.tags')}</span>
 					{#if activeTag}
 						<Button
 							variant="ghost"
@@ -191,7 +192,7 @@
 							class="px-0 text-primary hover:bg-transparent"
 							onclick={() => onselecttag?.(null)}
 						>
-							Clear
+							{t('notes.clear')}
 						</Button>
 					{/if}
 				</div>

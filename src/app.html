@@ -20,6 +20,14 @@
         /* keep defaults */
       }
       try {
+        const rawLocale = localStorage.getItem('stylenotes.locale.v1');
+        if (rawLocale === 'en' || rawLocale === 'id') {
+          document.documentElement.lang = rawLocale;
+        }
+      } catch (error) {
+        /* keep defaults */
+      }
+      try {
         const plugins = localStorage.getItem('stylenotes.plugins.v1');
         if (plugins) {
           const style = document.createElement('style');

@@ -34,6 +34,7 @@
 	} from '$lib/stores/tasks';
 	import { persistTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 	import { detailWorkspaceId, listAllTasks, listWorkspaceTasks } from '$lib/stores/tasks.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		addDependency,
 		DEPENDENCIES_CHANGED,
@@ -351,7 +352,7 @@
 				<Button
 					bare
 					class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
-					aria-label="Version history"
+					aria-label={t('tasks.window.versionHistory')}
 					onclick={() => (historyOpen = true)}
 				>
 					<History size={13} />
@@ -365,14 +366,14 @@
 								{...props}
 								bare
 								class="size-6 rounded-md text-on-surface-variant"
-								aria-label="Open {note.title || 'Untitled note'}"
+								aria-label={t('tasks.window.openNote', { title: note.title || t('common.untitledNote') })}
 								onclick={() => void openNoteWindow(note.id)}
 							>
 								<NotebookPen size={13} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Open {note.title || 'Untitled note'}</Tooltip.Content>
+					<Tooltip.Content>{t('tasks.window.openNote', { title: note.title || t('common.untitledNote') })}</Tooltip.Content>
 				</Tooltip.Root>
 			{/each}
 		{/snippet}
@@ -407,8 +408,8 @@
 		<EmptyState
 			size="md"
 			icon={ListTodo}
-			heading="Task unavailable"
-			title="This task was deleted or could not be loaded."
+			heading={t('tasks.window.unavailable')}
+			title={t('tasks.window.unavailableHint')}
 			class="gap-3"
 		>
 			<Button
@@ -417,7 +418,7 @@
 				class="px-3 text-label-md text-on-surface-variant hover:text-on-surface"
 				onclick={closeWindow}
 			>
-				Close window
+				{t('tasks.window.closeWindow')}
 			</Button>
 		</EmptyState>
 	{/if}

@@ -2,6 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button, Field, Input } from '$lib/components/base';
 	import { Tag } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		open = $bindable(false),
@@ -19,8 +20,8 @@
 	const clean = $derived(value.replace(/^#/, '').trim());
 	const error = $derived.by(() => {
 		if (!touched) return '';
-		if (!clean) return 'Enter a tag name.';
-		if (existing.includes(clean)) return 'That tag is already on this note.';
+		if (!clean) return t('dialogs.tag.nameRequired');
+		if (existing.includes(clean)) return t('dialogs.tag.taken');
 		return '';
 	});
 
@@ -47,9 +48,9 @@
 			>
 				<Tag size={18} />
 			</div>
-			<Dialog.Title class="text-headline-md font-headline text-on-surface">Add a tag</Dialog.Title>
+			<Dialog.Title class="text-headline-md font-headline text-on-surface">{t('dialogs.tag.title')}</Dialog.Title>
 			<Dialog.Description>
-				Tags help you find related notes later. Keep them short and reusable.
+				{t('dialogs.tag.description')}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -60,12 +61,12 @@
 				submit();
 			}}
 		>
-			<Field label="Tag" for="tag-name">
+			<Field label={t('dialogs.tag.label')} for="tag-name">
 				<Input
 					id="tag-name"
 					bind:value
 					size="lg"
-					placeholder="e.g. Research"
+					placeholder={t('dialogs.tag.placeholder')}
 					invalid={Boolean(error)}
 					oninput={() => (touched = true)}
 				/>
@@ -87,8 +88,8 @@
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button variant="primary" type="submit">Add tag</Button>
+				<Button variant="outline" onclick={() => (open = false)}>{t('dialogs.tag.cancel')}</Button>
+				<Button variant="primary" type="submit">{t('dialogs.tag.add')}</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

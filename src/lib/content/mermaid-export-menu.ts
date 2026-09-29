@@ -1,17 +1,19 @@
 import { el, iconMarkup, onActivate } from '$lib/content/mermaid-dom';
 import { extractSvgText } from '$lib/content/mermaid-export';
 import { saveDiagram, svgToPng } from '$lib/content/preview-actions';
+import { currentLocale, tFor } from '$lib/i18n/index.svelte';
 
 /** Export dropdown for a diagram: vector SVG or raster PNG. */
 export function createExportMenu(svg: SVGSVGElement): HTMLElement {
+	const locale = currentLocale();
 	const wrapper = el('div', 'mermaid-export');
 	const button = el('button', 'mermaid-export-button');
 	button.type = 'button';
 	button.setAttribute('aria-haspopup', 'menu');
 	button.setAttribute('aria-expanded', 'false');
-	button.title = 'Export diagram';
-	button.setAttribute('aria-label', 'Export diagram');
-	button.innerHTML = `<span>Export</span>${iconMarkup('chevron', 12)}`;
+	button.title = tFor(locale, 'editor.mermaid.export');
+	button.setAttribute('aria-label', tFor(locale, 'editor.mermaid.export'));
+	button.innerHTML = `<span>${tFor(locale, 'common.export')}</span>${iconMarkup('chevron', 12)}`;
 
 	const menu = el('div', 'mermaid-export-menu');
 	menu.hidden = true;
@@ -31,7 +33,7 @@ export function createExportMenu(svg: SVGSVGElement): HTMLElement {
 		const item = el('button', 'mermaid-export-item');
 		item.type = 'button';
 		item.setAttribute('role', 'menuitem');
-		item.textContent = `Export as ${format.toUpperCase()}`;
+		item.textContent = tFor(locale, 'editor.mermaid.exportAs', { format: format.toUpperCase() });
 		onActivate(item, () => {
 			close();
 			void exportDiagram(svg, format, button);
@@ -56,9 +58,10 @@ export function createExportMenu(svg: SVGSVGElement): HTMLElement {
 }
 
 async function exportDiagram(svg: SVGSVGElement, format: 'svg' | 'png', button: HTMLElement) {
+	const locale = currentLocale();
 	const label = button.querySelector('span');
 	if (!label) return;
-	const original = label.textContent ?? 'Export';
+	const original = label.textContent ?? tFor(locale, 'common.export');
 	try {
 		const text = extractSvgText(svg.outerHTML);
 		const blob =
@@ -66,9 +69,9 @@ async function exportDiagram(svg: SVGSVGElement, format: 'svg' | 'png', button: 
 				? new Blob([text], { type: 'image/svg+xml;charset=utf-8' })
 				: await svgToPng(text);
 		const saved = await saveDiagram(blob, `mermaid-diagram.${format}`, format);
-		label.textContent = saved ? 'Saved' : original;
+		label.textContent = saved ? tFor(locale, 'editor.mermaid.saved') : original;
 	} catch {
-		label.textContent = 'Failed';
+		label.textContent = tFor(locale, 'editor.mermaid.failed');
 	}
 	setTimeout(() => {
 		if (button.isConnected) label.textContent = original;

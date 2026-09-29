@@ -10,6 +10,7 @@
 	/** Recent MCP tool calls, with a reset (docs/design/mcp-local-free.md #D7, #D10). */
 	import { RotateCcw } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { clearMcpAudit, mcpStore } from '$lib/stores/mcp.svelte';
 
 	let confirmClear = $state(false);
@@ -24,25 +25,29 @@
 
 <div class="flex flex-col gap-2.5">
 	<div class="flex items-center justify-between gap-2">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">Recent calls</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+			>{t('settings.mcp.recentCalls')}</span
+		>
 		{#if confirmClear}
 			<div class="flex items-center gap-1.5">
-				<span class="text-label-sm font-label text-error">Clear log?</span>
+				<span class="text-label-sm font-label text-error">{t('settings.mcp.clearLog')}</span>
 				<Button variant="secondary" size="xs" class="text-error" onclick={() => void reset()}>
-					Yes
+					{t('settings.mcp.yes')}
 				</Button>
-				<Button variant="secondary" size="xs" onclick={() => (confirmClear = false)}>No</Button>
+				<Button variant="secondary" size="xs" onclick={() => (confirmClear = false)}
+					>{t('settings.mcp.no')}</Button
+				>
 			</div>
 		{:else if rows.length}
 			<Button variant="ghost" size="xs" class="text-outline" onclick={() => (confirmClear = true)}>
-				<RotateCcw size={13} /> Reset
+				<RotateCcw size={13} /> {t('settings.mcp.reset')}
 			</Button>
 		{/if}
 	</div>
 
 	{#if rows.length === 0}
 		<div class="glass-well rounded-2xl p-3 text-body-sm font-body text-outline">
-			No calls yet. Every tool an agent runs is listed here with its workspace and outcome.
+			{t('settings.mcp.auditEmpty')}
 		</div>
 	{:else}
 		<div class="flex max-h-64 flex-col gap-1 overflow-y-auto">
@@ -61,7 +66,7 @@
 							? 'bg-tertiary-container text-on-tertiary-container'
 							: 'bg-surface-container text-outline'}"
 					>
-						{row.scope}
+						{t(row.scope === 'write' ? 'settings.mcp.scopeWrite' : 'settings.mcp.scopeRead')}
 					</span>
 					<span class="shrink-0 text-label-sm font-label text-outline"
 						>{formatCallTime(row.at)}</span

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { priorityMeta, statusMeta, taskPriority, taskStatus, type Task } from '$lib/stores/tasks';
+	import { taskPriority, taskStatus, type Task } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		task,
@@ -19,11 +20,16 @@
 <div class="flex flex-col gap-0.5">
 	<span class="font-medium">{task.title}</span>
 	<span class="text-background/70">
-		{statusMeta[status].label} · {priorityMeta[priority].label}{overdue ? ' · Overdue' : ''}
+		{t('tasks.statusLabel.' + status)} · {t('tasks.priorityLabel.' + priority)}{overdue
+			? ' · ' + t('tasks.gantt.overdue')
+			: ''}
 	</span>
 	{#if blockers.length}
 		<span>
-			Blocked by {blockers.length}: {blockers.map((item) => item.title).join(', ')}
+			{t('tasks.gantt.blockedByList', {
+				count: blockers.length,
+				names: blockers.map((item) => item.title).join(', ')
+			})}
 		</span>
 	{/if}
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Circle, CircleCheck, CircleDashed, Eye } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { dockItemBar, type DockEdge } from '$lib/dock';
 	import {
 		taskPriority,
@@ -52,7 +53,7 @@
 	const Icon = $derived(statusIcons[status]);
 	const bar = $derived(dockItemBar(edge, active));
 	const label = $derived(
-		`${task.title} — double-click to open task window${workspace ? ` (${workspace})` : ''}`
+		t('over.openTask', { title: task.title }) + (workspace ? ` (${workspace})` : '')
 	);
 </script>
 

@@ -2,13 +2,12 @@
 	import { ExternalLink, X } from '@lucide/svelte';
 	import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
 	import {
-		GRAPH_EDGE_LABELS,
 		GRAPH_TOKENS,
 		graphColorHex,
 		graphNodeColor,
 		graphTokenColor,
 	} from '$lib/components/graph/graph-palette';
-	import { statusMeta } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { Button } from '$lib/components/base';
 
@@ -58,8 +57,10 @@
 	const eyebrow = $derived(
 		node
 			? [
-					node.kind === 'task' ? 'Task' : 'Note',
-					node.kind === 'task' && node.status ? statusMeta[node.status].label : null,
+					node.kind === 'task' ? t('graph.node.task') : t('graph.node.note'),
+					node.kind === 'task' && node.status
+						? t('tasks.statusLabel.' + node.status)
+						: null,
 					node.folder,
 				]
 					.filter(Boolean)
@@ -71,7 +72,7 @@
 {#if node}
 	<aside
 		class="glass-solid absolute top-3 right-3 bottom-3 z-20 flex w-72 flex-col overflow-hidden rounded-2xl text-on-surface"
-		aria-label="Node details"
+		aria-label={t('graph.drawer.title')}
 	>
 		<header class="flex items-start gap-2 border-b border-outline-variant/60 px-4 py-3">
 			<span
@@ -84,18 +85,19 @@
 				</p>
 				<h3 class="truncate text-headline-sm">{node.title}</h3>
 				<p class="text-label-sm text-on-surface-variant">
-					{connections.length}
-					{connections.length === 1 ? 'connection' : 'connections'}
+					{connections.length === 1
+						? t('graph.drawer.connectionOne', { count: connections.length })
+						: t('graph.drawer.connectionMany', { count: connections.length })}
 				</p>
 			</div>
-			<Button bare size="icon-sm" aria-label="Close details" onclick={onclose}>
+			<Button bare size="icon-sm" aria-label={t('graph.drawer.close')} onclick={onclose}>
 				<X size={15} />
 			</Button>
 		</header>
 
 		<div class="scrollbar-none min-h-0 flex-1 overflow-y-auto p-3">
 			<p class="mb-2 text-label-sm font-bold tracking-[0.14em] text-on-surface-variant uppercase">
-				Connections
+				{t('graph.drawer.connections')}
 			</p>
 			<div class="grid gap-1">
 				{#each connections as item (`${item.direction}-${item.kind}-${item.node.id}`)}
@@ -114,7 +116,7 @@
 							<span class="min-w-0 flex-1">
 								<span class="block truncate text-label-md text-on-surface">{item.node.title}</span>
 								<span class="block truncate text-label-sm text-on-surface-variant">
-									{item.direction === 'out' ? '→' : '←'} {GRAPH_EDGE_LABELS[item.kind]}
+									{item.direction === 'out' ? '→' : '←'} {t('graph.edge.' + item.kind)}
 								</span>
 							</span>
 						</Button>
@@ -122,7 +124,7 @@
 							bare
 							size="icon-xs"
 							class="opacity-0 transition-opacity group-hover:opacity-100"
-							aria-label="Open {item.node.title}"
+							aria-label={t('graph.drawer.open', { title: item.node.title })}
 							onclick={() => onopen(item.node)}
 						>
 							<ExternalLink size={13} />
@@ -131,7 +133,7 @@
 				{/each}
 				{#if !connections.length}
 					<p class="text-label-md leading-relaxed text-on-surface-variant">
-						No links yet — this node is isolated in the graph.
+						{t('graph.drawer.isolated')}
 					</p>
 				{/if}
 			</div>
@@ -139,7 +141,7 @@
 
 		<footer class="border-t border-outline-variant/60 p-3">
 			<Button variant="secondary" class="w-full justify-center gap-1.5" onclick={() => onopen(node)}>
-				<ExternalLink size={13} /> {node.kind === 'task' ? 'Open task' : 'Open note'}
+				<ExternalLink size={13} /> {node.kind === 'task' ? t('graph.drawer.openTask') : t('graph.drawer.openNote')}
 			</Button>
 		</footer>
 	</aside>

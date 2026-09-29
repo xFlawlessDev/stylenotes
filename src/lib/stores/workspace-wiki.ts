@@ -9,6 +9,7 @@ import type { GraphNode } from '$lib/content/workspace-graph';
 import type { WorkspaceSection } from '$lib/windows';
 import { persistNote } from '$lib/stores/notes';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
+import { t } from '$lib/i18n/index.svelte';
 import type { TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 
 /** Reactive slices plus navigation hooks the wiki flow reads and writes. */
@@ -105,7 +106,7 @@ export function createWikiFlow(port: WikiPort) {
 		const ok = await persistNote(created);
 		if (!ok) {
 			port.items = port.items.filter((item) => item.id !== created.id);
-			port.notify('Could not create linked note');
+			port.notify(t('editor.actions.linkedNoteCreateFailed'));
 			return;
 		}
 		await selectTarget({ ...created, kind: 'note' }, plan.heading);

@@ -2,6 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button, Input } from '$lib/components/base';
 	import { Check, Folder, FolderCog, Pencil, Plus, Trash2, X } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { workspaceChipClass } from '$lib/workspace';
 
 	let {
@@ -35,19 +36,19 @@
 
 	const createError = $derived.by(() => {
 		if (!createTouched) return '';
-		if (!trimmedCreate) return 'Give the workspace a name.';
+		if (!trimmedCreate) return t('shell.workspace.error.nameRequired');
 		if (
 			workspaces.some(
 				(workspace) => workspace.name.toLowerCase() === trimmedCreate.toLowerCase()
 			)
 		)
-			return 'A workspace with that name already exists.';
+			return t('shell.workspace.error.nameTaken');
 		return '';
 	});
 
 	const editError = $derived.by(() => {
 		if (!editTouched) return '';
-		if (!trimmedEdit) return 'Give the workspace a name.';
+		if (!trimmedEdit) return t('shell.workspace.error.nameRequired');
 		if (
 			workspaces.some(
 				(workspace) =>
@@ -55,7 +56,7 @@
 					workspace.name.toLowerCase() === trimmedEdit.toLowerCase()
 			)
 		)
-			return 'A workspace with that name already exists.';
+			return t('shell.workspace.error.nameTaken');
 		return '';
 	});
 
@@ -84,7 +85,7 @@
 			createName = '';
 			createTouched = false;
 		} else {
-			actionError = 'Could not create the workspace.';
+			actionError = t('shell.workspace.error.create');
 		}
 	}
 
@@ -107,7 +108,7 @@
 		if (ok) {
 			editingId = null;
 		} else {
-			actionError = 'Could not rename the workspace.';
+			actionError = t('shell.workspace.error.rename');
 		}
 	}
 
@@ -121,7 +122,7 @@
 			confirmId = null;
 			editingId = editingId === id ? null : editingId;
 		} else {
-			actionError = 'Could not delete the workspace.';
+			actionError = t('shell.workspace.error.delete');
 		}
 	}
 </script>
@@ -135,10 +136,10 @@
 				<FolderCog size={18} />
 			</div>
 			<Dialog.Title class="text-headline-md font-headline text-on-surface">
-				Manage workspaces
+				{t('shell.workspace.manageTitle')}
 			</Dialog.Title>
 			<Dialog.Description>
-				Workspaces keep notes and tasks apart per context. Deleting one removes everything inside it.
+				{t('shell.workspace.manageDescription')}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -147,14 +148,14 @@
 				bind:value={createName}
 				size="md"
 				class="min-w-0 flex-1"
-				placeholder="New workspace name"
-				aria-label="New workspace name"
+				placeholder={t('shell.workspace.newPlaceholder')}
+				aria-label={t('shell.workspace.newLabel')}
 				invalid={Boolean(createError)}
 				oninput={() => (createTouched = true)}
 			/>
 			<Button type="submit" variant="primary" disabled={busy}>
 				<Plus size={15} />
-				Add
+				{t('shell.workspace.add')}
 			</Button>
 		</form>
 		{#if createError}
@@ -177,7 +178,7 @@
 									bind:value={editName}
 									size="sm"
 									class="min-w-0 flex-1"
-									aria-label="Workspace name"
+									aria-label={t('shell.workspace.nameLabel')}
 									invalid={Boolean(editError)}
 									oninput={() => (editTouched = true)}
 								/>
@@ -185,14 +186,14 @@
 									type="submit"
 									size="icon-sm"
 									variant="tonal"
-									aria-label="Save workspace name"
+									aria-label={t('shell.workspace.saveName')}
 									disabled={busy}><Check size={14} /></Button
 								>
 								<Button
 									type="button"
 									bare
 									size="icon-sm"
-									aria-label="Cancel rename"
+									aria-label={t('shell.workspace.cancelRename')}
 									onclick={() => (editingId = null)}><X size={14} /></Button
 								>
 							</form>
@@ -203,11 +204,11 @@
 					{:else if confirmId === workspace.id}
 						<div class="flex min-w-0 flex-1 items-center gap-2">
 							<p class="min-w-0 flex-1 truncate text-body-sm font-body text-on-surface-variant">
-								Delete “{workspace.name}” and everything inside it?
+								{t('shell.workspace.deleteQuestion', { name: workspace.name })}
 							</p>
-							<Button size="xs" variant="outline" onclick={() => (confirmId = null)}>Cancel</Button>
+							<Button size="xs" variant="outline" onclick={() => (confirmId = null)}>{t('common.cancel')}</Button>
 							<Button size="xs" variant="danger" disabled={busy} onclick={() => remove(workspace.id)}>
-								Delete
+								{t('common.delete')}
 							</Button>
 						</div>
 					{:else}
@@ -217,12 +218,12 @@
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-body-md font-body text-on-surface">{workspace.name}</p>
 							<p class="text-label-sm font-label text-outline">
-								{workspace.id === activeId ? 'Active workspace' : 'Workspace'}
+								{workspace.id === activeId ? t('shell.workspace.active') : t('shell.workspace.member')}
 							</p>
 						</div>
 						<Button
 							size="icon-sm"
-							aria-label="Rename {workspace.name}"
+							aria-label={t('shell.workspace.rename', { name: workspace.name })}
 							onclick={() => startRename(workspace.id, workspace.name)}
 						>
 							<Pencil size={14} />
@@ -230,7 +231,7 @@
 						<Button
 							size="icon-sm"
 							variant="danger-ghost"
-							aria-label="Delete {workspace.name}"
+							aria-label={t('shell.workspace.delete', { name: workspace.name })}
 							disabled={workspaces.length < 2 || busy}
 							onclick={() => (confirmId = workspace.id)}
 						>
@@ -248,7 +249,7 @@
 		<Dialog.Footer
 			class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 		>
-			<Button variant="outline" onclick={() => (open = false)}>Close</Button>
+			<Button variant="outline" onclick={() => (open = false)}>{t('shell.workspace.close')}</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

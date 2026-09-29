@@ -7,6 +7,7 @@
 		Sun
 	} from '@lucide/svelte';
 	import { Button, EmptyState } from '$lib/components/base';
+	import { currentLocale, localeTag, t } from '$lib/i18n/index.svelte';
 	import TaskCard from '$lib/components/tasks/TaskCard.svelte';
 	import {
 		INCOMPLETE_TASK_VIEWS,
@@ -35,11 +36,26 @@
 	const selectedDayTasks = $derived(sortTasks(tasksForDate(tasks, selectedDate)));
 	const incompleteTasks = $derived(incompleteTasksForView(tasks, incompleteView));
 	const holidays = $derived(upcomingHolidays(undefined, today));
+	const weekdays = $derived([
+		t('tasks.dashboard.weekdays.mon'),
+		t('tasks.dashboard.weekdays.tue'),
+		t('tasks.dashboard.weekdays.wed'),
+		t('tasks.dashboard.weekdays.thu'),
+		t('tasks.dashboard.weekdays.fri'),
+		t('tasks.dashboard.weekdays.sat'),
+		t('tasks.dashboard.weekdays.sun')
+	]);
 	const monthLabel = $derived(
-		new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(visibleMonth)
+		new Intl.DateTimeFormat(localeTag(currentLocale()), { month: 'long', year: 'numeric' }).format(
+			visibleMonth
+		)
 	);
 	const selectedDateLabel = $derived(
-		new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(selectedDate)
+		new Intl.DateTimeFormat(localeTag(currentLocale()), {
+			weekday: 'long',
+			month: 'long',
+			day: 'numeric'
+		}).format(selectedDate)
 	);
 
 	function changeMonth(offset: number) {
@@ -56,7 +72,9 @@
 	}
 
 	function holidayDate(date: Date): string {
-		return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(date);
+		return new Intl.DateTimeFormat(localeTag(currentLocale()), { day: 'numeric', month: 'short' }).format(
+			date
+		);
 	}
 </script>
 
@@ -71,23 +89,37 @@
 			aria-labelledby="mini-calendar-heading"
 		>
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<h2 id="mini-calendar-heading" class="text-title-sm font-title text-on-surface">Mini Calendar</h2>
+				<h2 id="mini-calendar-heading" class="text-title-sm font-title text-on-surface">
+					{t('tasks.dashboard.miniCalendar')}
+				</h2>
 				<div class="flex min-w-0 flex-wrap items-center gap-1">
 					{#if localDateKey(selectedDate) !== localDateKey(today)}
-						<Button variant="secondary" size="md" class="min-h-11" onclick={returnToToday}>Today</Button>
+						<Button variant="secondary" size="md" class="min-h-11" onclick={returnToToday}
+							>{t('tasks.dashboard.today')}</Button
+						>
 					{/if}
-					<Button variant="ghost" size="icon-lg" aria-label="Previous month" onclick={() => changeMonth(-1)}>
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						aria-label={t('tasks.dashboard.previousMonth')}
+						onclick={() => changeMonth(-1)}
+					>
 						<ChevronLeft size={16} />
 					</Button>
 					<span class="min-w-[100px] text-center text-label-md font-label text-on-surface sm:min-w-[118px]">{monthLabel}</span>
-					<Button variant="ghost" size="icon-lg" aria-label="Next month" onclick={() => changeMonth(1)}>
+					<Button
+						variant="ghost"
+						size="icon-lg"
+						aria-label={t('tasks.dashboard.nextMonth')}
+						onclick={() => changeMonth(1)}
+					>
 						<ChevronRight size={16} />
 					</Button>
 				</div>
 			</div>
 
 			<div class="grid grid-cols-7 gap-0.5 text-center sm:gap-1" aria-label={monthLabel}>
-				{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as weekday (weekday)}
+				{#each weekdays as weekday (weekday)}
 					<span class="py-1 text-code-sm font-code text-outline">{weekday}</span>
 				{/each}
 				{#each calendarDays as date (localDateKey(date))}
@@ -100,7 +132,7 @@
 						variant={isSelected ? 'secondary' : 'ghost'}
 						size="sm"
 						class="relative mx-auto h-10 w-full max-w-11 min-w-0 p-0 text-label-sm sm:h-11 {inMonth ? 'text-on-surface' : 'text-outline/50'} {isToday && !isSelected ? 'ring-1 ring-primary/60' : ''}"
-						aria-label={new Intl.DateTimeFormat('en', { dateStyle: 'full' }).format(date)}
+						aria-label={new Intl.DateTimeFormat(localeTag(currentLocale()), { dateStyle: 'full' }).format(date)}
 						aria-pressed={isSelected}
 						onclick={() => selectDay(date)}
 					>
@@ -114,7 +146,7 @@
 			<section class="flex flex-col gap-2" aria-labelledby="upcoming-holidays-heading">
 				<div class="flex items-center gap-2">
 					<Sun size={15} class="text-tertiary" />
-					<h3 id="upcoming-holidays-heading" class="text-label-md font-label text-on-surface">Upcoming Holidays</h3>
+					<h3 id="upcoming-holidays-heading" class="text-label-md font-label text-on-surface">{t('tasks.dashboard.holidaysTitle')}</h3>
 				</div>
 				{#each holidays as holiday (`${holiday.name}-${holiday.date.toISOString()}`)}
 					<div class="flex items-center justify-between gap-3 text-body-sm">
@@ -122,9 +154,9 @@
 						<time class="shrink-0 text-code-sm font-code text-outline" datetime={localDateKey(holiday.date)}>{holidayDate(holiday.date)}</time>
 					</div>
 				{:else}
-					<p class="text-body-sm text-outline">No upcoming fixed-date holidays.</p>
+					<p class="text-body-sm text-outline">{t('tasks.dashboard.noHolidays')}</p>
 				{/each}
-				<p class="text-code-sm text-outline/70">Indonesia · fixed-date national holidays</p>
+				<p class="text-code-sm text-outline/70">{t('tasks.dashboard.holidaysFootnote')}</p>
 			</section>
 		</section>
 
@@ -136,7 +168,7 @@
 				<div class="flex items-center gap-2">
 					<CalendarDays size={16} class="text-primary" />
 					<div>
-						<h2 id="events-heading" class="text-title-sm font-title text-on-surface">Events</h2>
+						<h2 id="events-heading" class="text-title-sm font-title text-on-surface">{t('tasks.dashboard.events')}</h2>
 						<p class="text-label-sm text-outline">{selectedDateLabel}</p>
 					</div>
 				</div>
@@ -153,7 +185,7 @@
 				{:else}
 					<EmptyState
 						icon={Inbox}
-						title={localDateKey(selectedDate) === localDateKey(today) ? 'No tasks scheduled for today.' : 'No tasks scheduled for this day.'}
+						title={localDateKey(selectedDate) === localDateKey(today) ? t('tasks.dashboard.noTasksToday') : t('tasks.dashboard.noTasksDay')}
 						class="py-8"
 					/>
 				{/each}
@@ -167,10 +199,10 @@
 	>
 		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
 			<div class="min-w-0">
-				<h2 id="incomplete-heading" class="text-title-sm font-title text-on-surface">Incomplete Tasks</h2>
-				<p class="text-label-sm text-outline">Tasks that still need attention</p>
+				<h2 id="incomplete-heading" class="text-title-sm font-title text-on-surface">{t('tasks.dashboard.incomplete')}</h2>
+				<p class="text-label-sm text-outline">{t('tasks.dashboard.incompleteHint')}</p>
 			</div>
-			<nav class="scrollbar-none -mx-1 flex min-w-0 max-w-full items-center gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" aria-label="Incomplete task filters">
+			<nav class="scrollbar-none -mx-1 flex min-w-0 max-w-full items-center gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" aria-label={t('tasks.dashboard.incompleteFilterLabel')}>
 				{#each INCOMPLETE_TASK_VIEWS as item (item.id)}
 					<Button
 						variant={incompleteView === item.id ? 'secondary' : 'ghost'}
@@ -178,7 +210,7 @@
 						aria-pressed={incompleteView === item.id}
 						onclick={() => (incompleteView = item.id)}
 					>
-						{item.label}
+						{t('tasks.dashboard.views.' + item.id)}
 					</Button>
 				{/each}
 			</nav>
@@ -196,7 +228,7 @@
 			{:else}
 				<EmptyState
 					icon={Inbox}
-					title="No incomplete tasks in this view."
+					title={t('tasks.dashboard.noIncomplete')}
 					class="col-span-full py-8"
 				/>
 			{/each}

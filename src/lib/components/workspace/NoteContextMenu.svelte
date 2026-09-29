@@ -13,6 +13,7 @@
 		Trash2,
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import * as ContextMenu from '$lib/components/ui/context-menu';
 
 	let {
@@ -62,63 +63,63 @@
 	</ContextMenu.Trigger>
 	<ContextMenu.Content class="min-w-48">
 		<div class="px-1.5 py-1.5 text-label-sm font-label text-outline">
-			{title || 'Untitled note'}
+			{title || t('common.untitledNote')}
 		</div>
 		<ContextMenu.Separator />
 		<ContextMenu.Item onSelect={() => onselect(noteId)}>
 			<Pin />
-			Open
+			{t('notes.quickMenu.open')}
 		</ContextMenu.Item>
 		<ContextMenu.Item onSelect={() => run(ontogglepin)}>
 			{#if pinned}
 				<PinOff />
-				Unpin
+				{t('notes.quickMenu.unpin')}
 			{:else}
 				<Pin />
-				Pin
+				{t('notes.quickMenu.pin')}
 			{/if}
 		</ContextMenu.Item>
 		<ContextMenu.Item onSelect={() => run(onopenwindow)}>
 			<AppWindow />
-			Open in window
+			{t('notes.quickMenu.openInWindow')}
 		</ContextMenu.Item>
 		<ContextMenu.Item onSelect={() => run(ontoggledock)}>
 			<PictureInPicture2 />
-			{docked ? 'Remove from dock' : 'Add to dock'}
+			{docked ? t('notes.quickMenu.removeFromDock') : t('notes.quickMenu.addToDock')}
 		</ContextMenu.Item>
 		<ContextMenu.Item onSelect={() => run(ontogglearchive)}>
 			{#if archived}
 				<ArchiveRestore />
-				Unarchive
+				{t('notes.quickMenu.unarchive')}
 			{:else}
 				<Archive />
-				Archive
+				{t('notes.quickMenu.archive')}
 			{/if}
 		</ContextMenu.Item>
 		<ContextMenu.Sub>
 			<ContextMenu.SubTrigger>
 				<Share2 />
-				Share
+				{t('notes.quickMenu.share')}
 			</ContextMenu.SubTrigger>
 			<ContextMenu.SubContent class="min-w-40">
 				<ContextMenu.Item onSelect={() => run(onprint)}>
 					<Printer />
-					Print
+					{t('notes.quickMenu.print')}
 				</ContextMenu.Item>
 				<ContextMenu.Item onSelect={() => run(onexport)}>
 					<FileDown />
-					Export .md
+					{t('notes.quickMenu.export')}
 				</ContextMenu.Item>
 				<ContextMenu.Item onSelect={() => run(oncopy)}>
 					<Copy />
-					Copy all
+					{t('notes.quickMenu.copyAll')}
 				</ContextMenu.Item>
 			</ContextMenu.SubContent>
 		</ContextMenu.Sub>
 		<ContextMenu.Separator />
 		<ContextMenu.Item variant="destructive" onSelect={() => run(ondelete)}>
 			<Trash2 />
-			Delete
+			{t('notes.quickMenu.delete')}
 		</ContextMenu.Item>
 	</ContextMenu.Content>
 </ContextMenu.Root>

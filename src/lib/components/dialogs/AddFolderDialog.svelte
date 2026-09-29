@@ -2,6 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button, Field, Input } from '$lib/components/base';
 	import { FolderPlus } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		open = $bindable(false),
@@ -19,9 +20,9 @@
 	const clean = $derived(value.trim());
 	const error = $derived.by(() => {
 		if (!touched) return '';
-		if (!clean) return 'Give the folder a name.';
+		if (!clean) return t('dialogs.folder.nameRequired');
 		if (labels.some((label) => label.toLowerCase() === clean.toLowerCase()))
-			return 'A folder with that name already exists.';
+			return t('dialogs.folder.nameTaken');
 		return '';
 	});
 
@@ -50,10 +51,10 @@
 				<FolderPlus size={18} />
 			</div>
 			<Dialog.Title class="text-headline-md font-headline text-on-surface">
-				New folder
+				{t('dialogs.folder.title')}
 			</Dialog.Title>
 			<Dialog.Description>
-				Folders group related notes. You can move notes into it at any time.
+				{t('dialogs.folder.description')}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -64,12 +65,12 @@
 				submit();
 			}}
 		>
-			<Field label="Folder name" for="folder-name">
+			<Field label={t('dialogs.folder.name')} for="folder-name">
 				<Input
 					id="folder-name"
 					bind:value
 					size="lg"
-					placeholder="e.g. Research"
+					placeholder={t('dialogs.folder.placeholder')}
 					invalid={Boolean(error)}
 					oninput={() => (touched = true)}
 				/>
@@ -81,8 +82,8 @@
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button variant="primary" type="submit">Create folder</Button>
+				<Button variant="outline" onclick={() => (open = false)}>{t('dialogs.folder.cancel')}</Button>
+				<Button variant="primary" type="submit">{t('dialogs.folder.create')}</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

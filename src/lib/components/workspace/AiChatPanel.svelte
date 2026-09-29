@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { Bot, Check, Copy, Loader2, Plus, Sparkles, Trash2, X } from '@lucide/svelte';
 	import { Button, EmptyState } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import AiMessageBody from '$lib/components/note/AiMessageBody.svelte';
 	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import AiReasoning from '$lib/components/ai/AiReasoning.svelte';
@@ -223,14 +224,15 @@
 			.filter((entity) => ids.has(`${entity.kind}:${entity.id}`))
 			.map((entity) => {
 				const body = entity.body?.trim();
-				const label = entity.kind === 'task' ? 'task' : 'note';
-				const head = `Context — the ${label} "${entity.title}":`;
+				const head = t(entity.kind === 'task' ? 'ai.context.task' : 'ai.context.note', {
+					title: entity.title
+				});
 				return body ? `${head}\n\n${body}` : head;
 			});
 	}
 
 	async function startNew() {
-		await createThread('New chat');
+		await createThread(t('ai.newChat'));
 		draft = '';
 		error = null;
 		reasoning = '';
@@ -258,27 +260,27 @@
 	     so opening it never squeezes the editor. The scrim closes it. -->
 	<button
 		class="fixed inset-0 z-40 cursor-default bg-scrim/40"
-		aria-label="Close assistant"
+		aria-label={t('ai.closeAssistant')}
 		onclick={onclose}
 	></button>
 	<aside
 		class="glass-solid fixed inset-y-2.5 left-2.5 z-40 flex h-[calc(100vh-1.25rem)] w-[min(380px,calc(100vw-1.25rem))] flex-col rounded-2xl shadow-2xl"
-		aria-label="AI chat"
+		aria-label={t('ai.title')}
 	>
 		<div class="flex items-center justify-between gap-2 px-4 py-3">
 			<div class="flex min-w-0 flex-col">
 				<span class="flex items-center gap-1.5 text-headline-sm font-headline text-on-surface">
-					<Sparkles size={15} class="text-primary" /> Assistant
+					<Sparkles size={15} class="text-primary" /> {t('ai.title')}
 				</span>
 				<span class="truncate text-label-sm font-label text-outline">
-					Search, summarize and edit across every note and task
+					{t('ai.subtitle')}
 				</span>
 			</div>
 			<div class="flex items-center gap-1">
-				<Button size="icon-sm" shape="pill" variant="ghost" aria-label="New chat" onclick={() => void startNew()}>
+				<Button size="icon-sm" shape="pill" variant="ghost" aria-label={t('ai.newChat')} onclick={() => void startNew()}>
 					<Plus size={15} />
 				</Button>
-				<Button size="icon-sm" shape="pill" variant="ghost" aria-label="Close assistant" onclick={onclose}>
+				<Button size="icon-sm" shape="pill" variant="ghost" aria-label={t('ai.closeAssistant')} onclick={onclose}>
 					<X size={15} />
 				</Button>
 			</div>
@@ -299,14 +301,14 @@
 							onclick={() => void openThread(thread.id)}
 						>
 							{#if titleGenerating(thread.id)}
-								<Loader2 size={11} class="shrink-0 animate-spin" aria-label="Naming chat" />
+								<Loader2 size={11} class="shrink-0 animate-spin" aria-label={t('ai.namingChat')} />
 							{/if}
-							<span class="truncate">{thread.title || 'Untitled'}</span>
+							<span class="truncate">{thread.title || t('ai.untitled')}</span>
 						</button>
 						<Button
 							size="icon-xs"
 							variant="danger-ghost"
-							aria-label="Delete chat"
+							aria-label={t('ai.deleteChat')}
 							class="ml-0.5 opacity-0 group-hover:opacity-100"
 							onclick={() => void removeThread(thread.id)}
 						>
@@ -322,8 +324,8 @@
 				<EmptyState
 					size="sm"
 					icon={Bot}
-					heading="Ask about your notes"
-					title="Summarize, draft, or find something you wrote earlier."
+					heading={t('ai.emptyHeading')}
+					title={t('ai.emptyTitle')}
 				/>
 			{/if}
 
@@ -357,7 +359,7 @@
 							onclick={() => void copyMessage(message.id, message.content)}
 						>
 							{#if copiedId === message.id}<Check size={12} />{:else}<Copy size={12} />{/if}
-							{copiedId === message.id ? 'Copied' : 'Copy'}
+							{copiedId === message.id ? t('ai.copied') : t('ai.copy')}
 						</Button>
 					{:else}
 						<div
@@ -372,7 +374,7 @@
 							onclick={() => void copyMessage(message.id, message.content)}
 						>
 							{#if copiedId === message.id}<Check size={12} />{:else}<Copy size={12} />{/if}
-							{copiedId === message.id ? 'Copied' : 'Copy'}
+							{copiedId === message.id ? t('ai.copied') : t('ai.copy')}
 						</Button>
 					{/if}
 				</div>
@@ -405,14 +407,14 @@
 			{#if pendingWrite}
 				<div class="flex flex-col gap-2 rounded-xl bg-tertiary-container/30 p-3">
 					<span class="text-label-sm font-label text-on-surface">
-						The assistant wants to: {describeToolCall(pendingWrite.call.name, pendingWrite.call.arguments)}
+						{t('ai.wantsTo')} {describeToolCall(pendingWrite.call.name, pendingWrite.call.arguments)}
 					</span>
 					<div class="flex items-center gap-2">
 						<Button variant="primary" size="xs" shape="pill" onclick={() => answerWrite(true)}>
-							Allow
+							{t('ai.allow')}
 						</Button>
 						<Button variant="secondary" size="xs" shape="pill" onclick={() => answerWrite(false)}>
-							Decline
+							{t('ai.decline')}
 						</Button>
 					</div>
 				</div>

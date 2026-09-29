@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from '@lucide/svelte';
 	import { Button, Switch } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { describeUiPlugin } from '$lib/content/ui-plugin-css';
 	import {
 		clearUiPlugins,
@@ -53,7 +54,9 @@
 
 <div class="flex min-w-0 flex-col gap-2.5">
 	<div class="flex items-center justify-between gap-2">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">UI plugins</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+			>{t('settings.plugins.title')}</span
+		>
 		{#if !editing}
 			<Button
 				variant="secondary"
@@ -61,14 +64,13 @@
 				shape="pill"
 				onclick={() => void startCreate()}
 			>
-				<Plus size={13} /> New plugin
+				<Plus size={13} /> {t('settings.plugins.newPlugin')}
 			</Button>
 		{/if}
 	</div>
 
 	<p class="text-body-sm font-body leading-relaxed text-outline">
-		Each plugin layers theme overrides and its own CSS on top of StyleNotes. Turn several on at once
-		— plugins lower in the list win.
+		{t('settings.plugins.description')}
 	</p>
 
 	{#if error}
@@ -79,7 +81,7 @@
 			<Button
 				size="icon-xs"
 				class="shrink-0 text-on-error-container"
-				aria-label="Dismiss error"
+				aria-label={t('settings.plugins.dismissError')}
 				onclick={dismissUiPluginError}
 			>
 				<X size={14} />
@@ -91,7 +93,7 @@
 		<UiPluginEditor plugin={editing} ondone={() => void doneEditing()} />
 	{:else if uiPlugins.length === 0}
 		<div class="glass-well rounded-2xl p-3 text-body-sm font-body text-outline">
-			No plugins yet. Create one to restyle colors, corners, and type — or drop in your own CSS.
+			{t('settings.plugins.empty')}
 		</div>
 	{:else}
 		<div class="flex flex-col gap-1.5">
@@ -102,7 +104,7 @@
 					<div class="flex items-center gap-2.5">
 						<Switch
 							checked={plugin.enabled}
-							label="Enable {plugin.name}"
+							label={t('settings.plugins.enablePlugin', { name: plugin.name })}
 							onchange={(checked) => void toggleUiPlugin(plugin.id, checked)}
 						/>
 
@@ -119,25 +121,25 @@
 
 						<div class="flex shrink-0 items-center gap-0.5">
 							{#if confirmId === plugin.id}
-								<span class="text-label-sm font-label text-error">Delete?</span>
+								<span class="text-label-sm font-label text-error">{t('settings.plugins.deleteQuestion')}</span>
 								<Button
 									variant="secondary"
 									size="xs"
 									class="text-error"
-									onclick={() => void confirmDelete(plugin.id)}>Yes</Button
+									onclick={() => void confirmDelete(plugin.id)}>{t('settings.plugins.yes')}</Button
 								>
 								<Button
 									variant="secondary"
 									size="xs"
 									class="text-on-surface-variant"
-									onclick={() => (confirmId = null)}>No</Button
+									onclick={() => (confirmId = null)}>{t('settings.plugins.no')}</Button
 								>
 							{:else}
 								<Button
 									size="icon-xs"
 									shape="pill"
 									disabled={index === 0}
-									aria-label="Move {plugin.name} up"
+									aria-label={t('settings.plugins.moveUp', { name: plugin.name })}
 									onclick={() => void moveUiPlugin(plugin.id, -1)}
 								>
 									<ChevronUp size={14} />
@@ -146,7 +148,7 @@
 									size="icon-xs"
 									shape="pill"
 									disabled={index === uiPlugins.length - 1}
-									aria-label="Move {plugin.name} down"
+									aria-label={t('settings.plugins.moveDown', { name: plugin.name })}
 									onclick={() => void moveUiPlugin(plugin.id, 1)}
 								>
 									<ChevronDown size={14} />
@@ -154,7 +156,7 @@
 								<Button
 									size="icon-xs"
 									shape="pill"
-									aria-label="Edit {plugin.name}"
+									aria-label={t('settings.plugins.edit', { name: plugin.name })}
 									onclick={() => (editingId = plugin.id)}
 								>
 									<Pencil size={14} />
@@ -163,7 +165,7 @@
 									variant="danger-ghost"
 									size="icon-xs"
 									shape="pill"
-									aria-label="Delete {plugin.name}"
+									aria-label={t('settings.plugins.delete', { name: plugin.name })}
 									onclick={() => (confirmId = plugin.id)}
 								>
 									<Trash2 size={14} />
@@ -177,18 +179,18 @@
 
 		{#if confirmClear}
 			<div class="flex items-center gap-2">
-				<span class="text-label-sm font-label text-error">Remove every plugin?</span>
+				<span class="text-label-sm font-label text-error">{t('settings.plugins.removeAllQuestion')}</span>
 				<Button
 					variant="secondary"
 					size="xs"
 					class="text-error"
-					onclick={() => void clearAll()}>Yes</Button
+					onclick={() => void clearAll()}>{t('settings.plugins.yes')}</Button
 				>
 				<Button
 					variant="secondary"
 					size="xs"
 					class="text-on-surface-variant"
-					onclick={() => (confirmClear = false)}>No</Button
+					onclick={() => (confirmClear = false)}>{t('settings.plugins.no')}</Button
 				>
 			</div>
 		{:else}
@@ -198,7 +200,7 @@
 				class="self-start"
 				onclick={() => (confirmClear = true)}
 			>
-				Remove all plugins
+				{t('settings.plugins.removeAll')}
 			</Button>
 		{/if}
 	{/if}

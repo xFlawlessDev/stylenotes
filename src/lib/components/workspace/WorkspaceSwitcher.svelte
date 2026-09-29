@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Folder, FolderCog } from '@lucide/svelte';
 	import { Button, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { workspaceColorClass } from '$lib/workspace';
 	import ManageWorkspacesDialog from '$lib/components/workspace/ManageWorkspacesDialog.svelte';
 
@@ -32,7 +33,7 @@
 		bind:open
 		value={activeId}
 		{options}
-		label="Workspace"
+		label={t('shell.workspace.label')}
 		variant="chip"
 		size="sm"
 		class="max-w-[170px] border-0"
@@ -49,7 +50,7 @@
 				}}
 			>
 				<FolderCog size={14} class="text-outline" />
-				Manage workspaces…
+				{t('shell.workspace.manage')}
 			</Button>
 		{/snippet}
 	</Select>

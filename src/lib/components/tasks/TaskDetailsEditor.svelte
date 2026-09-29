@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { t } from '$lib/i18n/index.svelte';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
@@ -208,14 +209,14 @@
 					variant="bare"
 					size="sm"
 					class={textareaClass}
-					placeholder="Context, links, next steps. Type [[ to link a note or task."
+					placeholder={t('tasks.form.detailsPlaceholder')}
 				/>
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 				<div bind:this={previewEl} class={previewClass} onclick={handlePreviewClick}>
 					{#if html}
 						<div class="markdown-body">{@html html}</div>
 					{:else}
-						<p class="text-body-sm font-body text-outline">Nothing to preview yet.</p>
+						<p class="text-body-sm font-body text-outline">{t('tasks.form.nothingToPreview')}</p>
 					{/if}
 				</div>
 			</div>
@@ -232,7 +233,7 @@
 				variant="bare"
 				size="sm"
 				class={textareaClass}
-				placeholder="Context, links, next steps. Type [[ to link a note or task."
+				placeholder={t('tasks.form.detailsPlaceholder')}
 			/>
 		{:else}
 			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -241,7 +242,7 @@
 					<div class="markdown-body">{@html html}</div>
 				{:else}
 					<p class="text-body-sm font-body text-outline">
-						This task has no details yet. Switch to Write to start.
+						{t('tasks.form.detailsEmpty')}
 					</p>
 				{/if}
 			</div>
@@ -262,7 +263,7 @@
 		{#if html}
 			<div class="markdown-body">{@html html}</div>
 		{:else}
-			<p class="text-body-sm font-body text-outline">Nothing to preview yet.</p>
+			<p class="text-body-sm font-body text-outline">{t('tasks.form.nothingToPreview')}</p>
 		{/if}
 	</div>
 {:else}
@@ -279,7 +280,7 @@
 			rows={compact ? 2 : 3}
 			size="sm"
 			class={compact ? 'py-1.5' : 'py-2'}
-			placeholder="Context, links, next steps. Type [[ to link a note or task."
+			placeholder={t('tasks.form.detailsPlaceholder')}
 		/>
 		<WikiLinkPopover
 			{open}

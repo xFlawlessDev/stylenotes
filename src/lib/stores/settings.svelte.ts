@@ -6,6 +6,8 @@ import type { OverlaySort, TaskPriorityFilter, TaskStatus } from '$lib/stores/ta
 import { isTauri } from '$lib/windows';
 
 export type ThemeMode = 'dark' | 'light';
+/** UI language. Values must match `LOCALES` in `$lib/i18n/catalog`. */
+export type Language = 'en' | 'id';
 export type Accent = 'steel' | 'sage' | 'sand' | 'rose';
 export type Density = 'comfortable' | 'compact';
 export type EditorView = 'split' | 'write' | 'preview';
@@ -14,6 +16,8 @@ export type TaskView = EditorView;
 
 export type Settings = {
 	mode: ThemeMode;
+	/** UI language; drives `$lib/i18n`. */
+	language: Language;
 	accent: Accent;
 	density: Density;
 	reduceMotion: boolean;
@@ -47,6 +51,7 @@ export const accents: { id: Accent; label: string; swatchClass: string }[] = [
 
 const defaults: Settings = {
 	mode: 'dark',
+	language: 'en',
 	accent: 'steel',
 	density: 'comfortable',
 	reduceMotion: false,
@@ -128,6 +133,8 @@ export function persistSettings() {
 }
 
 const PREPAINT_KEY = 'stylenotes.theme.v1';
+/** Mirror of the chosen language, read before paint in `app.html`. */
+const PREPAINT_LOCALE_KEY = 'stylenotes.locale.v1';
 
 export function applySettings() {
 	if (!browser) return;
@@ -137,6 +144,7 @@ export function applySettings() {
 	html.dataset.accent = settings.accent;
 	html.dataset.density = settings.density;
 	html.dataset.motion = settings.reduceMotion ? 'reduced' : 'full';
+	html.lang = settings.language;
 	try {
 		localStorage.setItem(
 			PREPAINT_KEY,
@@ -147,6 +155,7 @@ export function applySettings() {
 				reduceMotion: settings.reduceMotion,
 			})
 		);
+		localStorage.setItem(PREPAINT_LOCALE_KEY, settings.language);
 	} catch {
 		/* ignore */
 	}

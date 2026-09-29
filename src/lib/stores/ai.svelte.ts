@@ -21,6 +21,7 @@ import type { ToolResult } from '$lib/content/ai-tools';
 import { aiRepo } from '$lib/db/ai';
 import { sanitizeThreadTitle, titlePrompt } from '$lib/content/ai-assistant';
 import { isTauri } from '$lib/windows';
+import { t } from '$lib/i18n/index.svelte';
 import {
 	AI_CHANGED,
 	aiReady,
@@ -258,7 +259,7 @@ export async function createThread(title = 'New chat', noteId: string | null = n
 	const id = crypto.randomUUID();
 	const ok = await aiRepo.createThread({ id, title, noteId });
 	if (!ok) {
-		aiStore.error = 'Could not start a new chat';
+		aiStore.error = t('ai.error.newChat');
 		return null;
 	}
 	// A generically named thread is a candidate for an LLM title.
@@ -276,7 +277,7 @@ export async function createThread(title = 'New chat', noteId: string | null = n
 export async function renameThread(id: string, title: string): Promise<boolean> {
 	const ok = await aiRepo.renameThread(id, title);
 	if (!ok) {
-		aiStore.error = 'Could not rename the chat';
+		aiStore.error = t('ai.error.renameChat');
 		return false;
 	}
 	clearThreadAutoTitle(id);
@@ -371,7 +372,7 @@ export function generateThreadTitle(threadId: string): void {
 export async function deleteThread(id: string): Promise<boolean> {
 	const ok = await aiRepo.deleteThread(id);
 	if (!ok) {
-		aiStore.error = 'Could not delete the chat';
+		aiStore.error = t('ai.error.deleteChat');
 		return false;
 	}
 	aiStore.threads = await aiRepo.listThreads();
@@ -397,7 +398,7 @@ export async function appendMessage(
 	}
 	const record = await aiRepo.addMessage(threadId, role, content, trace);
 	if (!record) {
-		aiStore.error = 'Could not save the message';
+		aiStore.error = t('ai.error.saveMessage');
 		return null;
 	}
 	aiStore.messages = [...aiStore.messages, record];

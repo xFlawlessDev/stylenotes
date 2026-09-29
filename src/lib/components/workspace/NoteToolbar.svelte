@@ -20,6 +20,7 @@
 	import { Button } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		view,
@@ -56,9 +57,9 @@
 	} = $props();
 
 	const views: { id: EditorView; icon: typeof Eye; title: string }[] = [
-		{ id: 'write', icon: PenLine, title: 'Write' },
-		{ id: 'split', icon: Columns2, title: 'Split' },
-		{ id: 'preview', icon: Eye, title: 'Preview' },
+		{ id: 'write', icon: PenLine, title: t('settings.editor.view.write') },
+		{ id: 'split', icon: Columns2, title: t('settings.editor.view.split') },
+		{ id: 'preview', icon: Eye, title: t('settings.editor.view.preview') },
 	];
 </script>
 
@@ -93,14 +94,14 @@
 					variant="secondary"
 					size="icon"
 					class="text-on-surface-variant"
-					aria-label="Full preview"
+					aria-label={t('notes.editor.fullPreview')}
 					onclick={onfullpreview}
 				>
 					<Maximize2 size={16} />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Full preview</Tooltip.Content>
+		<Tooltip.Content>{t('notes.editor.fullPreview')}</Tooltip.Content>
 	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
@@ -110,7 +111,7 @@
 					variant={pinned ? 'tonal' : 'secondary'}
 					size="icon"
 					class={pinned ? undefined : 'text-on-surface-variant'}
-					aria-label="Pin note"
+					aria-label={t('notes.quickMenu.pin')}
 					aria-pressed={pinned}
 					onclick={ontogglepin}
 				>
@@ -118,7 +119,7 @@
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>{pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
+		<Tooltip.Content>{pinned ? t('notes.quickMenu.unpin') : t('notes.quickMenu.pin')}</Tooltip.Content>
 	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
@@ -128,14 +129,14 @@
 					variant="secondary"
 					size="icon"
 					class="text-on-surface-variant"
-					aria-label="Open in note window"
+					aria-label={t('notes.quickMenu.openInWindow')}
 					onclick={onopenwindow}
 				>
 					<AppWindow size={16} />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Open in note window</Tooltip.Content>
+		<Tooltip.Content>{t('notes.quickMenu.openInWindow')}</Tooltip.Content>
 	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
@@ -145,7 +146,7 @@
 					variant={docked ? 'tonal' : 'secondary'}
 					size="icon"
 					class={docked ? undefined : 'text-on-surface-variant'}
-					aria-label={docked ? 'Remove from dock' : 'Add to dock'}
+					aria-label={docked ? t('notes.quickMenu.removeFromDock') : t('notes.quickMenu.addToDock')}
 					aria-pressed={docked}
 					onclick={ontoggledock}
 				>
@@ -153,7 +154,7 @@
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>{docked ? 'Remove from dock' : 'Add to dock'}</Tooltip.Content>
+		<Tooltip.Content>{docked ? t('notes.quickMenu.removeFromDock') : t('notes.quickMenu.addToDock')}</Tooltip.Content>
 	</Tooltip.Root>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
@@ -163,7 +164,7 @@
 					variant={archived ? 'tonal' : 'secondary'}
 					size="icon"
 					class={archived ? undefined : 'text-on-surface-variant'}
-					aria-label={archived ? 'Unarchive note' : 'Archive note'}
+					aria-label={archived ? t('notes.quickMenu.unarchive') : t('notes.quickMenu.archive')}
 					aria-pressed={archived}
 					onclick={ontogglearchive}
 				>
@@ -175,7 +176,7 @@
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>{archived ? 'Unarchive note' : 'Archive note'}</Tooltip.Content>
+		<Tooltip.Content>{archived ? t('notes.quickMenu.unarchive') : t('notes.quickMenu.archive')}</Tooltip.Content>
 	</Tooltip.Root>
 	{#if onhistory}
 		<Tooltip.Root>
@@ -186,14 +187,14 @@
 						variant="secondary"
 						size="icon"
 						class="text-on-surface-variant"
-						aria-label="Version history"
+						aria-label={t('notes.editor.versionHistory')}
 						onclick={onhistory}
 					>
 						<History size={16} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Version history</Tooltip.Content>
+			<Tooltip.Content>{t('notes.editor.versionHistory')}</Tooltip.Content>
 		</Tooltip.Root>
 	{/if}
 	<DropdownMenu.Root>
@@ -204,7 +205,7 @@
 					variant="secondary"
 					size="icon"
 					class="text-on-surface-variant"
-					aria-label="Share note"
+					aria-label={t('notes.quickMenu.share')}
 				>
 					<Share2 size={16} />
 				</Button>
@@ -213,15 +214,15 @@
 		<DropdownMenu.Content align="end" class="min-w-40">
 			<DropdownMenu.Item onSelect={onprint}>
 				<Printer />
-				Print
+				{t('notes.quickMenu.print')}
 			</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={onexport}>
 				<FileDown />
-				Export .md
+				{t('notes.quickMenu.export')}
 			</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={oncopy}>
 				<Copy />
-				Copy all
+				{t('notes.quickMenu.copyAll')}
 			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
@@ -233,13 +234,13 @@
 					variant="secondary"
 					size="icon"
 					class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
-					aria-label="Delete note"
+					aria-label={t('notes.quickMenu.delete')}
 					onclick={ondelete}
 				>
 					<Trash2 size={16} />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Delete note</Tooltip.Content>
+		<Tooltip.Content>{t('notes.quickMenu.delete')}</Tooltip.Content>
 	</Tooltip.Root>
 </div>

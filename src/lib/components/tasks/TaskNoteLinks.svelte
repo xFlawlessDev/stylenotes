@@ -2,6 +2,7 @@
 	import { X } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { Button, Field, Input } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeNoteIds } from '$lib/stores/tasks';
 
 	let {
@@ -29,12 +30,12 @@
 		if (!query) return [];
 		return notes
 			.filter((note) => !selected.includes(note.id))
-			.filter((note) => (note.title || 'Untitled note').toLowerCase().includes(query))
+			.filter((note) => (note.title || t('common.untitledNote')).toLowerCase().includes(query))
 			.slice(0, 6);
 	});
 
 	function labelFor(id: string): string {
-		return byId.get(id)?.title || 'Untitled note';
+		return byId.get(id)?.title || t('common.untitledNote');
 	}
 
 	function add(id: string) {
@@ -49,8 +50,10 @@
 </script>
 
 <Field
-	label="Linked notes"
-	hint={selected.length ? `${selected.length} linked` : 'optional'}
+	label={t('tasks.form.linkedNotes')}
+	hint={selected.length
+		? t('tasks.form.linkedCount', { count: selected.length })
+		: t('common.optional')}
 	class={className}
 	{labelClass}
 >
@@ -65,7 +68,7 @@
 						<Button
 							bare
 							class="rounded text-outline hover:text-error"
-							aria-label="Unlink {labelFor(id)}"
+							aria-label={t('tasks.form.unlink', { title: labelFor(id) })}
 							onclick={() => remove(id)}
 						>
 							<X size={11} />
@@ -81,8 +84,8 @@
 				size={compact ? 'md' : 'lg'}
 				class={compact ? 'text-body-sm' : ''}
 				bind:value={term}
-				placeholder={selected.length ? 'Link another note…' : 'Search notes to link…'}
-				aria-label="Search notes to link"
+				placeholder={selected.length ? t('tasks.form.linkAnother') : t('tasks.form.searchNotes')}
+				aria-label={t('tasks.form.searchNotesLabel')}
 			/>
 			{#if suggestions.length}
 				<ul
@@ -95,7 +98,7 @@
 								class="w-full truncate rounded-lg px-2 py-1.5 text-left text-body-sm font-body text-on-surface hover:bg-surface-container"
 								onclick={() => add(note.id)}
 							>
-								{note.title || 'Untitled note'}
+								{note.title || t('common.untitledNote')}
 							</Button>
 						</li>
 					{/each}
@@ -104,7 +107,7 @@
 		</div>
 
 		{#if !notes.length}
-			<p class="text-label-sm font-label text-outline">No notes to link yet.</p>
+			<p class="text-label-sm font-label text-outline">{t('tasks.form.noNotesToLink')}</p>
 		{/if}
 	</div>
 </Field>

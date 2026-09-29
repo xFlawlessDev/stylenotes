@@ -12,6 +12,7 @@ import {
 	type Folder,
 } from '$lib/stores/notes';
 import type { Note } from '$lib/content/content';
+import { t } from '$lib/i18n/index.svelte';
 
 /** The reactive slices and callbacks the folder operations read and write. */
 export type FolderOpsPort = {
@@ -35,14 +36,14 @@ export function createFolderOps(port: FolderOpsPort) {
 		port.customFolders = next;
 		port.activeFolder = id;
 		void persistFolders(next);
-		port.notify(`Folder “${label}” created`);
+		port.notify(t('editor.actions.folderCreated', { name: label }));
 	}
 
 	function rename(id: string, label: string) {
 		const next = renameFolderInList(port.customFolders, id, label);
 		port.customFolders = next;
 		void persistFolders(next);
-		port.notify(`Folder renamed to “${label}”`);
+		port.notify(t('editor.actions.folderRenamed', { name: label }));
 	}
 
 	function setIcon(id: string, icon: string) {
@@ -67,7 +68,7 @@ export function createFolderOps(port: FolderOpsPort) {
 		port.items = remaining;
 		void persistNotes(remaining);
 		if (port.activeFolder === id) port.activeFolder = 'all';
-		port.notify('Folder removed');
+		port.notify(t('editor.actions.folderRemoved'));
 	}
 
 	function reorder(fromId: string, toId: string) {

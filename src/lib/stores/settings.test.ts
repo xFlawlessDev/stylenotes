@@ -40,6 +40,7 @@ describe('defaults', () => {
 	it('exposes the expected shape', () => {
 		expect(defaultSettings()).toMatchObject({
 			mode: 'dark',
+			language: 'en',
 			accent: 'steel',
 			editorView: 'preview',
 			taskView: 'write',
@@ -63,6 +64,13 @@ describe('applySettings', () => {
 		expect(root.dataset.accent).toBe('rose');
 		expect(root.dataset.density).toBe('compact');
 		expect(root.dataset.motion).toBe('reduced');
+	});
+
+	it('writes the language onto <html lang> and mirrors it for prepaint', () => {
+		Object.assign(settings, { language: 'id' });
+		applySettings();
+		expect(document.documentElement.lang).toBe('id');
+		expect(localStorage.getItem('stylenotes.locale.v1')).toBe('id');
 	});
 
 	it('mirrors a prepaint snapshot for the next launch', () => {

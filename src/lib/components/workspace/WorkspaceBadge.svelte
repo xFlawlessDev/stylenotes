@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Layers3 } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		name,
@@ -15,7 +16,9 @@
 				: 'bg-primary/10 text-primary'
 	);
 	const title = $derived(
-		foreign ? `Workspace: ${name} (not the workspace this window follows)` : `Workspace: ${name}`
+		foreign
+			? t('shell.workspace.foreignBadge', { name })
+			: t('shell.workspace.activeBadge', { name })
 	);
 </script>
 

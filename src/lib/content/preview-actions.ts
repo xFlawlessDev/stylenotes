@@ -1,5 +1,6 @@
 import { buttonVariants } from '$lib/components/base';
 import { isTauri } from '$lib/windows';
+import { t } from '$lib/i18n/index.svelte';
 
 const actionButton = buttonVariants({ variant: 'ghost', size: 'xs' });
 
@@ -26,7 +27,7 @@ export function addCodeCopyButtons(html: string): string {
 	for (const pre of template.content.querySelectorAll('pre')) {
 		const code = pre.querySelector(':scope > code');
 		if (!code || code.classList.contains('language-mermaid')) continue;
-		appendActionBar(pre, [['copy-code', 'Copy code']]);
+		appendActionBar(pre, [['copy-code', t('editor.preview.copyCode')]]);
 	}
 	return template.innerHTML;
 }
@@ -103,7 +104,7 @@ export async function saveDiagram(blob: Blob, filename: string, format: 'svg' | 
 function setActionFeedback(button: HTMLButtonElement, success: boolean) {
 	const original = button.dataset.originalLabel ?? button.textContent ?? '';
 	button.dataset.originalLabel = original;
-	button.textContent = success ? 'Done' : 'Failed';
+	button.textContent = success ? t('common.done') : t('common.failed');
 	button.disabled = true;
 	setTimeout(() => {
 		if (!button.isConnected) return;

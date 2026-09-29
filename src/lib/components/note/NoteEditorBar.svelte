@@ -6,6 +6,7 @@
 	import { openNoteWindow } from '$lib/windows';
 	import { Button } from '$lib/components/base';
 	import NoteToolbar from '$lib/components/workspace/NoteToolbar.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * The editor's top bar: it shows either the full-preview / focus-mode exit
@@ -46,14 +47,14 @@
 
 {#if fullPreview}
 	<div class="flex h-11 shrink-0 items-center justify-between px-4">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">Full preview</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('notes.editor.fullPreview')}</span>
 		<Button variant="secondary" size="xs" shape="pill" class="gap-1.5" onclick={onfullpreview}>
-			<Minimize2 size={13} /> Exit
+			<Minimize2 size={13} /> {t('notes.editor.exit')}
 		</Button>
 	</div>
 {:else if settings.focusMode}
 	<div class="flex h-11 shrink-0 items-center justify-between px-4">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">Focus mode</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('notes.editor.focusMode')}</span>
 		<Button
 			variant="secondary"
 			size="xs"
@@ -61,7 +62,7 @@
 			class="gap-1.5"
 			onclick={() => updateSettings({ focusMode: false })}
 		>
-			<X size={13} /> Exit
+			<X size={13} /> {t('notes.editor.exit')}
 		</Button>
 	</div>
 {:else}

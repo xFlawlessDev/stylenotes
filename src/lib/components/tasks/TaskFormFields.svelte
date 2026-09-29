@@ -5,6 +5,7 @@
 	import type { Task, TaskPriority, TaskStatus } from '$lib/stores/tasks';
 	import type { WikiClick } from '$lib/content/wiki-links';
 	import { Field, Input } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import TaskDetailsEditor from '$lib/components/tasks/TaskDetailsEditor.svelte';
 	import TaskMetaFields from '$lib/components/tasks/TaskMetaFields.svelte';
 
@@ -67,18 +68,18 @@
 </script>
 
 <div class={stack}>
-	<Field label="Title" for="{idPrefix}-title" class={group} {labelClass}>
+	<Field label={t('tasks.form.title')} for="{idPrefix}-title" class={group} {labelClass}>
 		<Input
 			id="{idPrefix}-title"
 			bind:ref={titleEl}
 			bind:value={title}
 			size={inputSize}
 			class={inputClass}
-			placeholder="What needs doing?"
+			placeholder={t('tasks.form.titleQuestion')}
 		/>
 	</Field>
 
-	<Field label="Details" hint="optional" for="{idPrefix}-notes" class={group} {labelClass}>
+	<Field label={t('tasks.form.details')} hint={t('common.optional')} for="{idPrefix}-notes" class={group} {labelClass}>
 		<TaskDetailsEditor
 			{idPrefix}
 			bind:detail

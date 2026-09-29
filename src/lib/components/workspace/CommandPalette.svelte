@@ -11,6 +11,7 @@
 	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder as FolderType } from '$lib/stores/notes';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, Input } from '$lib/components/base';
 	import { statusMeta, taskStatus, matchesTaskQuery, type Task } from '$lib/stores/tasks';
 
@@ -53,6 +54,13 @@
 		run: () => void;
 	};
 
+	const groupKeys: Record<Item['group'], string> = {
+		Notes: 'palette.groups.notes',
+		Tasks: 'palette.groups.tasks',
+		Folders: 'palette.groups.folders',
+		Actions: 'palette.groups.actions',
+	};
+
 	let query = $state('');
 	let activeIndex = $state(0);
 	let inputEl = $state<HTMLInputElement | null>(null);
@@ -70,7 +78,7 @@
 			.map((note) => ({
 				id: `note:${note.id}`,
 				group: 'Notes' as const,
-				label: note.title || 'Untitled note',
+				label: note.title || t('common.untitledNote'),
 				hint: note.folder,
 				icon: FileText,
 				run: () => {
@@ -85,7 +93,7 @@
 			.map((task) => ({
 				id: `task:${task.id}`,
 				group: 'Tasks' as const,
-				label: task.title || 'Untitled task',
+				label: task.title || t('common.untitledTask'),
 				hint: statusMeta[taskStatus(task)].label,
 				icon: ListTodo,
 				run: () => {
@@ -193,7 +201,7 @@
 	<div class="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh]">
 		<button
 			class="absolute inset-0 cursor-default bg-scrim backdrop-blur-sm"
-			aria-label="Close command palette"
+			aria-label={t('palette.closeLabel')}
 			onclick={onclose}
 		></button>
 
@@ -211,7 +219,7 @@
 					bind:value={query}
 					onkeydown={onkeydown}
 					class="h-6 px-0 text-body-lg"
-					placeholder="Search notes, tasks, folders, and actions"
+					placeholder={t('palette.placeholder')}
 					spellcheck="false"
 				/>
 				<kbd class="glass-chip shrink-0 rounded-md px-1.5 py-0.5 text-code-sm font-code text-outline"
@@ -224,14 +232,14 @@
 			<div bind:this={listEl} class="scrollbar-none flex-1 overflow-y-auto p-2">
 				{#if items.length === 0}
 					<p class="px-3 py-8 text-center text-body-sm font-body text-outline">
-						No results for “{query}”.
+						{t('palette.noResults', { query })}
 					</p>
 				{/if}
 
 				{#each grouped as section (section.group)}
 					<div class="mb-1">
 						<p class="px-3 py-1.5 text-label-sm font-label tracking-wider text-outline uppercase">
-							{section.group}
+							{t(groupKeys[section.group])}
 						</p>
 						{#each section.items as item (item.id)}
 							{@const index = items.indexOf(item)}
@@ -261,9 +269,9 @@
 			<div
 				class="flex items-center gap-4 px-4 py-2 text-code-sm font-code text-outline [&>span]:flex [&>span]:items-center [&>span]:gap-1"
 			>
-				<span><ArrowUp size={13} /><ArrowDown size={13} /> navigate</span>
-				<span><CornerDownLeft size={13} /> open</span>
-				<span>Esc close</span>
+				<span><ArrowUp size={13} /><ArrowDown size={13} /> {t('palette.hint.navigate')}</span>
+				<span><CornerDownLeft size={13} /> {t('palette.hint.open')}</span>
+				<span>Esc {t('palette.hint.close')}</span>
 			</div>
 		</div>
 	</div>

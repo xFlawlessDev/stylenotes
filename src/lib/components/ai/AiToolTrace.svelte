@@ -4,11 +4,11 @@
 		prettyArguments,
 		prettyResult,
 		toolResultSummary,
-		toolStatusLabel,
 		toolTraceStatus,
 		type ToolTraceEntry
 	} from '$lib/content/ai-trace';
 	import { toolLabel } from '$lib/content/ai-tool-schema';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * The persisted record of what the assistant ran to answer a turn.
@@ -27,9 +27,13 @@
 
 	const running = $derived(entries.some((entry) => !entry.result));
 	const summary = $derived(
-		running
-			? `Running ${entries.length} tool${entries.length === 1 ? '' : 's'}…`
-			: `${entries.length} tool${entries.length === 1 ? '' : 's'} used`
+		entries.length === 1
+			? running
+				? t('ai.tools.runningOne', { count: entries.length })
+				: t('ai.tools.ranOne', { count: entries.length })
+			: running
+				? t('ai.tools.running', { count: entries.length })
+				: t('ai.tools.ran', { count: entries.length })
 	);
 
 	function toggleAll() {
@@ -53,7 +57,7 @@
 					class="cursor-pointer text-label-sm font-label text-outline transition-colors hover:text-on-surface-variant"
 					onclick={toggleAll}
 				>
-					{allOpen ? 'Hide details' : 'Show details'}
+					{allOpen ? t('ai.tools.hideDetails') : t('ai.tools.showDetails')}
 				</button>
 			{/if}
 		</div>
@@ -86,7 +90,7 @@
 							? 'text-error'
 							: 'text-outline'}"
 					>
-						{toolStatusLabel(status)}
+						{t('ai.toolStatus.' + status)}
 					</span>
 					<ChevronDown
 						size={12}
@@ -99,7 +103,7 @@
 				{#if expanded[entry.call.id]}
 					<div class="flex flex-col gap-2 px-2 pb-2">
 						<div class="flex flex-col gap-1">
-							<span class="text-label-sm font-label text-outline">Parameters</span>
+							<span class="text-label-sm font-label text-outline">{t('ai.tools.parameters')}</span>
 							<pre
 								class="scrollbar-none max-h-40 overflow-auto rounded-md bg-surface-container-lowest/60 p-2 text-label-sm font-label text-on-surface-variant">{prettyArguments(
 									entry.call.arguments
@@ -108,7 +112,7 @@
 						{#if entry.result}
 							<div class="flex flex-col gap-1">
 								<span class="text-label-sm font-label text-outline">
-									{entry.result.ok ? 'Result' : 'Error'}
+									{entry.result.ok ? t('ai.tools.result') : t('ai.tools.error')}
 								</span>
 								<pre
 									class="scrollbar-none max-h-40 overflow-auto rounded-md p-2 text-label-sm font-label {entry.result.ok

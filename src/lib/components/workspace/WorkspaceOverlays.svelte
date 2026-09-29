@@ -11,6 +11,7 @@
 		RotateCcw,
 	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
 	import CommandPalette from '$lib/components/workspace/CommandPalette.svelte';
@@ -94,19 +95,23 @@
 	} = $props();
 
 	const actions = $derived([
-		{ id: 'new', label: 'New note', hint: 'Ctrl N', icon: FilePlus2, run: onnewnote },
-		{ id: 'new-folder', label: 'New folder', icon: FolderPlus, run: onnewfolder },
-		{ id: 'tasks', label: 'Open tasks', icon: ListTodo, run: onopentasks },
-		{ id: 'graph', label: 'Open graph', icon: Network, run: onopengraph },
-		{ id: 'theme', label: 'Toggle light and dark', hint: 'Ctrl /', icon: Contrast, run: ontogglemode },
-		{ id: 'settings', label: 'Open settings', hint: 'Ctrl ,', icon: SettingsIcon, run: onopensettings },
-		{ id: 'export', label: 'Export all notes', icon: Download, run: onexport },
+		{ id: 'new', label: t('palette.action.newNote'), hint: 'Ctrl N', icon: FilePlus2, run: onnewnote },
+		{ id: 'new-folder', label: t('palette.action.newFolder'), icon: FolderPlus, run: onnewfolder },
+		{ id: 'tasks', label: t('palette.action.openTasks'), icon: ListTodo, run: onopentasks },
+		{ id: 'graph', label: t('palette.action.openGraph'), icon: Network, run: onopengraph },
+		{ id: 'theme', label: t('palette.action.toggleTheme'), hint: 'Ctrl /', icon: Contrast, run: ontogglemode },
+		{ id: 'settings', label: t('palette.action.openSettings'), hint: 'Ctrl ,', icon: SettingsIcon, run: onopensettings },
+		{ id: 'export', label: t('palette.action.export'), icon: Download, run: onexport },
 	]);
 
 	const folderDeleteDescription = $derived(
-		`The folder “${pendingFolder?.label ?? ''}” will be removed. Its ${
-			(pendingFolder?.count ?? 0) === 1 ? 'note' : 'notes'
-		} will move to Personal. This action cannot be undone.`
+		t('dialogs.deleteFolder.description', {
+			name: pendingFolder?.label ?? '',
+			items:
+				(pendingFolder?.count ?? 0) === 1
+					? t('dialogs.deleteFolder.itemOne')
+					: t('dialogs.deleteFolder.itemMany'),
+		})
 	);
 </script>
 
@@ -153,9 +158,9 @@
 
 <ConfirmDialog
 	bind:open={deleteOpen}
-	title="Delete this note?"
-	description="This permanently removes the note and its content. This action cannot be undone."
-	confirmLabel="Delete note"
+	title={t('dialogs.deleteNote.title')}
+	description={t('dialogs.deleteNote.description')}
+	confirmLabel={t('dialogs.deleteNote.confirm')}
 	confirmVariant="danger"
 	onconfirm={onconfirmdelete}
 	oncancel={oncanceldelete}
@@ -167,9 +172,9 @@
 
 <ConfirmDialog
 	bind:open={folderDeleteOpen}
-	title="Delete this folder?"
+	title={t('dialogs.deleteFolder.title')}
 	description={folderDeleteDescription}
-	confirmLabel="Delete folder"
+	confirmLabel={t('dialogs.deleteFolder.confirm')}
 	confirmVariant="danger"
 	onconfirm={onconfirmfolderdelete}
 	oncancel={oncancelfolderdelete}
@@ -181,9 +186,9 @@
 
 <ConfirmDialog
 	bind:open={resetOpen}
-	title="Reset all data?"
-	description="Restores the sample notes and clears your local changes and preferences."
-	confirmLabel="Reset everything"
+	title={t('dialogs.resetData.title')}
+	description={t('dialogs.resetData.description')}
+	confirmLabel={t('dialogs.resetData.confirm')}
 	confirmVariant="danger"
 	onconfirm={onreset}
 >

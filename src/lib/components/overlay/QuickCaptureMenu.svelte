@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ListTodo, NotebookPen } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		QUICK_NOTE_LABEL,
 		QUICK_TASK_LABEL,
@@ -16,7 +17,7 @@
 
 <div class="glass-solid flex w-full flex-col gap-0.5 rounded-xl p-1.5 ring-1 ring-hairline shadow-none">
 	<span class="px-2 pt-1 pb-0.5 text-label-sm font-label tracking-wider text-outline uppercase">
-		Quick capture
+		{t('over.dockTitle')}
 	</span>
 	<Button
 		bare
@@ -24,7 +25,7 @@
 		onclick={() => oncreate('note')}
 	>
 		<NotebookPen size={15} class="shrink-0 text-tertiary" />
-		<span class="flex-1">New note</span>
+		<span class="flex-1">{t('over.newNote')}</span>
 		<kbd class="text-code-sm font-code text-outline">{QUICK_NOTE_LABEL}</kbd>
 	</Button>
 	<Button
@@ -33,7 +34,7 @@
 		onclick={() => oncreate('task')}
 	>
 		<ListTodo size={15} class="shrink-0 text-secondary" />
-		<span class="flex-1">New task</span>
+		<span class="flex-1">{t('over.newTask')}</span>
 		<kbd class="text-code-sm font-code text-outline">{QUICK_TASK_LABEL}</kbd>
 	</Button>
 </div>

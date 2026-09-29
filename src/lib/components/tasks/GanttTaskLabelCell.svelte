@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n/index.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import GanttTaskTooltip from '$lib/components/tasks/GanttTaskTooltip.svelte';
 	import { statusMeta, taskStatus, type Task } from '$lib/stores/tasks';
@@ -42,10 +43,10 @@
 			>
 				<span class="block truncate text-body-sm font-body text-on-surface">{task.title}</span>
 				<span class="block truncate text-code-sm font-code {statusMeta[status].tone}">
-					{statusMeta[status].label}{#if overdue}<span class="text-error"> · Overdue</span>{/if}{#if blockers.length}<span
+					{t('tasks.statusLabel.' + status)}{#if overdue}<span class="text-error"> · {t('tasks.gantt.overdue')}</span>{/if}{#if blockers.length}<span
 							class="text-error"
 						>
-							· Blocked by {blockers.length}</span
+							· {t('tasks.gantt.blockedByCount', { count: blockers.length })}</span
 						>{/if}
 				</span>
 			</button>

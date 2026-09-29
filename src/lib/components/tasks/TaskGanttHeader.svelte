@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { GanttStripGroup, GanttTimelineColumn } from '$lib/stores/task-gantt';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		columns,
@@ -29,7 +30,7 @@
 		bind:offsetWidth={labelWidth}
 		class="sticky left-0 z-30 flex w-[var(--gantt-label)] shrink-0 items-center border-r border-hairline bg-surface-container/80 px-3 text-label-sm font-label tracking-wider text-outline uppercase backdrop-blur"
 	>
-		Task
+		{t('tasks.gantt.taskColumn')}
 	</div>
 	<div class="flex flex-col" style="width: {width}px">
 		<!-- Period strip: one cell per month (or year on the month scale). -->

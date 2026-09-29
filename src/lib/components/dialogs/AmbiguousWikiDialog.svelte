@@ -2,6 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/base';
 	import { wikiEntityLabel, type WikiEntity } from '$lib/content/wiki-links';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		open = $bindable(false),
@@ -19,8 +20,8 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="glass-dialog max-w-sm">
 		<Dialog.Header>
-			<Dialog.Title>Choose a target</Dialog.Title>
-			<Dialog.Description>This title matches more than one note or task in this workspace.</Dialog.Description>
+			<Dialog.Title>{t('dialogs.ambiguousWiki.title')}</Dialog.Title>
+			<Dialog.Description>{t('dialogs.ambiguousWiki.description')}</Dialog.Description>
 		</Dialog.Header>
 		<div class="flex flex-col gap-1">
 			{#each entities as entity (entity.id)}
@@ -38,7 +39,7 @@
 			{/each}
 		</div>
 		<Dialog.Footer>
-			<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>
+			<Button variant="secondary" onclick={() => (open = false)}>{t('dialogs.ambiguousWiki.cancel')}</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

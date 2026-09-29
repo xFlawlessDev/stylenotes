@@ -4,6 +4,7 @@
 	import type { CustomFolder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
 	import type { WikiClick } from '$lib/content/wiki-links';
+	import { t } from '$lib/i18n/index.svelte';
 	import VaultRail from '$lib/components/workspace/VaultRail.svelte';
 	import NotesFeed from '$lib/components/workspace/NotesFeed.svelte';
 	import NoteEditor from '$lib/components/workspace/NoteEditor.svelte';
@@ -76,7 +77,7 @@
 
 	const folderLabel = $derived(
 		activeFolder === 'all'
-			? 'All Notes'
+			? t('notes.allNotes')
 			: (folders.find((folder) => folder.id === activeFolder)?.label ?? activeFolder)
 	);
 
@@ -91,14 +92,14 @@
 	{#if railOpen}
 		<button
 			class="fixed inset-0 z-30 cursor-default bg-scrim/40 lg:hidden"
-			aria-label="Close folders"
+			aria-label={t('notes.closeFolders')}
 			onclick={() => (railOpen = false)}
 		></button>
 	{/if}
 	{#if feedOpen}
 		<button
 			class="fixed inset-0 z-30 cursor-default bg-scrim/40 md:hidden"
-			aria-label="Close notes list"
+			aria-label={t('notes.closeNotesList')}
 			onclick={() => (feedOpen = false)}
 		></button>
 	{/if}

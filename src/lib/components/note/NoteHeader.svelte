@@ -5,6 +5,7 @@
 	import AiEditorAssist from '$lib/components/note/AiEditorAssist.svelte';
 	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import NoteTags from '$lib/components/note/NoteTags.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * The note header: folder chip + move control, the title field, tags, the
@@ -51,8 +52,8 @@
 		{#if folderOptions.length}
 			<Select
 				bind:value={moveFolder}
-				placeholder="Move to…"
-				label="Move note to folder"
+				placeholder={t('notes.editor.moveTo')}
+				label={t('notes.editor.moveNote')}
 				size="sm"
 				variant="chip"
 				class="max-w-full"
@@ -65,7 +66,7 @@
 		variant="bare"
 		size="none"
 		class="w-full font-headline text-headline-xl font-bold tracking-tight placeholder:text-outline/60"
-		placeholder="Untitled note"
+		placeholder={t('notes.editor.titlePlaceholder')}
 		bind:value={title}
 		oninput={() => onupdatetitle(title)}
 	/>

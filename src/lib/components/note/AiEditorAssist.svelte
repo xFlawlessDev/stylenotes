@@ -3,6 +3,7 @@
 	import { Sparkles } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import AiAssistantPopover from '$lib/components/note/AiAssistantPopover.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { applyGeneratedText, type AiApplyMode } from '$lib/content/ai-assistant';
 	import { hydrateAi } from '$lib/stores/ai.svelte';
 
@@ -60,10 +61,10 @@
 	variant={open ? 'tonal' : 'secondary'}
 	size="sm"
 	shape="pill"
-	aria-label="Open AI assistant"
+	aria-label={t('ai.label.openAssistant')}
 	onclick={toggle}
 >
-	<Sparkles size={14} /> AI
+	<Sparkles size={14} /> {t('ai.label.ai')}
 </Button>
 
 {#if open}

@@ -10,6 +10,8 @@
 		Trash2,
 	} from '@lucide/svelte';
 	import type { NotificationKind } from '$lib/stores/notifications';
+	import { t } from '$lib/i18n/index.svelte';
+	import { seedNotificationText } from '$lib/content/notification-text';
 	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -55,6 +57,15 @@
 	};
 
 	const unreadCount = $derived(notifications.filter((item) => !item.read).length);
+
+	/**
+	 * Renders a row's copy: seed rows are translated from the catalog (their
+	 * stored text is frozen at first-run language), everything else keeps the
+	 * stored title/body/time.
+	 */
+	function rowText(item: Notification): { title: string; body: string; time: string } {
+		return seedNotificationText(item.id) ?? { title: item.title, body: item.body, time: item.time };
+	}
 </script>
 
 <div class="relative">
@@ -67,7 +78,7 @@
 					size="icon"
 					shape="pill"
 					class="relative text-on-surface-variant"
-					aria-label="Notifications"
+					aria-label={t('shell.notifications')}
 					onclick={ontoggle}
 				>
 					<Bell size={16} />
@@ -81,14 +92,14 @@
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Notifications</Tooltip.Content>
+		<Tooltip.Content>{t('shell.notifications')}</Tooltip.Content>
 	</Tooltip.Root>
 </div>
 
 {#if open}
 	<button
 		class="fixed inset-0 z-40 cursor-default"
-		aria-label="Close notifications"
+		aria-label={t('shell.notification.closeNotifications')}
 		onclick={onclose}
 	></button>
 	<div
@@ -96,11 +107,11 @@
 	>
 		<div class="flex items-center justify-between px-3.5 py-3">
 			<div class="flex items-center gap-2">
-				<span class="text-headline-sm font-headline text-on-surface">Notifications</span>
+				<span class="text-headline-sm font-headline text-on-surface">{t('shell.notification.panelTitle')}</span>
 				{#if unreadCount > 0}
 					<span
 						class="rounded-full bg-secondary-container px-2 py-0.5 text-label-sm font-label text-on-secondary-container"
-						>{unreadCount} new</span
+						>{t('shell.notification.newCount', { count: unreadCount })}</span
 					>
 				{/if}
 			</div>
@@ -110,7 +121,7 @@
 					class="text-label-sm text-primary hover:brightness-110"
 					onclick={onreadall}
 				>
-					Mark all read
+					{t('shell.notification.markAllRead')}
 				</Button>
 			{/if}
 		</div>
@@ -119,11 +130,12 @@
 
 		<div class="scrollbar-none flex max-h-[300px] flex-1 flex-col overflow-y-auto p-1.5">
 			{#if notifications.length === 0}
-				<EmptyState icon={BellOff} title="You are all caught up." class="flex-none" />
+				<EmptyState icon={BellOff} title={t('shell.notification.allCaughtUp')} class="flex-none" />
 			{/if}
 
 			{#each notifications as item (item.id)}
 				{@const Icon = kindIcon[item.kind] ?? Bell}
+				{@const copy = rowText(item)}
 				<Button
 					bare
 					class="group relative w-full justify-start gap-3 rounded-xl p-2.5 text-left {item.read
@@ -145,13 +157,13 @@
 						<span
 							class="text-label-md font-label font-medium {item.read
 								? 'text-on-surface-variant'
-								: 'text-on-surface'}">{item.title}</span
+								: 'text-on-surface'}">{copy.title}</span
 						>
 						<span class="text-body-sm font-body leading-snug {item.read
 							? 'text-outline'
-							: 'text-on-surface-variant'}">{item.body}</span
+							: 'text-on-surface-variant'}">{copy.body}</span
 						>
-						<span class="text-code-sm font-code text-outline">{item.time}</span>
+						<span class="text-code-sm font-code text-outline">{copy.time}</span>
 					</span>
 				</Button>
 			{/each}
@@ -162,11 +174,11 @@
 			<div class="flex items-center justify-between px-3.5 py-2">
 				<Button bare class="gap-1.5 text-label-sm text-outline" onclick={onclear}>
 					<Trash2 size={13} />
-					Clear all
+					{t('shell.notification.clearAll')}
 				</Button>
 				<span class="flex items-center gap-1.5 text-label-sm font-label text-tertiary">
 					<Check size={13} />
-					Saved locally
+					{t('shell.notification.savedLocally')}
 				</span>
 			</div>
 		{/if}

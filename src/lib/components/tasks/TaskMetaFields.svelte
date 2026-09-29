@@ -4,12 +4,11 @@
 	import {
 		TASK_PRIORITIES,
 		TASK_STATUSES,
-		priorityMeta,
-		statusMeta,
 		type TaskPriority,
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { Field, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import TaskNoteLinks from '$lib/components/tasks/TaskNoteLinks.svelte';
 	import TaskScheduleFields from '$lib/components/tasks/TaskScheduleFields.svelte';
 
@@ -56,22 +55,22 @@
 
 <div class="flex {stack ? 'min-h-0 flex-col gap-4' : 'flex-col gap-3.5'} {className}">
 	<div class={grid}>
-		<Field label="Status" class={group} {labelClass}>
+		<Field label={t('tasks.status')} class={group} {labelClass}>
 			<Select
-				label="Status"
+				label={t('tasks.status')}
 				size={selectSize}
 				class={selectClass}
-				options={TASK_STATUSES.map((value) => ({ value, label: statusMeta[value].label }))}
+				options={TASK_STATUSES.map((value) => ({ value, label: t('tasks.statusLabel.' + value) }))}
 				bind:value={status}
 			/>
 		</Field>
 
-		<Field label="Priority" class={group} {labelClass}>
+		<Field label={t('tasks.priority')} class={group} {labelClass}>
 			<Select
-				label="Priority"
+				label={t('tasks.priority')}
 				size={selectSize}
 				class={selectClass}
-				options={TASK_PRIORITIES.map((value) => ({ value, label: priorityMeta[value].label }))}
+				options={TASK_PRIORITIES.map((value) => ({ value, label: t('tasks.priorityLabel.' + value) }))}
 				bind:value={priority}
 			/>
 		</Field>
@@ -80,9 +79,9 @@
 	<TaskScheduleFields bind:startDate bind:dueDate {compact} {inputSize} {group} {labelClass} {idPrefix} />
 
 	<div class={grid}>
-		<Field label="Folder" class={group} {labelClass}>
+		<Field label={t('common.folder')} class={group} {labelClass}>
 			<Select
-				label="Folder"
+				label={t('common.folder')}
 				size={selectSize}
 				class={selectClass}
 				options={folderOptions.map((option) => ({ value: option.id, label: option.label }))}

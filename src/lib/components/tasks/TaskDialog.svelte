@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import { ListTodo } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { Folder } from '$lib/stores/notes';
@@ -127,11 +128,11 @@
 					? 'pr-7 text-headline-sm font-headline text-on-surface'
 					: 'text-headline-md font-headline text-on-surface'}
 			>
-				{task ? 'Edit task' : 'New task'}
+				{task ? t('tasks.dialog.editTitle') : t('tasks.dialog.newTitle')}
 			</Dialog.Title>
 			{#if !compact}
 				<Dialog.Description>
-					Give the task a home, a status, and a date range for the Gantt view.
+					{t('tasks.dialog.description')}
 				</Dialog.Description>
 			{/if}
 		</Dialog.Header>
@@ -196,7 +197,7 @@
 				<Button
 					variant="outline"
 					size={compact ? 'sm' : 'md'}
-					onclick={() => (open = false)}>Cancel</Button
+					onclick={() => (open = false)}>{t('common.cancel')}</Button
 				>
 				<Button
 					variant="primary"
@@ -204,7 +205,7 @@
 					size={compact ? 'sm' : 'md'}
 					disabled={!title.trim() || dateError}
 				>
-					{task ? 'Save task' : 'Create task'}
+					{task ? t('tasks.dialog.save') : t('tasks.dialog.create')}
 				</Button>
 			</Dialog.Footer>
 		</form>
@@ -223,7 +224,7 @@
 		/>
 	{:else}
 		<p class="text-label-sm font-label text-outline">
-			Save the task first, then edit it to add dependencies.
+			{t('tasks.dependencies.saveFirst')}
 		</p>
 	{/if}
 {/snippet}

@@ -18,6 +18,7 @@
 		toggleKanbanLock
 	} from '$lib/stores/kanban.svelte';
 	import { isTauri, openTasksInWorkspace } from '$lib/windows';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		hydrateWorkspaces,
 		setActiveWorkspace,
@@ -98,7 +99,7 @@
 		const next = nextBoardWorkspace();
 		setBoards([...workspaces, next]);
 		await reloadBoards();
-		notify(`Split — showing ${workspaceStore.items.find((w) => w.id === next)?.name ?? 'another workspace'}`);
+		notify(t('tasks.splitNotice', { name: workspaceStore.items.find((w) => w.id === next)?.name ?? t('tasks.anotherWorkspace') }));
 	}
 
 	function openCreate(workspaceId: string, status: TaskStatus = 'todo') {
@@ -156,17 +157,17 @@
 	async function onBoardWorkspaceChanged(workspaceId: string) {
 		if (isSplit()) return;
 		if (await setActiveWorkspace(workspaceId)) notifyWorkspacesChanged();
-		else notify('Workspace choice not saved — it may reset on restart');
+		else notify(t('tasks.kanbanWindow.workspaceNotSaved'));
 	}
 
 	async function toggleLock() {
 		const applied = await toggleKanbanLock();
 		notify(
 			!applied
-				? 'Could not change the lock state'
+				? t('tasks.kanbanWindow.lockFailed')
 				: settings.kanbanLocked
-					? `Locked to desktop — press ${KANBAN_SHORTCUT_LABEL} to unlock`
-					: 'Unlocked — always on top'
+					? t('tasks.kanbanWindow.lockedToast', { shortcut: KANBAN_SHORTCUT_LABEL })
+					: t('tasks.kanbanWindow.unlockedToast')
 		);
 	}
 
@@ -242,9 +243,11 @@
 	>
 		<div class="flex min-w-0 items-center gap-2">
 			<img src="/icon-128.png" alt="StyleNotes" class="size-4 shrink-0 object-cover" />
-			<span class="text-label-md font-label font-semibold tracking-tight text-on-surface">Kanban</span>
+			<span class="text-label-md font-label font-semibold tracking-tight text-on-surface">{t('tasks.kanbanWindow.title')}</span>
 			<span class="shrink-0 text-code-sm font-code text-outline">
-				{split ? `${workspaces.length} workspaces` : 'Following the app'}
+				{split
+					? t('tasks.kanbanWindow.workspaceCount', { count: workspaces.length })
+					: t('tasks.kanbanWindow.followingApp')}
 			</span>
 			<Tooltip.Root>
 				<Tooltip.Trigger>
@@ -254,24 +257,24 @@
 							variant="ghost"
 							size="icon-sm"
 							class="shrink-0 text-outline hover:text-on-surface"
-							aria-label="Add a board for another workspace"
+							aria-label={t('tasks.kanbanWindow.addBoard')}
 							onclick={() => void addBoard()}
 						>
 							<Columns3 size={14} />
 						</Button>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content>Split: add another workspace board</Tooltip.Content>
+				<Tooltip.Content>{t('tasks.kanbanWindow.addBoardHint')}</Tooltip.Content>
 			</Tooltip.Root>
 		</div>
 
 		{#if locked}
 			<span
 				class="flex shrink-0 items-center gap-1.5 rounded-full bg-emphasis-container px-2 py-0.5 text-code-sm font-code text-on-primary-container"
-				title="Desktop underlay — the window does not take input while locked"
+				title={t('tasks.kanbanWindow.lockedHint')}
 			>
 				<Lock size={11} />
-				Locked · {KANBAN_SHORTCUT_LABEL} to unlock
+				{t('tasks.kanbanWindow.lockedBadge', { shortcut: KANBAN_SHORTCUT_LABEL })}
 			</span>
 		{:else}
 			<div class="flex shrink-0 items-center gap-0.5">
@@ -281,14 +284,14 @@
 							<Button
 								{...props}
 								size="icon-sm"
-								aria-label="Lock Kanban window to desktop"
+								aria-label={t('tasks.kanbanWindow.lockLabel')}
 								onclick={toggleLock}
 							>
 								<Lock size={14} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Lock to desktop ({KANBAN_SHORTCUT_LABEL})</Tooltip.Content>
+					<Tooltip.Content>{t('tasks.kanbanWindow.lockHint', { shortcut: KANBAN_SHORTCUT_LABEL })}</Tooltip.Content>
 				</Tooltip.Root>
 
 				<Tooltip.Root>
@@ -297,21 +300,21 @@
 							<Button
 								{...props}
 								size="icon-sm"
-								aria-label="Open StyleNotes on the Kanban view"
+								aria-label={t('tasks.kanbanWindow.openLabel')}
 								onclick={() => void openTasksInWorkspace()}
 							>
 								<NotebookPen size={14} />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Open StyleNotes (Tasks · Kanban)</Tooltip.Content>
+					<Tooltip.Content>{t('tasks.kanbanWindow.openHint')}</Tooltip.Content>
 				</Tooltip.Root>
 
 				<span class="mx-0.5 h-4 w-px bg-hairline/70"></span>
 
 				<Button
 					size="icon-sm"
-					aria-label="Minimize"
+					aria-label={t('shell.window.minimize')}
 					onclick={() => isTauri && getCurrentWindow().minimize()}
 				>
 					<Minus size={14} />
@@ -319,7 +322,7 @@
 				<Button
 					size="icon-sm"
 					class="hover:bg-window-close/20"
-					aria-label="Hide to tray"
+					aria-label={t('shell.window.hideToTray')}
 					onclick={hideWindow}
 				>
 					<X size={14} />

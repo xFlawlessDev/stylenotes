@@ -258,6 +258,7 @@ describe('settingsRepo', () => {
 	it('serializes settings on save', async () => {
 		await settingsRepo.save({
 			mode: 'dark',
+			language: 'en',
 			accent: 'steel',
 			density: 'comfortable',
 			reduceMotion: false,

@@ -15,6 +15,7 @@
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { isTauri, type WorkspaceSection } from '$lib/windows';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, SegmentedControl } from '$lib/components/base';
 	import type { ThemeMode } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -64,9 +65,9 @@
 	} = $props();
 
 	const sections = [
-		{ id: 'notes' as const, label: 'Notes', icon: NotebookPen },
-		{ id: 'tasks' as const, label: 'Tasks', icon: ListTodo },
-		{ id: 'graph' as const, label: 'Graph', icon: Network },
+		{ id: 'notes' as const, label: t('shell.section.notes'), icon: NotebookPen },
+		{ id: 'tasks' as const, label: t('shell.section.tasks'), icon: ListTodo },
+		{ id: 'graph' as const, label: t('shell.section.graph'), icon: Network },
 	];
 
 	function win() {
@@ -93,21 +94,21 @@
 		<div class="flex items-center gap-2 pr-1">
 			<button
 				class="group flex size-3 items-center justify-center rounded-full bg-window-close transition-transform hover:scale-110"
-				aria-label="Hide to tray"
+				aria-label={t('shell.window.hideToTray')}
 				onclick={hideWindow}
 			>
 				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>
 			<button
 				class="group flex size-3 items-center justify-center rounded-full bg-window-minimize transition-transform hover:scale-110"
-				aria-label="Minimize"
+				aria-label={t('shell.window.minimize')}
 				onclick={() => isTauri && win().minimize()}
 			>
 				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
 			</button>
 			<button
 				class="group flex size-3 items-center justify-center rounded-full bg-window-maximize transition-transform hover:scale-110"
-				aria-label="Maximize"
+				aria-label={t('shell.window.maximize')}
 				onclick={() => isTauri && win().toggleMaximize()}
 			>
 				<span class="size-1.5 rounded-full bg-window-control-glyph opacity-0 group-hover:opacity-100"></span>
@@ -119,7 +120,7 @@
 		<div class="flex items-center gap-2">
 			<img
 				src="/icon-128.png"
-				alt="StyleNotes"
+				alt={t('shell.brand')}
 				class="size-6 object-cover"
 			/>
 			<span class="text-headline-sm font-headline tracking-tight text-on-surface">{title}</span>
@@ -138,7 +139,7 @@
 		<SegmentedControl
 			value={section}
 			items={sections}
-			ariaLabel="Workspace section"
+			ariaLabel={t('shell.sectionLabel')}
 			class="ml-1 hidden rounded-full sm:flex"
 			itemClass="rounded-full px-3 text-label-md"
 			onchange={(id) => onsection?.(id as WorkspaceSection)}
@@ -154,7 +155,7 @@
 					size="icon"
 					shape="pill"
 					class="text-on-surface-variant lg:hidden"
-					aria-label="Open folders"
+					aria-label={t('shell.openFolders')}
 					onclick={onopenfolders}
 				>
 					<FolderTree size={16} />
@@ -164,7 +165,7 @@
 					size="icon"
 					shape="pill"
 					class="text-on-surface-variant md:hidden"
-					aria-label="Open notes list"
+					aria-label={t('shell.openNotesList')}
 					onclick={onopennotes}
 				>
 					<Rows3 size={16} />
@@ -174,12 +175,12 @@
 		<Button
 			shape="pill"
 			class="glass-well h-8 min-w-0 justify-start gap-2 pr-2 pl-3 text-left hover:bg-transparent hover:ring-1 hover:ring-inset hover:ring-emphasis-ring md:w-36 lg:w-48"
-			aria-label="Open command palette"
+			aria-label={t('shell.commandPalette')}
 			onclick={onpalette}
 		>
 			<Search size={14} class="shrink-0 text-outline" />
 			<span class="hidden flex-1 truncate text-body-sm font-body text-outline md:block"
-				>Search notes and actions</span
+				>{t('shell.searchPlaceholder')}</span
 			>
 			<kbd
 				class="hidden shrink-0 rounded-md bg-surface-container-high/70 px-1.5 py-0.5 text-code-sm font-code text-outline md:block"
@@ -198,14 +199,14 @@
 						size="icon"
 						shape="pill"
 						class="text-on-surface-variant"
-						aria-label="Toggle AI assistant"
+						aria-label={t('shell.toggleAssistant')}
 						onclick={onassistant}
 					>
 						<Sparkles size={16} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>AI assistant</Tooltip.Content>
+			<Tooltip.Content>{t('shell.toggleAssistant')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		<Tooltip.Root>
@@ -217,14 +218,14 @@
 						size="icon"
 						shape="pill"
 						class="text-on-surface-variant"
-						aria-label="Toggle dock"
+						aria-label={t('shell.toggleDock')}
 						onclick={ontoggledock}
 					>
 						<PanelRight size={16} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Toggle dock</Tooltip.Content>
+			<Tooltip.Content>{t('shell.toggleDock')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		<Tooltip.Root>
@@ -236,7 +237,7 @@
 						size="icon"
 						shape="pill"
 						class="text-on-surface-variant"
-						aria-label="Toggle theme"
+						aria-label={t('shell.toggleTheme')}
 						onclick={ontogglemode}
 					>
 						{#if mode === 'dark'}
@@ -247,7 +248,7 @@
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Toggle light and dark</Tooltip.Content>
+			<Tooltip.Content>{t('shell.toggleTheme')}</Tooltip.Content>
 		</Tooltip.Root>
 
 		{@render notifications?.()}
@@ -261,14 +262,14 @@
 						size="icon"
 						shape="pill"
 						class="font-semibold hover:scale-105"
-						aria-label="Open settings"
+						aria-label={t('shell.settings')}
 						onclick={onsettings}
 					>
 						<SettingsIcon size={16} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Settings</Tooltip.Content>
+			<Tooltip.Content>{t('shell.settings')}</Tooltip.Content>
 		</Tooltip.Root>
 	</div>
 </header>

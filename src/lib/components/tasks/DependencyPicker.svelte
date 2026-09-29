@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Link2 } from '@lucide/svelte';
 	import { Button, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { Task } from '$lib/stores/tasks';
 
 	let { taskId, tasks, dependencies, onadd }: {
@@ -20,7 +21,7 @@
 
 {#if options.length}
 	<div class="flex items-center gap-1.5">
-		<Select bind:value={selected} options={options} label="Dependency" placeholder="Select dependency" size="sm" class="min-w-0 flex-1" />
-		<Button size="icon" variant="secondary" aria-label="Add dependency" disabled={!selected} onclick={add}><Link2 size={14} /></Button>
+		<Select bind:value={selected} options={options} label={t('tasks.dependencies.label')} placeholder={t('tasks.dependencies.placeholder')} size="sm" class="min-w-0 flex-1" />
+		<Button size="icon" variant="secondary" aria-label={t('tasks.dependencies.add')} disabled={!selected} onclick={add}><Link2 size={14} /></Button>
 	</div>
 {/if}

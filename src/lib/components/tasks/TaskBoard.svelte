@@ -18,7 +18,6 @@
 		filterTasks,
 		moveTaskInList,
 		nextPosition,
-		statusMeta,
 		taskStatus,
 		TASK_STATUSES,
 		type Task,
@@ -45,6 +44,7 @@
 	import TaskFilters from '$lib/components/tasks/TaskFilters.svelte';
 	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
 	import { isTaskBlocked } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 	import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -110,14 +110,14 @@
 	});
 
 	const noteTitles = $derived.by(() =>
-		Object.fromEntries(notes.map((note) => [note.id, note.title || 'Untitled note']))
+		Object.fromEntries(notes.map((note) => [note.id, note.title || t('common.untitledNote')]))
 	);
 
 	const selectedTask = $derived(tasks.find((task) => task.id === selectedId) ?? null);
 
 	const statusOptions = TASK_STATUSES.map((status) => ({
 		value: status,
-		label: statusMeta[status].label
+		label: t('tasks.statusLabel.' + status)
 	}));
 
 	const folderLabels = $derived(
@@ -125,10 +125,10 @@
 	);
 
 	const views: { id: TaskView; label: string; icon: typeof LayoutList }[] = [
-		{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-		{ id: 'list', label: 'List', icon: LayoutList },
-		{ id: 'kanban', label: 'Kanban', icon: Kanban },
-		{ id: 'gantt', label: 'Gantt', icon: GanttChart }
+		{ id: 'dashboard', label: t('tasks.view.dashboard'), icon: LayoutDashboard },
+		{ id: 'list', label: t('tasks.view.list'), icon: LayoutList },
+		{ id: 'kanban', label: t('tasks.view.kanban'), icon: Kanban },
+		{ id: 'gantt', label: t('tasks.view.gantt'), icon: GanttChart }
 	];
 
 	function openCreate(status: TaskStatus = 'todo') {
@@ -144,7 +144,7 @@
 
 	async function persistOrToast(task: Task) {
 		const ok = await persistTask(task);
-		if (!ok) onnotify('Could not save task — changes may be lost');
+		if (!ok) onnotify(t('tasks.toast.saveFailed'));
 	}
 
 	function commitForm(data: TaskFormData) {
@@ -153,13 +153,13 @@
 			const next = applyTaskPatch(current, data);
 			tasks = tasks.map((task) => (task.id === current.id ? next : task));
 			void persistOrToast(next);
-			onnotify('Task updated');
+			onnotify(t('tasks.toast.updated'));
 		} else {
 			const task = createTask({ ...data, workspaceId, position: nextPosition(tasks, data.status) });
 			tasks = [task, ...tasks];
 			selectedId = task.id;
 			void persistOrToast(task);
-			onnotify('Task created');
+			onnotify(t('tasks.toast.created'));
 		}
 	}
 
@@ -185,17 +185,17 @@
 		tasks = tasks.filter((item) => item.id !== id);
 		if (selectedId === id) selectedId = tasks[0]?.id ?? '';
 		void removeTask(id).then((ok) => {
-			if (!ok) onnotify('Could not delete task');
+			if (!ok) onnotify(t('tasks.toast.deleteFailed'));
 			else void refreshDependencies();
 		});
-		if (task) onnotify('Task deleted');
+		if (task) onnotify(t('tasks.toast.deleted'));
 	}
 
 	function toggleOverlay(task: Task) {
 		const next = applyTaskPatch(task, { overlay: !task.overlay });
 		tasks = tasks.map((item) => (item.id === task.id ? next : item));
 		void persistOrToast(next);
-		onnotify(next.overlay ? 'Added to dock' : 'Removed from dock');
+		onnotify(next.overlay ? t('tasks.toast.addedToDock') : t('tasks.toast.removedFromDock'));
 	}
 
 	async function syncTasks() {
@@ -207,11 +207,11 @@
 	async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<string | null> {
 		return (await addDependency(taskId, dependsOnTaskId, tasks))
 			? null
-			: 'Could not add dependency — it may be invalid or create a cycle.';
+			: t('tasks.dependencies.addError');
 	}
 
 	async function removeTaskDependency(dependency: TaskDependency): Promise<string | null> {
-		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
+		return (await removeDependency(dependency)) ? null : t('tasks.dependencies.removeError');
 	}
 
 	onMount(() => {
@@ -241,7 +241,7 @@
 	{#if railOpen}
 		<button
 			class="fixed inset-0 z-30 cursor-default bg-scrim/40 lg:hidden"
-			aria-label="Close task filters"
+			aria-label={t('tasks.closeFilters')}
 			onclick={() => (railOpen = false)}
 		></button>
 	{/if}
@@ -267,7 +267,7 @@
 					variant="secondary"
 					size="icon"
 					class="shrink-0 text-on-surface-variant lg:hidden"
-					aria-label="Open task filters"
+					aria-label={t('tasks.openFilters')}
 					onclick={() => (railOpen = true)}
 				>
 					<SlidersHorizontal size={16} />
@@ -300,23 +300,25 @@
 									size="icon-sm"
 									shape="pill"
 									class="text-outline"
-									aria-label="Open Kanban window"
+									aria-label={t('tasks.openKanban')}
 									onclick={() => void openKanban()}
 								>
 									<PictureInPicture2 size={14} />
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>Open Kanban window</Tooltip.Content>
+						<Tooltip.Content>{t('tasks.openKanban')}</Tooltip.Content>
 					</Tooltip.Root>
 
 					<span class="hidden text-label-sm font-label text-outline sm:inline">
-						{filtered.length} {filtered.length === 1 ? 'task' : 'tasks'}
+						{filtered.length === 1
+							? t('tasks.countOne', { count: filtered.length })
+							: t('tasks.countMany', { count: filtered.length })}
 					</span>
 					{#if selectedTask}
 						<span
 							class="hidden max-w-[160px] truncate text-label-sm font-label text-outline lg:inline"
-							title="Selected task: {selectedTask.title}"
+							title={t('tasks.selectedTask', { title: selectedTask.title })}
 						>
 							{selectedTask.title}
 						</span>
@@ -325,7 +327,7 @@
 						/>
 						<Select
 							size="sm"
-							label="Status of {selectedTask.title}"
+							label={t('tasks.statusOf', { title: selectedTask.title })}
 							class="w-[130px] px-2 font-code text-code-sm"
 							options={statusOptions}
 							value={taskStatus(selectedTask)}
@@ -336,8 +338,8 @@
 							size="icon-sm"
 							shape="pill"
 							class="text-outline hover:text-error"
-							aria-label="Delete {selectedTask.title}"
-							title="Delete {selectedTask.title}"
+							aria-label={t('tasks.deleteTask', { title: selectedTask.title })}
+							title={t('tasks.deleteTask', { title: selectedTask.title })}
 							onclick={() => remove(selectedTask.id)}
 						>
 							<Trash2 size={14} />

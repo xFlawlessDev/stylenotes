@@ -14,6 +14,7 @@
 		Zap
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Field, Input, Select, Slider, Switch } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		AI_MAX_TEMPERATURE,
 		AI_MAX_MAX_TOKENS,
@@ -56,6 +57,11 @@
 	const provider = $derived(activeProvider());
 	const baseUrlPlaceholder = $derived(provider.defaultBaseUrl);
 	const modelPlaceholder = $derived(provider.defaultModel);
+	const providerHint = $derived(
+		provider.id === 'anthropic-native'
+			? t('settings.ai.providerHints.anthropic')
+			: t('settings.ai.providerHints.openaiCompatible')
+	);
 	const temperatureLabel = $derived(temperatureDraft.toFixed(1));
 
 	// Seed the drafts once the store has hydrated (or immediately offline).
@@ -154,7 +160,9 @@
 
 <div class="flex min-w-0 flex-col gap-6">
 	<div class="flex flex-col gap-2.5">
-		<span class="text-label-sm font-label tracking-wider text-outline uppercase">AI assistant</span>
+		<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+		>{t('settings.ai.title')}</span
+	>
 
 		<div class="glass-well flex items-center gap-3 rounded-2xl p-3">
 			<div
@@ -166,45 +174,46 @@
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col">
 				<span class="text-headline-sm font-headline text-on-surface">
-					{aiStore.settings.enabled ? 'AI is on' : 'AI is off'}
+					{aiStore.settings.enabled ? t('settings.ai.on') : t('settings.ai.off')}
 				</span>
 				<span class="truncate text-label-sm font-label text-outline">
 					{aiStore.settings.enabled
 						? `${provider.label} · ${aiStore.settings.model || provider.defaultModel}`
-						: 'Bring your own key to enable writing help'}
+						: t('settings.ai.offHint')}
 				</span>
 			</div>
 			<Switch
 				checked={aiStore.settings.enabled}
-				label="Enable the AI assistant"
+				label={t('settings.ai.enableLabel')}
 				onchange={(checked) => void updateAiSettings({ enabled: checked })}
 			/>
 		</div>
 
 		<p class="text-label-sm font-label leading-relaxed text-outline">
-			The free tier is bring-your-own-key. Your key is encrypted on this device and sent only to
-			the provider you choose — never to us.
+			{t('settings.ai.byok')}
 		</p>
 	</div>
 
 	{#if aiStore.settings.enabled}
-		<Field label="Provider" legend class="gap-2.5">
+		<Field label={t('settings.ai.provider')} legend class="gap-2.5">
 			<Select
-				label="AI provider"
+				label={t('settings.ai.providerLabel')}
 				options={providerOptions}
 				value={aiStore.settings.provider}
 				onchange={(next) => void pickProvider(next as AiProviderId)}
 			/>
-			<span class="text-label-sm font-label leading-relaxed text-outline">{provider.hint}</span>
+			<span class="text-label-sm font-label leading-relaxed text-outline">{providerHint}</span>
 		</Field>
 
 		<div class="flex flex-col gap-3 rounded-2xl bg-surface-container-lowest/30 p-3">
-			<Field label="API key">
+			<Field label={t('settings.ai.apiKey')}>
 				<div class="flex items-center gap-2">
 					<Input
 						type={revealKey ? 'text' : 'password'}
-						aria-label="API key"
-						placeholder={aiStore.settings.hasKey ? '•••••••• stored' : 'Paste your key'}
+						aria-label={t('settings.ai.apiKeyLabel')}
+						placeholder={aiStore.settings.hasKey
+							? t('settings.ai.keyPlaceholderStored')
+							: t('settings.ai.keyPlaceholderPaste')}
 						bind:value={keyField}
 						autocomplete="off"
 						spellcheck={false}
@@ -216,7 +225,7 @@
 						size="icon"
 						shape="pill"
 						variant="ghost"
-						aria-label={revealKey ? 'Hide key' : 'Show key'}
+						aria-label={revealKey ? t('settings.ai.hideKey') : t('settings.ai.showKey')}
 						onclick={() => (revealKey = !revealKey)}
 					>
 						{#if revealKey}<EyeOff size={15} />{:else}<Eye size={15} />{/if}
@@ -225,15 +234,15 @@
 				<div class="flex items-center justify-between gap-2">
 					<span class="flex items-center gap-1.5 text-label-sm font-label text-outline">
 						{#if aiStore.settings.hasKey}
-							<Check size={13} class="text-tertiary" /> A key is stored on this device
+							<Check size={13} class="text-tertiary" /> {t('settings.ai.keyStored')}
 						{:else}
-							<KeyRound size={13} /> No key stored yet
+							<KeyRound size={13} /> {t('settings.ai.keyMissing')}
 						{/if}
 					</span>
 					<div class="flex items-center gap-1.5">
 						{#if aiStore.settings.hasKey}
 							<Button variant="ghost" size="xs" shape="pill" onclick={() => void removeKey()}>
-								Remove
+								{t('settings.ai.remove')}
 							</Button>
 						{/if}
 						<Button
@@ -243,15 +252,15 @@
 							disabled={!keyField.trim()}
 							onclick={() => void saveKey()}
 						>
-							Save key
+							{t('settings.ai.saveKey')}
 						</Button>
 					</div>
 				</div>
 			</Field>
 
-			<Field label="Base URL">
+			<Field label={t('settings.ai.baseUrl')}>
 				<Input
-					aria-label="Base URL"
+					aria-label={t('settings.ai.baseUrl')}
 					placeholder={baseUrlPlaceholder}
 					bind:value={baseUrlDraft}
 					spellcheck={false}
@@ -262,9 +271,9 @@
 				/>
 			</Field>
 
-			<Field label="Model">
+			<Field label={t('settings.ai.model')}>
 				<Input
-					aria-label="Model"
+					aria-label={t('settings.ai.model')}
 					placeholder={modelPlaceholder}
 					bind:value={modelDraft}
 					spellcheck={false}
@@ -279,11 +288,11 @@
 		<div class="flex flex-col gap-3 rounded-2xl bg-surface-container-lowest/30 p-3">
 			<div class="flex flex-col gap-1.5">
 				<div class="flex items-center justify-between">
-					<span class="text-body-md font-body text-on-surface">Temperature</span>
+					<span class="text-body-md font-body text-on-surface">{t('settings.ai.temperature')}</span>
 					<span class="text-label-sm font-label text-outline">{temperatureLabel}</span>
 				</div>
 				<Slider
-					label="Temperature"
+					label={t('settings.ai.temperature')}
 					min={AI_MIN_TEMPERATURE}
 					max={AI_MAX_TEMPERATURE}
 					step={0.1}
@@ -291,10 +300,10 @@
 					onchange={(value) => void updateAiSettings({ temperature: value })}
 				/>
 			</div>
-			<Field label="Max tokens">
+			<Field label={t('settings.ai.maxTokens')}>
 				<Input
 					type="number"
-					aria-label="Max tokens"
+					aria-label={t('settings.ai.maxTokens')}
 					min={AI_MIN_MAX_TOKENS}
 					max={AI_MAX_MAX_TOKENS}
 					bind:value={maxTokensDraft}
@@ -306,12 +315,12 @@
 			</Field>
 		</div>
 
-		<Field label="Tools" legend class="gap-2.5">
+		<Field label={t('settings.ai.tools')} legend class="gap-2.5">
 			<div class="grid grid-cols-2 gap-2">
 				<ChoiceTile
 					layout="stack"
 					icon={ShieldCheck}
-					label="Read only"
+					label={t('settings.ai.readOnly')}
 					class="py-3"
 					active={aiStore.settings.access === 'read'}
 					onclick={() => void updateAiGrant({ access: 'read', scopes: [] })}
@@ -319,30 +328,29 @@
 				<ChoiceTile
 					layout="stack"
 					icon={ShieldAlert}
-					label="Allow writes"
+					label={t('settings.ai.allowWrites')}
 					class="py-3"
 					active={aiStore.settings.access === 'write'}
 					onclick={() => void updateAiGrant({ access: 'write' })}
 				/>
 			</div>
 			<span class="text-label-sm font-label leading-relaxed text-outline">
-				Tools let the assistant read and change your notes and tasks. Reads are always allowed;
-				writes ask for confirmation before they run.
+				{t('settings.ai.toolsHint')}
 			</span>
 		</Field>
 
 		{#if aiStore.settings.access === 'write'}
 			<div class="flex flex-col gap-2">
-				<span class="text-label-sm font-label text-outline">What the assistant may change</span>
+				<span class="text-label-sm font-label text-outline">{t('settings.ai.whatMayChange')}</span>
 				{#each MCP_SCOPES as scope (scope.id)}
 					<div class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3">
 						<span class="flex flex-col">
-							<span class="text-body-md font-body text-on-surface">{scope.label}</span>
-							<span class="text-label-sm font-label text-outline">{scope.description}</span>
+							<span class="text-body-md font-body text-on-surface">{t('settings.mcp.scope.' + scope.id)}</span>
+							<span class="text-label-sm font-label text-outline">{t('settings.mcp.scopeDescription.' + scope.id)}</span>
 						</span>
 						<Switch
 							checked={aiStore.settings.scopes.includes(scope.id)}
-							label="Allow {scope.label}"
+							label={t('settings.ai.allowScope', { scope: t('settings.mcp.scope.' + scope.id) })}
 							onchange={(checked) => void toggleAiScope(scope.id, checked)}
 						/>
 					</div>
@@ -350,20 +358,19 @@
 			</div>
 		{/if}
 
-		<Field label="Web search" legend class="gap-2.5">
+		<Field label={t('settings.ai.webSearch')} legend class="gap-2.5">
 			<div class="flex items-start gap-2 rounded-2xl bg-surface-container-lowest/30 p-3">
 				<Globe size={15} class="mt-0.5 shrink-0 text-outline" />
 				<span class="text-label-sm font-label leading-relaxed text-outline">
-					Lets the assistant search the web and read pages when a question is not answerable
-					from your notes. It uses its own API key, stored encrypted on this device.
+					{t('settings.ai.webSearchHint')}
 				</span>
 			</div>
 
-			<Field label="Provider">
+			<Field label={t('settings.ai.provider')}>
 				<Select
-					label="Search provider"
+					label={t('settings.ai.searchProvider')}
 					value={aiStore.settings.searchProvider}
-					options={[{ value: '', label: 'Off' }, ...searchProviderOptions]}
+					options={[{ value: '', label: t('settings.ai.off') }, ...searchProviderOptions]}
 					onchange={(value) => void updateSearchSettings({ searchProvider: value })}
 				/>
 			</Field>
@@ -372,12 +379,14 @@
 			{/if}
 
 			{#if aiStore.settings.searchProvider}
-				<Field label="Search API key">
+				<Field label={t('settings.ai.searchKey')}>
 					<div class="flex items-center gap-2">
 						<div class="relative flex-1">
 							<Input
 								type={revealSearchKey ? 'text' : 'password'}
-								placeholder={aiStore.settings.hasSearchKey ? '•••••••• (stored)' : 'Paste the key'}
+								placeholder={aiStore.settings.hasSearchKey
+									? t('settings.ai.searchKeyStored')
+									: t('settings.ai.searchKeyPlaceholder')}
 								bind:value={searchKeyField}
 								onkeydown={(event) => {
 									if (event.key === 'Enter') void saveSearchKey();
@@ -387,7 +396,7 @@
 								size="icon-sm"
 								variant="ghost"
 								class="absolute top-0.5 right-0.5"
-								aria-label={revealSearchKey ? 'Hide key' : 'Show key'}
+								aria-label={revealSearchKey ? t('settings.ai.hideKey') : t('settings.ai.showKey')}
 								onclick={() => (revealSearchKey = !revealSearchKey)}
 							>
 								{#if revealSearchKey}<EyeOff size={14} />{:else}<Eye size={14} />{/if}
@@ -399,18 +408,18 @@
 							disabled={!searchKeyField.trim()}
 							onclick={() => void saveSearchKey()}
 						>
-							Save
+							{t('settings.ai.save')}
 						</Button>
 						{#if aiStore.settings.hasSearchKey}
 							<Button variant="danger-ghost" size="md" onclick={() => void removeSearchKey()}>
-								Remove
+								{t('settings.ai.remove')}
 							</Button>
 						{/if}
 					</div>
 				</Field>
 				{#if !aiStore.settings.hasSearchKey}
 					<span class="text-label-sm font-label text-outline">
-						Without a key, the assistant answers from your notes only.
+						{t('settings.ai.searchKeyMissing')}
 					</span>
 				{/if}
 			{/if}
@@ -427,7 +436,7 @@
 				onclick={() => void runTest()}
 			>
 				<Zap size={14} />
-				{testing ? 'Testing…' : 'Test connection'}
+				{testing ? t('settings.ai.testing') : t('settings.ai.testConnection')}
 			</Button>
 
 			{#if test}

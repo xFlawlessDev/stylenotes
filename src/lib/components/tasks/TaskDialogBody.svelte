@@ -4,6 +4,7 @@
 	import type { Task, TaskDependency, TaskPriority, TaskStatus } from '$lib/stores/tasks';
 	import type { TaskView } from '$lib/stores/settings.svelte';
 	import { isTaskBlocked } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 	import TaskTitleField from '$lib/components/tasks/TaskTitleField.svelte';
 	import TaskDetailsEditor from '$lib/components/tasks/TaskDetailsEditor.svelte';
 	import TaskMetaFields from '$lib/components/tasks/TaskMetaFields.svelte';
@@ -94,7 +95,7 @@
 {#snippet details()}
 	<div class="flex {view === 'preview' ? 'min-h-0 flex-1' : 'min-h-[280px]'} flex-col gap-1.5">
 		<div class="flex shrink-0 items-center justify-between gap-2">
-			<span class="text-label-sm font-label tracking-wider text-outline uppercase">Details</span>
+			<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.form.details')}</span>
 			<TaskViewSwitcher {view} onview={(next) => (view = next)} />
 		</div>
 		<TaskDetailsEditor
@@ -114,7 +115,7 @@
 	{#if onadddependency}
 		<section class="shrink-0 rounded-xl bg-surface-container-low/60 p-2.5">
 			<div class="flex items-center justify-between gap-2">
-				<h3 class="text-label-md font-label font-medium text-on-surface">Dependencies</h3>
+				<h3 class="text-label-md font-label font-medium text-on-surface">{t('tasks.dependencies.title')}</h3>
 				{#if task}
 					<BlockedIndicator blocked={isTaskBlocked(task, allTasks, dependencies)} />
 				{/if}
@@ -130,7 +131,7 @@
 				/>
 			{:else}
 				<p class="text-label-sm font-label text-outline">
-					Save the task first, then edit it to add dependencies.
+					{t('tasks.dependencies.saveFirst')}
 				</p>
 			{/if}
 		</section>

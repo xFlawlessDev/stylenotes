@@ -3,6 +3,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button, Field, Input, Select, Textarea } from '$lib/components/base';
 	import { AlertTriangle, FilePlus2 } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { Folder } from '$lib/stores/notes';
 
 	let {
@@ -75,10 +76,10 @@
 				<FilePlus2 size={18} />
 			</div>
 			<Dialog.Title class="text-headline-md font-headline text-on-surface">
-				Create a new note
+				{t('dialogs.createNote.title')}
 			</Dialog.Title>
 			<Dialog.Description>
-				Name the note and choose where it should live. You can change everything later.
+				{t('dialogs.createNote.description')}
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -89,30 +90,30 @@
 				submit();
 			}}
 		>
-			<Field label="Title" hint="optional" for="note-title">
+			<Field label={t('dialogs.createNote.titleLabel')} hint={t('common.optional')} for="note-title">
 				<Input
 					id="note-title"
 					bind:ref={titleEl}
 					bind:value={title}
 					size="lg"
-					placeholder="Untitled note"
+					placeholder={t('common.untitledNote')}
 				/>
 			</Field>
 
-			<Field label="Folder">
+			<Field label={t('dialogs.createNote.folder')}>
 				<Select
-					label="Folder"
+					label={t('dialogs.createNote.folder')}
 					options={options.map((option) => ({ value: option.id, label: option.label }))}
 					bind:value={folder}
 				/>
 			</Field>
 
-			<Field label="Start writing" hint="optional" for="note-body">
+			<Field label={t('dialogs.createNote.startWriting')} hint={t('common.optional')} for="note-body">
 				<Textarea
 					id="note-body"
 					bind:value={body}
 					rows={3}
-					placeholder="A first thought, a to-do, anything."
+					placeholder={t('dialogs.createNote.bodyPlaceholder')}
 				/>
 			</Field>
 
@@ -121,15 +122,15 @@
 					class="flex items-center gap-2 rounded-xl bg-error-container/25 px-3 py-2 text-label-sm font-label text-error"
 				>
 					<AlertTriangle size={14} class="shrink-0" />
-					<span class="flex-1">Discard this draft? Your text will be lost.</span>
-					<Button size="xs" onclick={() => (confirming = false)}>Keep editing</Button>
+					<span class="flex-1">{t('dialogs.createNote.discard')}</span>
+					<Button size="xs" onclick={() => (confirming = false)}>{t('dialogs.createNote.keepEditing')}</Button>
 					<Button
 						variant="ghost"
 						size="xs"
 						class="font-semibold text-error hover:bg-error-container/40"
 						onclick={() => (open = false)}
 					>
-						Discard
+						{t('dialogs.createNote.discardConfirm')}
 					</Button>
 				</div>
 			{/if}
@@ -137,9 +138,9 @@
 			<Dialog.Footer
 				class="mx-0 mb-0 flex-col-reverse gap-2 border-t-0 bg-transparent p-0 sm:flex-row sm:justify-end"
 			>
-				<Button variant="outline" onclick={requestClose}>Cancel</Button>
+				<Button variant="outline" onclick={requestClose}>{t('common.cancel')}</Button>
 				<Button variant="primary" type="submit">
-					Create note
+					{t('dialogs.createNote.create')}
 					<kbd class="ml-1.5 text-[10px] opacity-70">Ctrl ↵</kbd>
 				</Button>
 			</Dialog.Footer>

@@ -5,6 +5,7 @@
 	import type { TaskView } from '$lib/stores/settings.svelte';
 	import type { WikiClick } from '$lib/content/wiki-links';
 	import { isTaskBlocked } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 	import { dependencyStore } from '$lib/stores/dependencies.svelte';
 	import TaskTitleField from '$lib/components/tasks/TaskTitleField.svelte';
 	import TaskDetailsEditor from '$lib/components/tasks/TaskDetailsEditor.svelte';
@@ -100,7 +101,7 @@
 {#snippet details()}
 	<div class="flex {view === 'preview' ? 'min-h-0 flex-1' : 'min-h-[280px]'} flex-col gap-1.5">
 		<span class="shrink-0 text-label-sm font-label tracking-wider text-outline uppercase">
-			Details
+			{t('tasks.form.details')}
 		</span>
 		<TaskDetailsEditor
 			bind:detail
@@ -119,7 +120,7 @@
 {#snippet dependencySection()}
 	<section class="shrink-0 rounded-xl bg-surface-container-low/60 p-2.5">
 		<div class="flex items-center gap-2">
-			<h2 class="text-label-md font-label font-medium text-on-surface">Task dependencies</h2>
+			<h2 class="text-label-md font-label font-medium text-on-surface">{t('tasks.dependencies.taskTitle')}</h2>
 			<WorkspaceBadge name={workspaceName} color={workspaceColor} foreign={foreignWorkspace} />
 			<span class="ml-auto flex items-center gap-1.5">
 				<BlockedIndicator blocked={isTaskBlocked(task, allTasks, dependencyStore.items)} />

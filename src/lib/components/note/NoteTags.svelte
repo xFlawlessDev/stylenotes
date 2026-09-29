@@ -2,6 +2,7 @@
 	import { Tag, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import AddTagDialog from '$lib/components/dialogs/AddTagDialog.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		tags = [],
@@ -32,7 +33,7 @@
 			<Button
 				bare
 				class="ml-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-				aria-label={`Remove tag ${tag}`}
+				aria-label={t('notes.removeTag', { tag })}
 				onclick={() => remove(tag)}
 			>
 				<X size={10} />
@@ -45,7 +46,7 @@
 		class="glass-well gap-1 px-2 font-code text-code-sm text-outline hover:bg-transparent"
 		onclick={() => (dialogOpen = true)}
 	>
-		+ Tag
+		{t('notes.addTagButton')}
 	</Button>
 </div>
 

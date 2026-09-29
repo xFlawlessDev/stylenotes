@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Calendar, CalendarDays, CalendarRange } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, EmptyState, SegmentedControl } from '$lib/components/base';
 	import TaskGanttHeader from '$lib/components/tasks/TaskGanttHeader.svelte';
 	import GanttTaskLabelCell from '$lib/components/tasks/GanttTaskLabelCell.svelte';
@@ -21,7 +22,6 @@
 		taskBar,
 		taskBlockers,
 		timelineRange,
-		statusMeta,
 		taskStatus,
 		type Task,
 		type TaskDependency,
@@ -56,9 +56,9 @@
 	let scale = $state<GanttTimelineScale>('date');
 
 	const scales: { id: GanttTimelineScale; label: string; icon: typeof Calendar }[] = [
-		{ id: 'date', label: 'Date', icon: CalendarDays },
-		{ id: 'week', label: 'Week', icon: CalendarRange },
-		{ id: 'month', label: 'Month', icon: Calendar }
+		{ id: 'date', label: t('tasks.gantt.scale.date'), icon: CalendarDays },
+		{ id: 'week', label: t('tasks.gantt.scale.week'), icon: CalendarRange },
+		{ id: 'month', label: t('tasks.gantt.scale.month'), icon: Calendar }
 	];
 
 	const BAR_BASE =
@@ -107,14 +107,14 @@
 	{#if rows.length === 0}
 		<EmptyState
 			icon={CalendarRange}
-			title="Add start or due dates to see tasks on the timeline."
+			title={t('tasks.gantt.empty')}
 		/>
 	{:else}
 		<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
 			<SegmentedControl
 				bind:value={scale}
 				items={scales}
-				ariaLabel="Timeline view"
+				ariaLabel={t('tasks.gantt.scaleLabel')}
 				class="w-auto"
 				itemClass="flex-none"
 			/>
@@ -130,13 +130,13 @@
 								stroke-dasharray="4 3"
 							/></svg
 						>
-						Waiting on dependency
+						{t('tasks.gantt.waitingOnDependency')}
 					</span>
 					<span class="flex items-center gap-1.5">
 						<svg width="24" height="6" viewBox="0 0 24 6" aria-hidden="true"
 							><path d="M0 3 H24" fill="none" stroke="var(--color-outline)" stroke-width="1.6" /></svg
 						>
-						Dependency met
+						{t('tasks.gantt.dependencyMet')}
 					</span>
 				</div>
 			{/if}
@@ -254,8 +254,8 @@
 														bare
 														class="{BAR_BASE} justify-start {BAR_STYLES[status]} {overdue ? OVERDUE_BAR : ''}"
 														style="left: {bar.offset * dayWidth + 1}px; width: {barWidth}px"
-														aria-label="{task.title}, {statusMeta[status].label}{overdue
-															? ', overdue'
+														aria-label="{task.title}, {t('tasks.statusLabel.' + status)}{overdue
+															? ', ' + t('tasks.gantt.overdue')
 															: ''}"
 														onclick={() => onselect(task.id)}
 														ondblclick={() => onedit(task)}

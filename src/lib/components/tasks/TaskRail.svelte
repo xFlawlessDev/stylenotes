@@ -2,7 +2,8 @@
 	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus, X } from '@lucide/svelte';
 	import { Button, SearchInput } from '$lib/components/base';
 	import type { Folder } from '$lib/stores/notes';
-	import { TASK_STATUSES, statusMeta, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
+	import { TASK_STATUSES, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		folders,
@@ -64,7 +65,7 @@
 	});
 
 	const folderOptions = $derived([
-		{ id: 'all', label: 'All folders' },
+		{ id: 'all', label: t('tasks.allFolders') },
 		...folders.filter((folder) => folder.id !== 'all')
 	]);
 
@@ -97,13 +98,13 @@
 			<ListTodo size={18} />
 		</div>
 		<div class="flex min-w-0 flex-col">
-			<span class="text-headline-sm font-headline leading-tight text-on-surface">Tasks</span>
-			<span class="text-label-sm font-label truncate text-outline">{tasks.length} in view</span>
+			<span class="text-headline-sm font-headline leading-tight text-on-surface">{t('tasks.railTitle')}</span>
+			<span class="text-label-sm font-label truncate text-outline">{t('tasks.railCount', { count: tasks.length })}</span>
 		</div>
 		<Button
 			size="icon-sm"
 			class="ml-auto text-outline lg:hidden"
-			aria-label="Close task filters"
+			aria-label={t('tasks.closeFilters')}
 			onclick={onclose}
 		>
 			<X size={16} />
@@ -123,29 +124,29 @@
 	>
 		<span class="flex items-center gap-2">
 			<Plus size={16} />
-			<span class="text-label-md font-label font-semibold">New Task</span>
+			<span class="text-label-md font-label font-semibold">{t('common.newTask')}</span>
 		</span>
 	</Button>
 
 	<SearchInput
 		value={query}
-		placeholder="Search tasks"
-		ariaLabel="Search tasks"
+		placeholder={t('tasks.searchPlaceholder')}
+		ariaLabel={t('tasks.searchLabel')}
 		onquery={onquery}
 	/>
 
 	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
 		<div class="flex flex-col gap-0.5">
 			<div class="mb-1 flex items-center justify-between px-1">
-				<p class="text-label-sm font-label tracking-wider text-outline uppercase">Status</p>
+				<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.status')}</p>
 				{#if activeStatus !== 'all'}
 					<span
 						class="rounded-full bg-secondary-container/40 px-1.5 py-px text-code-sm font-code text-secondary"
-						>active</span
+						>{t('tasks.active')}</span
 					>
 				{/if}
 			</div>
-			{#each [{ id: 'all' as const, label: 'All tasks' }, ...TASK_STATUSES.map((status) => ({ id: status, label: statusMeta[status].label }))] as item (item.id)}
+			{#each [{ id: 'all' as const, label: t('tasks.allTasks') }, ...TASK_STATUSES.map((status) => ({ id: status, label: t('tasks.statusLabel.' + status) }))] as item (item.id)}
 				{@const Icon = statusIcons[item.id]}
 				<Button
 					variant={activeStatus === item.id ? 'tonal' : 'ghost'}
@@ -169,11 +170,11 @@
 
 		<div class="flex flex-col gap-0.5 border-t border-hairline pt-3">
 			<div class="mb-1 flex items-center justify-between px-1">
-				<p class="text-label-sm font-label tracking-wider text-outline uppercase">Folders</p>
+				<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.folders')}</p>
 				{#if activeFolder !== 'all'}
 					<span
 						class="rounded-full bg-primary-container/30 px-1.5 py-px text-code-sm font-code text-primary"
-						>active</span
+						>{t('tasks.active')}</span
 					>
 				{/if}
 			</div>

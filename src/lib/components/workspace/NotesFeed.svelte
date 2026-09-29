@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Pin, FileText, X, Tag } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import { t } from '$lib/i18n/index.svelte';
 	import { Button, EmptyState, SearchInput, SegmentedControl } from '$lib/components/base';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -113,7 +114,7 @@
 		<Button
 			size="icon-sm"
 			class="absolute top-2.5 right-2.5 text-outline md:hidden"
-			aria-label="Close notes list"
+			aria-label={t('notes.closeNotesList')}
 			onclick={onclose}
 		>
 			<X size={15} />
@@ -121,18 +122,18 @@
 
 		<SearchInput
 			bind:value={query}
-			placeholder="Search notes and tags"
-			ariaLabel="Search notes and tags"
+			placeholder={t('notes.searchPlaceholder')}
+			ariaLabel={t('notes.searchLabel')}
 		/>
 
 		<SegmentedControl
 			value={tab}
 			items={[
-				{ id: 'all', label: `All (${total})` },
-				{ id: 'pinned', label: 'Pinned' }
+				{ id: 'all', label: t('notes.all', { count: total }) },
+				{ id: 'pinned', label: t('notes.pinned') }
 			]}
 			size="sm"
-			ariaLabel="Note filters"
+			ariaLabel={t('notes.filtersLabel')}
 			itemClass="text-label-md"
 			onchange={(id) => (tab = id as 'all' | 'pinned')}
 		/>
@@ -143,12 +144,12 @@
 			>
 				<span class="flex items-center gap-1.5 text-code-sm font-code text-on-primary-container">
 					<Tag size={12} />
-					Filtering by #{activeTag}
+					{t('notes.filteringBy', { tag: activeTag })}
 				</span>
 				<Button
 					size="icon-xs"
 					class="text-on-primary-container hover:bg-on-primary-container/15"
-					aria-label="Clear tag filter"
+					aria-label={t('notes.clearTagFilter')}
 					onclick={() => (oncleartag ? oncleartag() : onselecttag?.(activeTag))}
 				>
 					<X size={13} />
@@ -201,7 +202,7 @@
 						<h2
 							class="line-clamp-1 text-headline-sm font-headline font-semibold text-on-surface transition-colors group-hover:text-primary"
 						>
-							{note.title || 'Untitled note'}
+							{note.title || t('common.untitledNote')}
 						</h2>
 						<Tooltip.Root>
 							<Tooltip.Trigger>
@@ -212,7 +213,7 @@
 										class="shrink-0 p-0.5 transition-all {note.pinned
 											? 'text-primary'
 											: 'text-outline opacity-0 group-hover:opacity-100'}"
-										aria-label="Toggle pin"
+										aria-label={t('notes.togglePin')}
 										onclick={(event) => {
 											event.stopPropagation();
 											onpin(note.id);
@@ -222,7 +223,7 @@
 									</Button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content>{note.pinned ? 'Unpin note' : 'Pin note'}</Tooltip.Content>
+							<Tooltip.Content>{note.pinned ? t('notes.quickMenu.unpin') : t('notes.quickMenu.pin')}</Tooltip.Content>
 						</Tooltip.Root>
 					</div>
 					<p class="mb-2.5 line-clamp-2 text-body-sm font-body leading-relaxed text-outline">
@@ -278,7 +279,7 @@
 		{#if filtered.length === 0}
 			<EmptyState
 				icon={FileText}
-				title={query ? 'No notes match that search.' : 'Nothing here yet.'}
+				title={query ? t('notes.noNotesMatch') : t('notes.nothingHere')}
 			/>
 		{/if}
 	</div>

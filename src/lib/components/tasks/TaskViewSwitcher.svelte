@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/base';
 	import type { TaskView } from '$lib/stores/settings.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let {
 		view,
@@ -13,9 +14,9 @@
 	} = $props();
 
 	const views: { id: TaskView; icon: typeof Eye; title: string }[] = [
-		{ id: 'write', icon: PenLine, title: 'Write' },
-		{ id: 'split', icon: Columns2, title: 'Split' },
-		{ id: 'preview', icon: Eye, title: 'Preview' }
+		{ id: 'write', icon: PenLine, title: t('settings.editor.view.write') },
+		{ id: 'split', icon: Columns2, title: t('settings.editor.view.split') },
+		{ id: 'preview', icon: Eye, title: t('settings.editor.view.preview') }
 	];
 </script>
 

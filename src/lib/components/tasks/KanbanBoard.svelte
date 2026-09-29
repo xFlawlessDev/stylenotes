@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Plus, X } from '@lucide/svelte';
 	import { Button, Select } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		boardStore,
 		boardTask,
@@ -55,13 +56,13 @@
 
 	const folders = $derived(foldersFor(notes, customFolders));
 	const folderOptions = $derived([
-		{ value: 'all', label: 'All folders' },
+		{ value: 'all', label: t('tasks.allFolders') },
 		...folders
 			.filter((folder) => folder.id !== 'all')
 			.map((folder) => ({ value: folder.id, label: folder.label }))
 	]);
 	const noteTitles = $derived(
-		Object.fromEntries(notes.map((note) => [note.id, note.title || 'Untitled note']))
+		Object.fromEntries(notes.map((note) => [note.id, note.title || t('common.untitledNote')]))
 	);
 	let folderFilter = $state('all');
 	const visibleTasks = $derived(
@@ -71,7 +72,7 @@
 
 	async function write(next: Task[], message: string) {
 		if (!(await persistBoardTasks(workspaceId, next))) {
-			onnotify('Could not save task — changes may be lost');
+			onnotify(t('tasks.toast.saveFailed'));
 			return;
 		}
 		if (message) onnotify(message);
@@ -83,12 +84,12 @@
 			const next = tasks.map((item) =>
 				item.id === task.id ? applyTaskPatch(item, data) : item
 			);
-			void write(next, 'Task updated');
+			void write(next, t('tasks.toast.updated'));
 			return;
 		}
 		const created = boardTask(workspaceId, tasks, data);
 		selectedId = created.id;
-		void write([created, ...tasks], 'Task created');
+		void write([created, ...tasks], t('tasks.toast.created'));
 	}
 
 	function move(id: string, status: TaskStatus, beforeId: string | null) {
@@ -102,17 +103,17 @@
 
 <section
 	class="glass-panel flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden rounded-2xl p-2"
-	aria-label="Kanban board: {workspace.name}"
+	aria-label={t('tasks.boardLabel', { name: workspace.name })}
 >
 	<header class="flex shrink-0 items-center gap-2 px-0.5">
 		<WorkspaceBadge name={workspace.name} color={workspace.color} />
 		<span class="shrink-0 text-code-sm font-code text-outline">
-			{openCount} open · {visibleTasks.length} total
+			{t('tasks.openTotal', { open: openCount, total: visibleTasks.length })}
 		</span>
 		<div class="ml-auto flex min-w-0 shrink items-center gap-1.5">
 			<Select
 				size="sm"
-				label="Board workspace"
+				label={t('tasks.boardWorkspace')}
 				class="w-[120px] px-2 font-code text-code-sm"
 				options={choices}
 				value={workspaceId}
@@ -125,7 +126,7 @@
 			/>
 			<Select
 				size="sm"
-				label="Filter tasks by folder"
+				label={t('tasks.filterByFolder')}
 				class="hidden w-[112px] px-2 font-code text-code-sm @[620px]:block"
 				options={folderOptions}
 				bind:value={folderFilter}
@@ -134,7 +135,7 @@
 				<Button
 					bare
 					class="size-6 shrink-0 rounded-md text-outline hover:bg-error-container/40 hover:text-error"
-					aria-label="Close {workspace.name} board"
+					aria-label={t('tasks.closeBoard', { name: workspace.name })}
 					onclick={() => onclose(workspaceId)}
 				>
 					<X size={13} />

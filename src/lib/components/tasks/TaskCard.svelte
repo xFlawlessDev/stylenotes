@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CalendarClock, Link2, Pencil } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		isTaskOverdue,
 		priorityMeta,
@@ -45,7 +46,7 @@
 		: 'bg-surface-container-lowest/40 hover:bg-surface-container/50'}"
 	role="button"
 	tabindex="0"
-	aria-label="Select task: {task.title}"
+	aria-label={t('tasks.selectTask', { title: task.title })}
 	onclick={onselect}
 	onkeydown={(event) => {
 		if (event.key === 'Enter' || event.key === ' ') {
@@ -63,7 +64,7 @@
 		<Button
 			bare
 			class="shrink-0 rounded-md p-0.5 text-outline opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-primary"
-			aria-label="Edit task"
+			aria-label={t('tasks.list.edit')}
 			onclick={(event) => {
 				event.stopPropagation();
 				onedit();
@@ -80,14 +81,14 @@
 	<div class="flex flex-wrap items-center gap-1.5">
 		{#if showStatus}
 			<span class="rounded-md bg-surface-container-high/60 px-1.5 py-px text-code-sm font-code {status.tone}">
-				{status.label}
+				{t('tasks.statusLabel.' + taskStatus(task))}
 			</span>
 		{/if}
 		<span
 			class="rounded-md px-1.5 py-px text-code-sm font-code {priority.tone}"
-			title="Priority"
+			title={t('tasks.priority')}
 		>
-			{priority.label}
+			{t('tasks.priorityLabel.' + taskPriority(task))}
 		</span>
 		{#if task.dueAt}
 			<span

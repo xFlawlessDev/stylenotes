@@ -25,6 +25,7 @@
 	import { Button } from '$lib/components/base';
 	import type { EditorCommand } from '$lib/content/markdown-editor';
 	import { MOD } from '$lib/content/markdown-shortcuts';
+	import { t } from '$lib/i18n/index.svelte';
 
 	type Tool = {
 		id: EditorCommand;
@@ -35,26 +36,26 @@
 
 	const GROUPS: Tool[][] = [
 		[
-			{ id: 'bold', label: 'Bold', shortcut: `${MOD}+B`, icon: Bold },
-			{ id: 'italic', label: 'Italic', shortcut: `${MOD}+I`, icon: Italic },
-			{ id: 'strikethrough', label: 'Strikethrough', shortcut: `${MOD}+Shift+X`, icon: Strikethrough },
-			{ id: 'code', label: 'Inline code', shortcut: `${MOD}+E`, icon: Code2 },
-			{ id: 'link', label: 'Link', shortcut: `${MOD}+K`, icon: Link },
-			{ id: 'wikilink', label: 'Wiki link', shortcut: `${MOD}+Shift+K`, icon: SquareLibrary },
-			{ id: 'image', label: 'Image', icon: Image },
+			{ id: 'bold', label: t('editor.format.bold'), shortcut: `${MOD}+B`, icon: Bold },
+			{ id: 'italic', label: t('editor.format.italic'), shortcut: `${MOD}+I`, icon: Italic },
+			{ id: 'strikethrough', label: t('editor.format.strikethrough'), shortcut: `${MOD}+Shift+X`, icon: Strikethrough },
+			{ id: 'code', label: t('editor.format.inlineCode'), shortcut: `${MOD}+E`, icon: Code2 },
+			{ id: 'link', label: t('editor.format.link'), shortcut: `${MOD}+K`, icon: Link },
+			{ id: 'wikilink', label: t('editor.format.wikiLink'), shortcut: `${MOD}+Shift+K`, icon: SquareLibrary },
+			{ id: 'image', label: t('editor.format.image'), icon: Image },
 		],
 		[
-			{ id: 'heading1', label: 'Heading 1', shortcut: `${MOD}+Alt+1`, icon: Heading1 },
-			{ id: 'heading2', label: 'Heading 2', shortcut: `${MOD}+Alt+2`, icon: Heading2 },
-			{ id: 'heading3', label: 'Heading 3', shortcut: `${MOD}+Alt+3`, icon: Heading3 },
-			{ id: 'bullet', label: 'Bulleted list', shortcut: `${MOD}+Shift+8`, icon: List },
-			{ id: 'numbered', label: 'Numbered list', shortcut: `${MOD}+Shift+7`, icon: ListOrdered },
-			{ id: 'checklist', label: 'Checklist', shortcut: `${MOD}+Shift+9`, icon: ListChecks },
-			{ id: 'checked', label: 'Check / uncheck item', shortcut: `${MOD}+Enter`, icon: SquareCheck },
-			{ id: 'quote', label: 'Quote', shortcut: `${MOD}+Shift+.`, icon: Quote },
-			{ id: 'codeblock', label: 'Code block', shortcut: `${MOD}+Shift+C`, icon: SquareCode },
-			{ id: 'table', label: 'Table', icon: Table },
-			{ id: 'divider', label: 'Divider', icon: Minus },
+			{ id: 'heading1', label: t('editor.format.heading1'), shortcut: `${MOD}+Alt+1`, icon: Heading1 },
+			{ id: 'heading2', label: t('editor.format.heading2'), shortcut: `${MOD}+Alt+2`, icon: Heading2 },
+			{ id: 'heading3', label: t('editor.format.heading3'), shortcut: `${MOD}+Alt+3`, icon: Heading3 },
+			{ id: 'bullet', label: t('editor.format.bullet'), shortcut: `${MOD}+Shift+8`, icon: List },
+			{ id: 'numbered', label: t('editor.format.numbered'), shortcut: `${MOD}+Shift+7`, icon: ListOrdered },
+			{ id: 'checklist', label: t('editor.format.checklist'), shortcut: `${MOD}+Shift+9`, icon: ListChecks },
+			{ id: 'checked', label: t('editor.format.checked'), shortcut: `${MOD}+Enter`, icon: SquareCheck },
+			{ id: 'quote', label: t('editor.format.quote'), shortcut: `${MOD}+Shift+.`, icon: Quote },
+			{ id: 'codeblock', label: t('editor.format.codeblock'), shortcut: `${MOD}+Shift+C`, icon: SquareCode },
+			{ id: 'table', label: t('editor.format.table'), icon: Table },
+			{ id: 'divider', label: t('editor.format.divider'), icon: Minus },
 		],
 	];
 
@@ -103,13 +104,13 @@
 					{...props}
 					size="icon-sm"
 					class={buttonClass}
-					aria-label="Formatting guide"
+					aria-label={t('editor.format.guide')}
 					onclick={() => onguide?.()}
 				>
 					<CircleHelp size={16} />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>Formatting guide</Tooltip.Content>
+		<Tooltip.Content>{t('editor.format.guide')}</Tooltip.Content>
 	</Tooltip.Root>
 </div>

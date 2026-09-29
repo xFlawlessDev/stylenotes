@@ -4,6 +4,7 @@
 	import { emitTo, listen } from '@tauri-apps/api/event';
 	import { NotebookPen, History } from '@lucide/svelte';
 	import { createNote, type Note } from '$lib/content/content';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
 	import { planWikiClick } from '$lib/content/wiki-navigation';
 	import { NOTE_HEADING_EVENT, NOTE_WINDOW_PREFIX, openNoteWindow, openTaskInWorkspace } from '$lib/windows';
@@ -290,7 +291,7 @@
 				<Button
 					bare
 					class="size-6 rounded-md text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
-					aria-label="Version history"
+					aria-label={t('notes.editor.versionHistory')}
 					onclick={() => (historyOpen = true)}
 				>
 					<History size={13} />
@@ -305,8 +306,8 @@
 				variant="bare"
 				size="sm"
 				class="shrink-0 px-1.5 font-headline text-headline-sm font-bold tracking-tight placeholder:text-outline/60"
-				placeholder="Untitled note"
-				aria-label="Note title"
+				placeholder={t('notes.editor.titlePlaceholder')}
+				aria-label={t('notes.editor.titleLabel')}
 				bind:value={title}
 				oninput={() => update({ title })}
 			/>
@@ -318,7 +319,7 @@
 				/>
 				<Select
 					size="sm"
-					label="Note folder"
+					label={t('notes.editor.noteFolder')}
 					class="w-[136px] px-2 font-code text-code-sm"
 					options={folderOptions}
 					bind:value={folder}
@@ -340,15 +341,15 @@
 				onchange={(body) => update({ body })}
 			/>
 			<footer class="shrink-0 px-1.5 text-code-sm font-code text-outline">
-				<span>{note.words} words · {note.chars} chars</span>
+				<span>{t('editor.status.wordsChars', { words: note.words, chars: note.chars })}</span>
 			</footer>
 		</div>
 	{:else}
 		<EmptyState
 			size="md"
 			icon={NotebookPen}
-			heading="Note unavailable"
-			title="This note was deleted or could not be loaded."
+			heading={t('notes.editor.unavailable')}
+			title={t('notes.editor.unavailableHint')}
 			class="gap-3"
 		>
 			<Button
@@ -357,7 +358,7 @@
 				class="px-3 text-label-md text-on-surface-variant hover:text-on-surface"
 				onclick={closeWindow}
 			>
-				Close window
+				{t('notes.editor.closeWindow')}
 			</Button>
 		</EmptyState>
 	{/if}

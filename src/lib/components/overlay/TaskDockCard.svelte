@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CalendarDays, Check, Play, RotateCcw, SquarePen, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		formatTaskDate,
 		isTaskOverdue,
@@ -57,7 +58,7 @@
 			<span
 				class="text-label-sm font-label font-semibold tracking-wider uppercase {statusMeta[status].tone}"
 			>
-				{statusMeta[status].label}
+				{t('tasks.statusLabel.' + status)}
 			</span>
 		</div>
 		<span
@@ -87,7 +88,7 @@
 
 	<div class="flex items-center gap-1.5">
 		<span class="rounded-md px-1.5 py-px text-code-sm font-code {priority.tone}">
-			{priority.label}
+			{t('tasks.priorityLabel.' + taskPriority(task))}
 		</span>
 		<span
 			class="rounded-md bg-surface-container-highest px-1.5 py-px text-code-sm font-code text-on-surface"
@@ -106,14 +107,14 @@
 						variant="secondary"
 						size="icon-sm"
 						class={doing ? 'text-secondary' : 'text-on-surface-variant hover:text-secondary'}
-						aria-label={doing ? 'Move back to To do' : 'Move to In progress'}
+						aria-label={doing ? t('over.taskCard.moveToTodo') : t('over.taskCard.moveToProgress')}
 						onclick={() => onprogress(task)}
 					>
 						<Play size={15} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>{doing ? 'Move back to To do' : 'Move to In progress'}</Tooltip.Content>
+			<Tooltip.Content>{doing ? t('over.taskCard.moveToTodo') : t('over.taskCard.moveToProgress')}</Tooltip.Content>
 		</Tooltip.Root>
 		<Tooltip.Root>
 			<Tooltip.Trigger>
@@ -123,7 +124,7 @@
 						variant="secondary"
 						size="icon-sm"
 						class="text-on-surface-variant hover:text-primary"
-						aria-label={done ? 'Reopen task' : 'Complete task'}
+						aria-label={done ? t('over.taskCard.reopen') : t('over.taskCard.complete')}
 						onclick={() => oncomplete(task)}
 					>
 						{#if done}
@@ -134,7 +135,7 @@
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>{done ? 'Reopen task' : 'Complete task'}</Tooltip.Content>
+			<Tooltip.Content>{done ? t('over.taskCard.reopen') : t('over.taskCard.complete')}</Tooltip.Content>
 		</Tooltip.Root>
 		<Tooltip.Root>
 			<Tooltip.Trigger>
@@ -144,14 +145,14 @@
 						variant="secondary"
 						size="icon-sm"
 						class="text-on-surface-variant hover:bg-error-container/40 hover:text-error"
-						aria-label="Remove from dock"
+						aria-label={t('over.taskCard.removeFromDock')}
 						onclick={() => onremove(task)}
 					>
 						<X size={15} />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Remove from dock</Tooltip.Content>
+			<Tooltip.Content>{t('over.taskCard.removeFromDock')}</Tooltip.Content>
 		</Tooltip.Root>
 	</div>
 
@@ -163,7 +164,7 @@
 		class="gap-1.5 px-3 py-1.5 font-headline text-headline-sm active:scale-[0.99]"
 		onclick={onopen}
 	>
-		<span class="relative">Edit task</span>
+		<span class="relative">{t('over.taskCard.edit')}</span>
 		<SquarePen size={14} />
 	</Button>
 </div>
