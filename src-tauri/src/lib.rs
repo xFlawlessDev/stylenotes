@@ -7,6 +7,7 @@ mod tray;
 mod ai;
 mod db_tx;
 mod mcp_host;
+mod mcp_watch;
 mod quit;
 
 const DB_URL: &str = "sqlite:stylenotes.db";
@@ -20,6 +21,14 @@ const KANBAN_LOCK_EVENT: &str = "kanban:lock-changed";
 /// Emitted with `"note"` or `"task"` when a quick-capture shortcut fires; the
 /// dock webview creates the record and opens its editor window.
 const QUICK_CAPTURE_EVENT: &str = "quick-capture:create";
+
+/// App state holding the MCP job watcher.
+///
+/// The watcher must outlive the setup call, and the wait command needs to reach
+/// it from a worker thread, so it is shared rather than owned by the command.
+struct McpWatchState {
+    watch: std::sync::Arc<mcp_watch::JobWatch>,
+}
 
 /// Every window is hidden instead of closed so the app keeps running in the
 /// system tray; "Quit StyleNotes" in the tray menu is the way out.
@@ -180,10 +189,54 @@ fn mcp_clear_snapshot(app: tauri::AppHandle) {
     mcp_host::clear_snapshot(&app);
 }
 
-/// Oldest pending write job, as raw JSON, or `null` when the queue is empty.
+/// Oldest pending write job, as raw JSON, or `null` when none arrives in time.
+///
+/// Push, not polling: the frontend parks one call here and the filesystem
+/// watcher wakes it the moment the shim drops a job file.
+///
+/// The answer goes out over a `Channel` because a multi-second `invoke` reply
+/// would block the main thread — the same loop that paints and handles input —
+/// and freeze the whole app. Instead the directory is checked inline (so a job
+/// already on disk costs nothing extra) and an empty wait is parked on a worker
+/// thread that reports back through the channel.
+///
+/// The channel is the only way an answer reaches the caller, so every failure
+/// path must either report an error *or* send a message: returning `Ok(())`
+/// without one would park the frontend forever.
 #[tauri::command]
-fn mcp_poll_job(app: tauri::AppHandle) -> Option<String> {
-    mcp_host::poll_job(&app)
+async fn mcp_wait_job(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, McpWatchState>,
+    channel: tauri::ipc::Channel<Option<String>>,
+    wait_ms: Option<u64>,
+    deadline: Option<u64>,
+) -> Result<(), String> {
+    let Ok(dir) = mcp_host::jobs_dir(&app).ok_or("app data directory unavailable") else {
+        return Err("app data directory unavailable".into());
+    };
+    let watch = state.watch.clone();
+    let ours = watch.watches(&dir);
+    if ours {
+        // Drop a hint left over from the job we just returned.
+        watch.drain();
+    }
+    if let Some(raw) = mcp_host::oldest_job(&dir) {
+        let _ = channel.send(Some(raw));
+        return Ok(());
+    }
+    if !ours {
+        // No watcher: report empty rather than parking a wait that can never be
+        // woken. The frontend keeps its loop, so the next call retries.
+        let _ = channel.send(None);
+        return Ok(());
+    }
+    let budget = mcp_watch::wait_budget(wait_ms, deadline);
+    let parked = mcp_watch::parked(watch, budget, move || {
+        let next: Option<String> = mcp_host::oldest_job(&dir);
+        let _ = channel.send(next);
+    });
+    parked.spawn();
+    Ok(())
 }
 
 /// Writes the result of a job and drops it from the queue.
@@ -533,7 +586,7 @@ pub fn run() {
             mcp_reconcile,
             mcp_write_snapshot,
             mcp_clear_snapshot,
-            mcp_poll_job,
+            mcp_wait_job,
             mcp_write_result,
             mcp_backup_note,
             db_tx::note_upsert_tx,
@@ -548,6 +601,14 @@ pub fn run() {
             // Lays down `mcp/`, clears stale jobs, and writes the first
             // `app-info.json`. Failure is not fatal: MCP just stays unavailable.
             mcp_host::prepare(app.handle());
+            // Pushes new job files to the parked `mcp_wait_job` call instead of
+            // letting the frontend poll `mcp/jobs/`. A missing watcher degrades
+            // to the wait deadline, not to a broken bridge.
+            let jobs_dir = mcp_host::jobs_dir(app.handle())
+                .unwrap_or_else(|| std::path::PathBuf::from("mcp").join("jobs"));
+            app.manage(McpWatchState {
+                watch: mcp_watch::shared(mcp_watch::install(app.handle(), jobs_dir)),
+            });
             // Tracks which detail windows still owe a pre-quit flush.
             app.manage(quit::QuitState::default());
             // The atomic note-write pool must exist before any window can call

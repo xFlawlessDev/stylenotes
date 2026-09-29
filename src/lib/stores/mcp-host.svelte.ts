@@ -5,10 +5,14 @@
  * publishes the grant in `app-info.json`, and executes the write jobs the shim
  * drops into `mcp/jobs/` — through the same validated actions the UI uses, so
  * cross-window refresh and cycle checks apply to every agent write.
+ *
+ * The job side is push-driven: instead of polling the directory, the host parks
+ * one `mcp_wait_job` call that Rust answers the moment a job file lands
+ * (`src-tauri/src/mcp_watch.rs`). An idle host therefore makes no calls at all.
  */
 
 import { browser } from '$app/environment';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, Channel } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { MCP_NOTE_BACKUPS, type McpGrant, type McpJob, type McpResult } from '$lib/content/mcp-types';
 import { buildMcpSnapshot } from '$lib/content/mcp-snapshot';
@@ -41,15 +45,22 @@ import { hasPendingEdit } from '$lib/stores/mcp-pending-edits';
 const REFRESH_DEBOUNCE_MS = 300;
 /** Floor between snapshot writes, so a burst of edits writes once. */
 const REFRESH_FLOOR_MS = 2_000;
-/** Poll cadence for write jobs; the shim waits at most 5 s (see bridge.rs). */
-const JOB_POLL_MS = 150;
+/**
+ * Upper bound on one parked wait. Rust caps this further to stay clear of the
+ * job deadline (see `mcp_watch::wait_budget`); this value only matters for the
+ * case where the backend ignores the hint.
+ */
+const JOB_WAIT_MS = 1_000;
+/** Backoff after a failed wait, so a broken bridge does not spin. */
+const JOB_WAIT_ERROR_MS = 1_000;
 
 let revision = 0;
 let started = false;
 let disposed = false;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let floorTimer: ReturnType<typeof setTimeout> | null = null;
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let waitTimer: ReturnType<typeof setTimeout> | null = null;
+let waiting = false;
 let lastWriteAt = 0;
 let unlisteners: UnlistenFn[] = [];
 
@@ -142,14 +153,45 @@ function scheduleRefresh(): void {
 
 // --- job execution ----------------------------------------------------------
 
-async function pollOnce(): Promise<void> {
-	if (disposed || !mcpStore.enabled) return;
-	let raw: string | null = null;
+/**
+ * Parks one wait on the app side and runs whatever arrives.
+ *
+ * The answer comes over a `Channel`, not as the `invoke` reply: a reply that
+ * takes a second would block Tauri's main thread — the loop that paints and
+ * handles input — and freeze the app. Rust therefore answers an empty wait from
+ * a worker thread, and this promise resolves as soon as the first message
+ * lands.
+ *
+ * The wait is a hint, not a lease: the directory is re-read on every wake and
+ * on every deadline, so a lost notification only delays execution, never
+ * expires a job.
+ */
+async function waitForJob(): Promise<void> {
+	if (disposed || waiting || !mcpStore.enabled) return;
+	waiting = true;
+	let settled = false;
 	try {
-		raw = await invoke<string | null>('mcp_poll_job');
+		await new Promise<void>((resolve) => {
+			const channel = new Channel<string | null>();
+			channel.onmessage = (raw) => {
+				if (settled) return;
+				settled = true;
+				void handleJob(raw).finally(resolve);
+			};
+			invoke('mcp_wait_job', { waitMs: JOB_WAIT_MS, channel }).catch(() => {
+				if (settled) return;
+				settled = true;
+				resolve();
+			});
+		});
 	} catch {
-		return;
+		await pause(JOB_WAIT_ERROR_MS);
+	} finally {
+		waiting = false;
 	}
+}
+
+async function handleJob(raw: string | null): Promise<void> {
 	if (!raw) return;
 	let job: McpJob;
 	try {
@@ -292,12 +334,33 @@ async function writeResult(id: string, payload: McpResult): Promise<void> {
 	await invoke('mcp_write_result', { id, payload: JSON.stringify(payload) }).catch(() => undefined);
 }
 
-function tick(): void {
-	pollTimer = setTimeout(() => {
-		void pollOnce().finally(() => {
-			if (!disposed) tick();
-		});
-	}, JOB_POLL_MS);
+/** Trailing sleep, used when a wait cannot be parked right away. */
+function pause(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		waitTimer = setTimeout(() => {
+			waitTimer = null;
+			resolve();
+		}, ms);
+	});
+}
+
+/** Shortest pause between waits, so a disabled host cannot spin on the IPC. */
+const JOB_WAIT_MIN_GAP_MS = 100;
+
+/**
+ * Keeps exactly one wait parked while MCP is on.
+ *
+ * Sequential on purpose: V1 keeps one job in flight, and a job must be answered
+ * before the next wait starts, otherwise `jobs/` would report the same file
+ * twice. The trailing gap keeps the 5 ms path — disable MCP while a wait is
+ * parked — from re-arming in a tight loop.
+ */
+async function runJobLoop(): Promise<void> {
+	while (!disposed && mcpStore.enabled) {
+		await waitForJob();
+		if (disposed || !mcpStore.enabled) return;
+		await pause(JOB_WAIT_MIN_GAP_MS);
+	}
 }
 
 // --- lifecycle --------------------------------------------------------------
@@ -320,13 +383,13 @@ export async function startMcpHost(): Promise<void> {
 async function applyEnabledChange(): Promise<void> {
 	await hydrateMcp();
 	if (mcpStore.enabled) {
-		if (!pollTimer) tick();
+		void runJobLoop();
 		await refreshMcpSnapshot('force');
 		await Promise.all([refreshMcpClients(), refreshMcpAudit()]);
 	} else {
-		if (pollTimer) {
-			clearTimeout(pollTimer);
-			pollTimer = null;
+		if (waitTimer) {
+			clearTimeout(waitTimer);
+			waitTimer = null;
 		}
 		await clearSnapshot();
 	}
@@ -336,7 +399,7 @@ export function stopMcpHost(): void {
 	disposed = true;
 	if (refreshTimer) clearTimeout(refreshTimer);
 	if (floorTimer) clearTimeout(floorTimer);
-	if (pollTimer) clearTimeout(pollTimer);
+	if (waitTimer) clearTimeout(waitTimer);
 	for (const unlisten of unlisteners) unlisten();
 	unlisteners = [];
 	started = false;

@@ -219,13 +219,18 @@ pub fn clear_snapshot<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// Returns the oldest pending job file as raw JSON, or `None`.
+/// Directory holding pending job files, or `None` when the bridge is missing.
+pub fn jobs_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    Some(mcp_root(app)?.join("jobs"))
+}
+
+/// Oldest job file in `dir`, as raw JSON.
 ///
-/// V1 keeps one job in flight: the frontend calls this, executes, and writes a
-/// result before polling again.
-pub fn poll_job<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
-    let dir = mcp_root(app)?.join("jobs");
-    let mut files: Vec<PathBuf> = fs::read_dir(&dir)
+/// V1 keeps one job in flight: the host takes a job, executes it, and writes a
+/// result before looking again. Public because the parked wait re-reads the
+/// directory on its worker thread.
+pub fn oldest_job(dir: &Path) -> Option<String> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
         .ok()?
         .flatten()
         .map(|entry| entry.path())

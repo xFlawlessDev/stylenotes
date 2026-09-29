@@ -14,8 +14,12 @@ use serde_json::Value;
 
 use crate::protocol;
 
-/// Poll interval while waiting for a job result.
-const POLL_INTERVAL: Duration = Duration::from_millis(40);
+/// How often the shim re-checks for its result while the app works.
+///
+/// This side stays a file poll on purpose: the shim is a short-lived, stateless
+/// process per client, so it has nothing to be notified by. It is bounded by the
+/// job deadline, and the host answers from memory, so the wait is short.
+const RESULT_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
 /// `mcp/app-info.json`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -203,7 +207,7 @@ impl Bridge {
                     payload.message.unwrap_or_default(),
                 ));
             }
-            std::thread::sleep(POLL_INTERVAL);
+            std::thread::sleep(RESULT_POLL_INTERVAL);
         }
     }
 }

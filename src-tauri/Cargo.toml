@@ -48,6 +48,9 @@ aes-gcm = "0.10"
 base64 = "0.22"
 rand = "0.8"
 thiserror = "2"
+# Filesystem watcher: pushes new MCP job files to the parked `mcp_wait_job`
+# call instead of letting the frontend poll `mcp/jobs/` (src/mcp_watch.rs).
+notify = "8"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

@@ -76,7 +76,7 @@ Dibaca dari `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src/lib/db/index.ts
 │   • spawn  mcp-host saat record mcp_settings pertama ada / MCP pertama dinyalakan │
 │                                                                                  │
 │  Warisan window `workspace` (selalu hidup, tidak pernah destroy)                  │
-│   mcp-host.ts ──poll mcp/jobs/──► mcp-tools.ts (registry)                        │
+│   mcp-host.ts ──wait mcp/jobs/ (push)──► mcp-tools.ts (registry)                  │
 │        │                              ├─ READ  → `mcp/snapshot.json` (§4)        │
 │        │                              └─ WRITE → jalur persist lintas-workspace   │
 │        │                                         (store + §13b)                  │
@@ -149,6 +149,9 @@ Yang **tidak** ada di snapshot: `notes.updated` (#1 temuan 5), `settings`, `noti
 | Operasi **selalu dijalankan terhadap workspace yang diminta eksplisit**, dan hasilnya mengembalikan `workspace_id`. Tidak ada operasi "workspace aktif implisit" dari agent | ✅ **Revisi (#D4, jawaban Q8):** V1 mendukung **baca & tulis semua workspace** — lihat §13b untuk jalur persist lintas-workspace yang baru dibutuhkan |
 | Setiap job punya `timeout` (V1: 5 detik) → hasil = `timeout` | Job file yang tidak pernah dieksekusi harus gagal, bukan menggantung |
 | Job file ditulis **atomik** (temp + rename); `results/` dibersihkan saat start; V1 = **1 job in-flight** | Menghindari job setengah jadi dan antrean yang tumbuh tak terbatas |
+| Eksekutor **tidak polling**: ia memarkir satu `mcp_wait_job`, dan watcher filesystem (`src-tauri/src/mcp_watch.rs`) membangunkannya begitu job mendarat | 150 ms polling = ~7 panggilan IPC per detik selamanya, walau tidak ada job. Watcher hanya *hint*: direktori selalu dibaca ulang, jadi event yang lewat hanya menambah latensi, tidak pernah menghilangkan job |
+| Jawaban `mcp_wait_job` dikirim lewat **`Channel`**, dan wait yang kosong diparkir di **worker thread** — bukan sebagai balasan `invoke` | Tauri menjalankan IPC window di **main thread** (loop yang melukis + menangani input). Balasan `invoke` yang menunggu beberapa detik membekukan seluruh app. Cek direktori tetap dilakukan inline, jadi job yang sudah ada di disk tidak perlu thread hop |
+| Anggaran satu wait hanya **~1–1,5 detik** (`mcp_watch::MAX_WAIT_MS`) | Wait cuma jaring pengaman watcher, bukan penopang utama. Deadline job 5 detik tetap aman karena direktori selalu dibaca ulang di setiap wake |
 
 Setiap job membawa `grant` yang dipilih user (#D8); app memeriksa `grant` **sebelum** menjalankan handler (`grant.access.write && grant.scopes.includes('tasks')`), bukan hanya saat spawn.
 
@@ -158,7 +161,7 @@ Setiap job membawa `grant` yang dipilih user (#D8); app memeriksa `grant` **sebe
 
 1. handshake (MCP `initialize`, `notifications/initialized`);
 2. membaca `mcp/app-info.json` (path DB, versi protokol, pid app) untuk memutuskan pesan error yang tepat;
-3. per tool call: baca snapshot → kalau write, tulis job → poll `results/<id>.json` → balas.
+3. per tool call: baca snapshot → kalau write, tulis job → tunggu `results/<id>.json` → balas.
 
 Kalau app tertutup: baca menghasilkan snapshot *terakhir* yang tertinggal (kadaluarsa, dan **diberi label** `appRunning: false` di setiap respons), tulis menghasilkan error `app_not_running` dengan pesan "Buka StyleNotes, lalu coba lagi".
 
@@ -521,13 +524,13 @@ Prasyarat: mode `write`, scope `tasks` + `dependency` sudah diaktifkan user (dia
 2. [S]  cek grant → access=write, scopes ⊇ {tasks} ✔
 3. [S]  tulis mcp/jobs/<uuid>.json  (tmp + rename)
         { id, tool, args, grant, instance, workspace: "workspace-default", deadline }
-4. [H]  poll mcp/jobs/ menemukan job (1 in-flight) → validasi ulang grant → cek workspace ada
+4. [H]  `mcp_wait_job` terbangun oleh watcher `mcp/jobs/` (push) → validasi ulang grant → cek workspace ada
 5. [H]  cek guard #D4: tidak ada edit lokal tertunda untuk task itu
 6. [H]  tasksRepo.upsert({ ...task, status: 'done', completed: true, updated_at: now })
 7. [H]  emit("tasks:changed") + tulis mcp_audit { tool: complete_task, scope: write, ok: 1, workspace }
         → Kanban + DockRail + Workspace reload sendiri (listen yang sudah ada)
 8. [H]  tulis mcp/results/<uuid>.json { ok: true, task: {...}, revisionBaru }
-9. [S]  polling melihat result → balas structuredContent
+9. [S]  melihat result file → balas structuredContent
 10.[S]  hapus job; [H] menghapus result (bersih)
 ```
 
@@ -608,7 +611,7 @@ Kasus tepi yang **wajib diuji** karena mudah salah:
 |---|---|---|
 | Baca dari snapshot | 1 (disk→shim) | beberapa ms |
 | Baca + graph/konteks | 1 (CPU di shim) | puluhan ms pada vault besar |
-| Tulis apa pun | 3 (shim→job→host→store→result) | 20–80 ms, tergantung debounce poll host |
+| Tulis apa pun | 3 (shim→job→host→store→result) | 20–80 ms; host terbangun begitu job file mendarat |
 | Tulis + app sibuk | 3 | sama, dengan batas 5 s (`timeout`) |
 
 Ini yang membenarkan pemisahan §D3: **semua** pertanyaan yang user sebut ("monitor task", "konteks/query graph") ada di baris pertama dan kedua — jalur tulis hanya untuk aksi.
