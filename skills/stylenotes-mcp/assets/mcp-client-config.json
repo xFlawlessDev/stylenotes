@@ -1,0 +1,9 @@
+{
+  "_comment": "Paste the server block into your MCP client config. Replace the command path with the path shown in StyleNotes Settings -> MCP (Copy config). The --instance id names this client in the audit log.",
+  "mcpServers": {
+    "stylenotes": {
+      "command": "C:\\Program Files\\StyleNotes\\stylenotes-mcp.exe",
+      "args": ["--instance", "claude-desktop-00000000"]
+    }
+  }
+}
