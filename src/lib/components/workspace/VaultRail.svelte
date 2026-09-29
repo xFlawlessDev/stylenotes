@@ -147,7 +147,7 @@
 				</div>
 			</div>
 			<nav
-				class="scrollbar-none flex max-h-64 min-h-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
+				class="scrollbar-none flex min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
 				aria-label="Folders"
 				use:reorder
 			>
@@ -196,7 +196,7 @@
 					{/if}
 				</div>
 				<div
-					class="scrollbar-none flex max-h-40 flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
+					class="scrollbar-none flex max-h-[40vh] flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
 				>
 					{#each tags as tag, i}
 						<Button
