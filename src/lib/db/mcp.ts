@@ -9,6 +9,7 @@ import {
 	type McpToolKind,
 } from '$lib/content/mcp-types';
 import { getDb } from './index';
+import { MCP_SCOPE_IDS } from '$lib/content/mcp-types';
 
 const DEFAULT_SETTINGS: McpSettings = {
 	access: 'read',
@@ -48,7 +49,12 @@ type McpAuditRow = {
 	detail: string;
 };
 
-const VALID_SCOPES: McpScope[] = ['notes', 'tasks', 'dependency'];
+/**
+ * Scopes accepted from the database. Derived from the tool registry so adding a
+ * scope (… → workspace) never needs a second edit; a hardcoded triple here
+ * silently dropped `workspace` on load, so its toggle appeared to never save.
+ */
+const VALID_SCOPES: readonly string[] = MCP_SCOPE_IDS;
 
 function parseList(raw: string): string[] {
 	try {
@@ -60,9 +66,7 @@ function parseList(raw: string): string[] {
 }
 
 function parseScopes(raw: string): McpScope[] {
-	return parseList(raw).filter((scope): scope is McpScope =>
-		(VALID_SCOPES as string[]).includes(scope)
-	);
+	return parseList(raw).filter((scope): scope is McpScope => VALID_SCOPES.includes(scope));
 }
 
 function toSettings(row: McpSettingsRow): McpSettings {

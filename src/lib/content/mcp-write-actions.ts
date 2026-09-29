@@ -42,6 +42,8 @@ export type WriteContext = {
 	tasks: Task[];
 	dependencies: TaskDependency[];
 	workspaceIds: Set<string>;
+	/** Full workspace records: workspace tools need ids, names and colours. */
+	workspaces?: { id: string; name: string; color: string; createdAt: string }[];
 };
 
 export function fail(error: McpErrorCode, message: string): WriteOutcome {

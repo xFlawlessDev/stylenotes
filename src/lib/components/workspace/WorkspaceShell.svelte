@@ -4,6 +4,7 @@
 	import NotesWorkspace from '$lib/components/workspace/NotesWorkspace.svelte';
 	import TaskBoard from '$lib/components/tasks/TaskBoard.svelte';
 	import GraphPage from '$lib/components/graph/GraphPage.svelte';
+	import AiChatPanel from '$lib/components/workspace/AiChatPanel.svelte';
 	import { toggleOverlay, type WorkspaceSection } from '$lib/windows';
 	import { workspaceStore } from '$lib/stores/workspaces.svelte';
 	import { toggleMode, type ThemeMode } from '$lib/stores/settings.svelte';
@@ -94,10 +95,8 @@
 		fullPreview={state.fullPreview}
 		newNoteToken={state.newNoteToken}
 		onwikilink={controller.handleWikiClick}
-		onchatwikilink={controller.handleChatWikiClick}
 		bind:railOpen={state.railOpen}
 		bind:feedOpen={state.feedOpen}
-		bind:assistantOpen={state.assistantOpen}
 		actions={{
 			selectfolder: controller.selectFolder,
 			selecttag: controller.selectTag,
@@ -129,3 +128,20 @@
 		}}
 	/>
 {/if}
+
+<!-- Hosted at the shell so the assistant overlays notes, tasks and the graph
+     alike; `onclose` only closes it, wikilinks route through the controller. -->
+<AiChatPanel
+	open={state.assistantOpen}
+	notes={state.items}
+	tasks={state.tasks.map((task) => ({
+		id: task.id,
+		title: task.title,
+		folder: task.folder,
+		workspaceId: task.workspaceId,
+		body: task.notes
+	}))}
+	workspaceId={controller.selected?.workspaceId}
+	onwikilink={controller.handleChatWikiClick}
+	onclose={() => (state.assistantOpen = false)}
+/>

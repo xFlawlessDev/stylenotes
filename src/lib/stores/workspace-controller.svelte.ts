@@ -148,13 +148,17 @@ export function createWorkspaceController() {
 		}, 2200);
 	}
 
-	/** Reloads the notes, folders and tasks of the active workspace. */
-	async function reloadWorkspaceRecords() {
+	/**
+	 * Reloads the notes, folders and tasks of `workspaceId` (the active
+	 * workspace by default). Pass the id explicitly when the caller just moved
+	 * the selection, so the read cannot race another window's switch.
+	 */
+	async function reloadWorkspaceRecords(workspaceId = workspaceStore.activeId) {
 		const [storedNotes, storedFolders, storedTasks] = await Promise.all([
-			listNotes(),
-			loadFolders(),
-			refreshTasks(),
-			refreshDependencies(),
+			listNotes(workspaceId),
+			loadFolders(workspaceId),
+			refreshTasks(workspaceId),
+			refreshDependencies(workspaceId),
 		]);
 		state.items = storedNotes;
 		state.customFolders = storedFolders;
@@ -170,7 +174,7 @@ export function createWorkspaceController() {
 		if (workspaceLoading) return;
 		workspaceLoading = true;
 		if (await setActiveWorkspace(id)) {
-			await reloadWorkspaceRecords();
+			await reloadWorkspaceRecords(id);
 			// The dock, Kanban and detail windows follow the selection.
 			notifyWorkspacesChanged();
 		} else {

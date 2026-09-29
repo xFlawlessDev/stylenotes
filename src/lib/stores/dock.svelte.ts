@@ -9,7 +9,7 @@ import {
 	taskStatus,
 	type Task
 } from '$lib/stores/tasks';
-import { listAllTasks, persistTask, refreshTasks } from '$lib/stores/tasks.svelte';
+import { listAllTasks, persistTask } from '$lib/stores/tasks.svelte';
 
 /** Docked quick notes and tasks, plus how many are docked in total. */
 export const dockStore = $state<{ tasks: Task[]; notes: Note[]; docked: number }>({

@@ -27,21 +27,18 @@ export async function hydrateTasks(): Promise<Task[]> {
 }
 
 /**
- * Reads the tasks of the active workspace and merges them into `taskStore`.
+ * Reads the tasks of the active workspace into `taskStore`.
  *
- * Windows that show more than one workspace (the Kanban window, the dock)
- * keep their extra rows: rows of `workspaceId` are replaced, everything else
- * is preserved, so refreshing after a switch cannot drop them.
+ * `taskStore` is shared (the workspace window renders it directly), so it must
+ * hold exactly one workspace's rows: a switch replaces the list, never merges.
+ * Windows that show more than one workspace at once (the Kanban window, the
+ * dock) own their lists through {@link listWorkspaceTasks} / `listAllTasks`
+ * and do not read `taskStore`.
  */
 export async function refreshTasks(workspaceId = workspaceStore.activeId): Promise<Task[]> {
 	if (!browser) return taskStore.items;
 	try {
-		const rows = await tasksRepo.list(workspaceId);
-		const seen = new Set(rows.map((task) => task.id));
-		taskStore.items = [
-			...rows,
-			...taskStore.items.filter((task) => !seen.has(task.id) && (task.workspaceId ?? DEFAULT_ID) !== workspaceId)
-		];
+		taskStore.items = await tasksRepo.list(workspaceId);
 	} catch {
 		/* keep the last known tasks */
 	}

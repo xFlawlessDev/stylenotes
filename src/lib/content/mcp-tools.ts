@@ -20,6 +20,7 @@ export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'list_dependencies', kind: 'read', scope: 'dependency', description: 'Every task-to-task dependency edge.' },
 	{ name: 'critical_path', kind: 'read', scope: 'dependency', description: 'Longest dependency chain ending at a task.' },
 	{ name: 'graph_query', kind: 'read', scope: 'notes', description: 'Graph nodes and edges around a node, by depth and edge kind.' },
+	{ name: 'list_workspaces', kind: 'read', scope: 'workspace', description: 'Every workspace with its note and task counts.' },
 	{ name: 'create_note', kind: 'write', scope: 'notes', description: 'Create a note from a title and body.' },
 	{ name: 'update_note_body', kind: 'write', scope: 'notes', description: 'Replace a note body (a backup copy is kept first).' },
 	{ name: 'delete_note', kind: 'write', scope: 'notes', description: 'Delete a note; requires confirm: true.' },
@@ -29,12 +30,16 @@ export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'delete_task', kind: 'write', scope: 'tasks', description: 'Delete a task; requires confirm: true.' },
 	{ name: 'link_tasks', kind: 'write', scope: 'dependency', description: 'Add a dependency; cycles and cross-workspace links are rejected.' },
 	{ name: 'unlink_tasks', kind: 'write', scope: 'dependency', description: 'Remove a dependency.' },
+	{ name: 'create_workspace', kind: 'write', scope: 'workspace', description: 'Create a workspace.' },
+	{ name: 'rename_workspace', kind: 'write', scope: 'workspace', description: 'Rename an existing workspace.' },
+	{ name: 'delete_workspace', kind: 'write', scope: 'workspace', description: 'Delete a workspace and its contents; requires confirm: true.' },
 ];
 
 export const MCP_SCOPES: { id: McpScope; label: string; description: string }[] = [
 	{ id: 'notes', label: 'Notes', description: 'Create, edit and delete note content' },
 	{ id: 'tasks', label: 'Tasks', description: 'Create, update, complete and delete tasks' },
 	{ id: 'dependency', label: 'Dependencies', description: 'Link and unlink task dependencies' },
+	{ id: 'workspace', label: 'Workspaces', description: 'Create, rename and delete workspaces' },
 ];
 
 export function toolsForScope(scope: McpScope): McpToolDescriptor[] {

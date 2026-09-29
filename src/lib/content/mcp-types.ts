@@ -25,10 +25,19 @@ export type McpErrorCode =
 	| 'not_found'
 	| 'busy_local_edit'
 	| 'dependency_cycle'
+	| 'last_workspace'
 	| 'write_failed'
 	| 'timeout';
 
-export type McpScope = 'notes' | 'tasks' | 'dependency';
+export type McpScope = 'notes' | 'tasks' | 'dependency' | 'workspace';
+
+/**
+ * Every scope the bridge knows, in display order. The single source of truth:
+ * the tool registry groups by it, the settings layer validates against it, and
+ * the shim mirrors the resulting tool list. A second, hardcoded copy in any of
+ * those places is how a scope silently disappears.
+ */
+export const MCP_SCOPE_IDS: readonly McpScope[] = ['notes', 'tasks', 'dependency', 'workspace'];
 
 export type McpAccess = 'read' | 'write';
 

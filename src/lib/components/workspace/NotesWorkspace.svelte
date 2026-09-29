@@ -7,12 +7,11 @@
 	import VaultRail from '$lib/components/workspace/VaultRail.svelte';
 	import NotesFeed from '$lib/components/workspace/NotesFeed.svelte';
 	import NoteEditor from '$lib/components/workspace/NoteEditor.svelte';
-	import AiChatPanel from '$lib/components/workspace/AiChatPanel.svelte';
 
 	/**
 	 * The notes section of the workspace: the folder rail, the notes feed and
-	 * the editor (with the optional AI chat panel). It owns the small-screen
-	 * drawer state so `Workspace.svelte` stays about coordination.
+	 * the editor. It owns the small-screen drawer state so `Workspace.svelte`
+	 * stays about coordination.
 	 *
 	 * Callbacks are grouped in `actions` to keep the prop list readable; the
 	 * note-taking callbacks take the same shapes the child components expect.
@@ -32,10 +31,8 @@
 		fullPreview = false,
 		newNoteToken = 0,
 		onwikilink,
-		onchatwikilink,
 		railOpen = $bindable(false),
 		feedOpen = $bindable(false),
-		assistantOpen = $bindable(false),
 		actions
 	}: {
 		visible: Note[];
@@ -52,11 +49,8 @@
 		fullPreview?: boolean;
 		newNoteToken?: number;
 		onwikilink?: (click: WikiClick) => void;
-		/** Wiki click from the AI chat, which has no source note. */
-		onchatwikilink?: (click: WikiClick) => void;
 		railOpen?: boolean;
 		feedOpen?: boolean;
-		assistantOpen?: boolean;
 		actions: {
 			selectfolder: (id: string) => void;
 			selecttag: (tag: string | null) => void;
@@ -152,23 +146,6 @@
 			onexport={(id) => runById(id, actions.exportnote)}
 			oncopy={(id) => runById(id, actions.copynote)}
 			ondelete={actions.deletenote}
-		/>
-	{/if}
-
-	{#if assistantOpen}
-		<AiChatPanel
-			open={assistantOpen}
-			notes={items}
-			tasks={tasks.map((task) => ({
-				id: task.id,
-				title: task.title,
-				folder: task.folder,
-				workspaceId: task.workspaceId,
-				body: task.notes
-			}))}
-			workspaceId={selected?.workspaceId}
-			onwikilink={onchatwikilink}
-			onclose={() => (assistantOpen = false)}
 		/>
 	{/if}
 

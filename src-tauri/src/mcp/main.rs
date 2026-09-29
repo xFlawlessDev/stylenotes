@@ -10,6 +10,7 @@ mod read;
 mod read_deps;
 mod read_graph;
 mod read_tasks;
+mod read_workspaces;
 mod registry;
 mod write;
 
@@ -205,6 +206,7 @@ fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
         "list_dependencies" => read_deps::list_dependencies(bridge, args),
         "critical_path" => read_deps::critical_path(bridge, args),
         "graph_query" => read_graph::graph_query(bridge, args),
+        "list_workspaces" => read_workspaces::list_workspaces(bridge, args),
         other => protocol::tool_error("unknown_tool", format!("Unknown read tool `{other}`.")),
     }
 }

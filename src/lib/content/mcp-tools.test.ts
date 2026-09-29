@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+	MCP_SCOPES,
 	MCP_TOOLS,
 	findTool,
 	parseRustRegistry,
@@ -9,6 +10,7 @@ import {
 	toolsForScope,
 } from '$lib/content/mcp-tools';
 import { AI_TOOLS } from '$lib/content/ai-tool-schema';
+import { MCP_SCOPE_IDS } from '$lib/content/mcp-types';
 
 describe('MCP tool registry', () => {
 	it('has unique names', () => {
@@ -32,6 +34,19 @@ describe('MCP tool registry', () => {
 	it('groups tools by scope', () => {
 		expect(toolsForScope('notes').every((tool) => tool.scope === 'notes')).toBe(true);
 		expect(toolsForScope('dependency').map((tool) => tool.name)).toContain('link_tasks');
+	});
+
+	/**
+	 * Regression: the settings store and the MCP repo used to filter scopes
+	 * against a hardcoded `['notes','tasks','dependency']`. Adding `workspace`
+	 * to the registry then left its toggle permanently off. Every registered
+	 * scope must be a value the settings layer will keep.
+	 */
+	it('advertises only scopes that the settings layer can persist', () => {
+		expect(MCP_SCOPES.map((scope) => scope.id)).toEqual([...MCP_SCOPE_IDS]);
+		for (const scope of MCP_SCOPES) {
+			expect(toolsForScope(scope.id).length, `scope ${scope.id} has no tools`).toBeGreaterThan(0);
+		}
 	});
 
 	it('allows reads always and writes only with a grant', () => {

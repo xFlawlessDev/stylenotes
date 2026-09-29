@@ -95,6 +95,12 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Graph nodes and edges around a node, by depth and edge kind.",
     },
     ToolDescriptor {
+        name: "list_workspaces",
+        kind: ToolKind::Read,
+        scope: "workspace",
+        description: "Every workspace with its note and task counts.",
+    },
+    ToolDescriptor {
         name: "create_note",
         kind: ToolKind::Write,
         scope: "notes",
@@ -147,6 +153,24 @@ pub const TOOLS: &[ToolDescriptor] = &[
         kind: ToolKind::Write,
         scope: "dependency",
         description: "Remove a dependency.",
+    },
+    ToolDescriptor {
+        name: "create_workspace",
+        kind: ToolKind::Write,
+        scope: "workspace",
+        description: "Create a workspace.",
+    },
+    ToolDescriptor {
+        name: "rename_workspace",
+        kind: ToolKind::Write,
+        scope: "workspace",
+        description: "Rename an existing workspace.",
+    },
+    ToolDescriptor {
+        name: "delete_workspace",
+        kind: ToolKind::Write,
+        scope: "workspace",
+        description: "Delete a workspace and its contents; requires confirm: true.",
     },
 ];
 
@@ -219,6 +243,39 @@ fn schema_for(name: &str) -> Value {
             properties["dependsOn"] = json!({ "type": "string" });
             required.push("id");
             required.push("dependsOn");
+        }
+        "create_workspace" => {
+            // A workspace is not scoped by `workspace`; it is the scope itself.
+            let mut props = json!({
+                "name": { "type": "string" },
+                "color": { "type": "string" }
+            });
+            props["id"] = properties["id"].take();
+            properties = props;
+            required.push("name");
+        }
+        "rename_workspace" => {
+            let mut props = json!({
+                "id": { "type": "string" },
+                "name": { "type": "string" }
+            });
+            props["workspace"] = properties["workspace"].take();
+            properties = props;
+            required.push("id");
+            required.push("name");
+        }
+        "delete_workspace" => {
+            let mut props = json!({
+                "id": { "type": "string" },
+                "confirm": { "type": "boolean" }
+            });
+            props["workspace"] = properties["workspace"].take();
+            properties = props;
+            required.push("id");
+        }
+        "list_workspaces" => {
+            // No arguments: the list is inherently cross-workspace.
+            properties = json!({});
         }
         _ => {}
     }

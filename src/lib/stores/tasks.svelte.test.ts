@@ -46,18 +46,21 @@ describe('refreshTasks', () => {
 		expect(taskStore.items.map((item) => item.id)).toEqual(['w1']);
 	});
 
-	it('keeps rows of other workspaces in the store', async () => {
-		// A window that mixes workspaces (Kanban, dock) must not lose the rows
-		// it loaded for another workspace when the active one is refreshed.
+	it('drops rows of other workspaces when switching the active one', async () => {
+		// Regression: the workspace window renders `taskStore` directly, so a
+		// refresh after a workspace switch must not keep the previous
+		// workspace's rows in the shared store.
 		taskStore.items = [
-			task({ id: 'home', workspaceId: 'home' }),
+			task({ id: 'home-old', workspaceId: 'home' }),
 			task({ id: 'work-old', workspaceId: 'work' })
 		];
-		vi.mocked(repo.tasksList).mockResolvedValue([task({ id: 'work-new', workspaceId: 'work' })]);
+		workspaceStore.activeId = 'home';
+		vi.mocked(repo.tasksList).mockResolvedValue([task({ id: 'home-new', workspaceId: 'home' })]);
 
 		await refreshTasks();
 
-		expect(taskStore.items.map((item) => item.id).sort()).toEqual(['home', 'work-new']);
+		expect(repo.tasksList).toHaveBeenCalledWith('home');
+		expect(taskStore.items.map((item) => item.id)).toEqual(['home-new']);
 	});
 
 	it('keeps the last known tasks when the read fails', async () => {

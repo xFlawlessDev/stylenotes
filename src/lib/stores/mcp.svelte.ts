@@ -9,6 +9,7 @@ import {
 	type McpSettings,
 } from '$lib/content/mcp-types';
 import { mcpRepo } from '$lib/db/mcp';
+import { MCP_SCOPE_IDS } from '$lib/content/mcp-types';
 import { metaRepo } from '$lib/db';
 import { isTauri } from '$lib/windows';
 
@@ -68,8 +69,14 @@ function notifyChanged() {
 	void emit(MCP_CHANGED, { enabled: mcpStore.enabled }).catch(() => undefined);
 }
 
+/**
+ * A scope is valid when it appears in the canonical scope list. Deriving it
+ * from `MCP_SCOPE_IDS` means adding a scope (notes → tasks → dependency →
+ * workspace) never needs a second edit here — a hardcoded triple silently
+ * dropped `workspace`, so its toggle never stuck.
+ */
 function isScope(value: string): value is McpScope {
-	return value === 'notes' || value === 'tasks' || value === 'dependency';
+	return MCP_SCOPE_IDS.includes(value as McpScope);
 }
 
 /** Master switch: persists to `meta` and reconciles the supervisor. */
@@ -100,7 +107,7 @@ export async function updateMcpSettings(patch: Partial<McpSettings>): Promise<bo
 		...mcpStore.settings,
 		...patch,
 		scopes: (patch.scopes ?? mcpStore.settings.scopes).filter((scope): scope is McpScope =>
-			(scope as string) === 'notes' || (scope as string) === 'tasks' || (scope as string) === 'dependency'
+			isScope(scope as string)
 		),
 		workspaces: [...(patch.workspaces ?? mcpStore.settings.workspaces)],
 	};

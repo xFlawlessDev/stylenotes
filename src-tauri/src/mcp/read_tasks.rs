@@ -86,7 +86,9 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
                 .as_deref()
                 .is_none_or(|limit| task["dueAt"].as_str().is_some_and(|due| due < limit))
         })
-        .filter(|task| !overdue_only || task["blocked"].as_bool() == Some(true) || is_overdue(task))
+        .filter(|task| {
+            !overdue_only || is_overdue(task, snapshot["generatedAt"].as_str().unwrap_or(""))
+        })
         .cloned()
         .collect();
 
@@ -100,13 +102,26 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
     ok(json!({ "ok": true, "total": total, "returned": items.len(), "tasks": items }))
 }
 
-/// A rough overdue check on the ISO `dueAt` string: earlier than "now" date.
-fn is_overdue(task: &Value) -> bool {
-    // The snapshot carries no clock; treat any task with a due date in the past
-    // relative to the snapshot's own generation as still actionable, and let the
-    // model reason about the exact date. This stays conservative: no date means
-    // not overdue.
-    task["dueAt"].as_str().is_some() && task["status"] != "done"
+/// Whether a task is overdue as of the snapshot's own generation time.
+///
+/// `dueAt` is a plain `YYYY-MM-DD` string, so a lexicographic comparison against
+/// the `YYYY-MM-DD` prefix of the snapshot's ISO `generatedAt` is exact — no date
+/// library needed. A task is overdue when its due date is strictly before the
+/// snapshot day and it is not `done`. No due date means not overdue.
+fn is_overdue(task: &Value, generated_at: &str) -> bool {
+    if task["status"] == "done" {
+        return false;
+    }
+    let Some(due) = task["dueAt"].as_str().filter(|due| !due.is_empty()) else {
+        return false;
+    };
+    let today = generated_at.get(..10).unwrap_or(generated_at);
+    if today.len() < 10 {
+        // A snapshot without a usable timestamp cannot judge overdue-ness;
+        // stay conservative rather than flag everything.
+        return false;
+    }
+    due < today
 }
 
 // --- get_task ---------------------------------------------------------------
@@ -271,5 +286,32 @@ mod tests {
         sort_smart(&mut tasks);
         let ids: Vec<&str> = tasks.iter().map(|t| t["id"].as_str().unwrap()).collect();
         assert_eq!(ids, vec!["high-a", "high-b", "low"]);
+    }
+
+    fn dated(id: &str, status: &str, due: Value) -> Value {
+        let mut t = task(id, status, "medium", 0);
+        t["dueAt"] = due;
+        t
+    }
+
+    #[test]
+    fn overdue_compares_due_against_snapshot_day() {
+        let today = "2026-09-29T10:00:00.000Z";
+        // Past due, still open -> overdue.
+        assert!(is_overdue(&dated("a", "todo", json!("2026-09-28")), today));
+        assert!(is_overdue(&dated("b", "doing", json!("2020-01-01")), today));
+        // Due today is not overdue (strictly before).
+        assert!(!is_overdue(&dated("c", "todo", json!("2026-09-29")), today));
+        // Future due is not overdue — this was the bug: it used to be flagged.
+        assert!(!is_overdue(&dated("d", "todo", json!("2030-01-01")), today));
+        // Done tasks are never overdue.
+        assert!(!is_overdue(&dated("e", "done", json!("2026-09-01")), today));
+        // No due date is never overdue.
+        assert!(!is_overdue(&dated("f", "todo", Value::Null), today));
+    }
+
+    #[test]
+    fn overdue_is_conservative_without_a_usable_clock() {
+        assert!(!is_overdue(&dated("a", "todo", json!("2026-09-01")), ""));
     }
 }

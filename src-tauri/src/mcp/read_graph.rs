@@ -177,6 +177,27 @@ mod tests {
         assert_eq!(resolve_graph_anchor(&graph, "missing", None), None);
     }
 
+    /// The app builds graph ids as `<kind>:<id>` with no workspace segment.
+    /// Anchor resolution must still reach them from a plain or prefixed ref.
+    #[test]
+    fn graph_anchor_matches_production_node_ids() {
+        let graph = json!({ "nodes": [
+            { "id": "note:a", "entityId": "a", "workspaceId": "ws", "kind": "note" }
+        ]});
+        assert_eq!(
+            resolve_graph_anchor(&graph, "a", None).as_deref(),
+            Some("note:a")
+        );
+        assert_eq!(
+            resolve_graph_anchor(&graph, "ws/a", None).as_deref(),
+            Some("note:a")
+        );
+        assert_eq!(
+            resolve_graph_anchor(&graph, "note:a", None).as_deref(),
+            Some("note:a")
+        );
+    }
+
     #[test]
     fn kind_filter_empty_allows_everything() {
         let edge = json!({ "kind": "wiki" });

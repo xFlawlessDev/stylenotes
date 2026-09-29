@@ -30,7 +30,7 @@ pub fn call(bridge: &Bridge, tool: &str, args: &Value, grant: &Grant, instance: 
         );
     }
     // Destructive tools must be invoked with an explicit confirmation (#D16).
-    if matches!(tool, "delete_note" | "delete_task")
+    if matches!(tool, "delete_note" | "delete_task" | "delete_workspace")
         && args.get("confirm").and_then(Value::as_bool) != Some(true)
     {
         return protocol::tool_error(

@@ -29,13 +29,18 @@ import {
 	type WriteContext,
 	type WriteOutcome,
 } from '$lib/content/mcp-write-actions';
+import {
+	createWorkspaceAction,
+	deleteWorkspaceAction,
+	renameWorkspaceAction,
+} from '$lib/content/mcp-workspace-actions';
 import { listAllNotes } from '$lib/stores/notes';
 import { listAllTasks } from '$lib/stores/tasks.svelte';
 import { DEPENDENCIES_CHANGED } from '$lib/stores/dependencies.svelte';
 import { NOTES_CHANGED } from '$lib/stores/notes';
 import { TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 import { hydrateMcp, mcpStore, MCP_CHANGED, startMcpSync, clearSnapshot, refreshMcpClients, refreshMcpAudit } from '$lib/stores/mcp.svelte';
-import { workspaceStore } from '$lib/stores/workspaces.svelte';
+import { workspaceStore, reloadWorkspaces, WORKSPACES_CHANGED } from '$lib/stores/workspaces.svelte';
 import { isTauri } from '$lib/windows';
 import { mcpRepo } from '$lib/db/mcp';
 import { dependenciesRepo } from '$lib/db';
@@ -78,6 +83,7 @@ async function loadContext(): Promise<{ context: WriteContext; notes: Awaited<Re
 			tasks,
 			dependencies,
 			workspaceIds: new Set(workspaceStore.items.map((workspace) => workspace.id)),
+			workspaces: workspaceStore.items.map((workspace) => ({ ...workspace })),
 		},
 	};
 }
@@ -291,6 +297,12 @@ async function runAction(job: McpJob): Promise<WriteOutcome> {
 			return linkTasksAction(context, job.args);
 		case 'unlink_tasks':
 			return unlinkTasksAction(context, job.args);
+		case 'create_workspace':
+			return createWorkspaceAction(context, job.args);
+		case 'rename_workspace':
+			return renameWorkspaceAction(context, job.args);
+		case 'delete_workspace':
+			return deleteWorkspaceAction(context, job.args);
 		default:
 			return { ok: false, error: 'unknown_tool', message: `Unsupported write tool \`${job.tool}\`.` };
 	}
@@ -303,7 +315,9 @@ function scopeOf(tool: string): 'read' | 'write' {
 function summarize(data: unknown): string {
 	if (!data || typeof data !== 'object') return '';
 	const record = data as Record<string, unknown>;
-	const entity = (record.note ?? record.task) as Record<string, unknown> | undefined;
+	const entity = (record.note ?? record.task ?? record.workspace) as
+		| Record<string, unknown>
+		| undefined;
 	if (entity?.id) return String(entity.id);
 	if (record.deleted) return `deleted ${record.deleted}`;
 	return '';
@@ -375,9 +389,20 @@ export async function startMcpHost(): Promise<void> {
 		listen(NOTES_CHANGED, () => scheduleRefresh()),
 		listen(TASKS_CHANGED, () => scheduleRefresh()),
 		listen(DEPENDENCIES_CHANGED, () => scheduleRefresh()),
+		listen(WORKSPACES_CHANGED, () => void onWorkspacesChanged()),
 		listen(MCP_CHANGED, () => void applyEnabledChange()),
 	]);
 	await applyEnabledChange();
+}
+
+/**
+ * A workspace appeared, was renamed or was removed — possibly because of an MCP
+ * write this host itself performed. The store must be re-read before the next
+ * snapshot, or `workspaces` stays stale and count-less.
+ */
+async function onWorkspacesChanged(): Promise<void> {
+	await reloadWorkspaces().catch(() => undefined);
+	scheduleRefresh();
 }
 
 async function applyEnabledChange(): Promise<void> {

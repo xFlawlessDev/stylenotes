@@ -327,13 +327,16 @@ pub fn get_note(bridge: &Bridge, args: &Value, workspace: Option<&str>) -> Value
     ok(payload)
 }
 
+/// Graph node id for an entity, matching `graphNodeId()` in
+/// `src/lib/content/workspace-graph.ts`: `<kind>:<id>`, **no** workspace segment.
+///
+/// The workspace is deliberately absent because the app builds the snapshot's
+/// graph that way, and `links_for` looks nodes up by this exact key. Adding a
+/// workspace prefix here silently empties every `backlinks`/`outlinks`/`neighbours`
+/// payload — see the regression test `graph_node_id_matches_workspace_graph`.
 pub(crate) fn graph_node_id(kind: &str, item: &Value) -> String {
-    let workspace = item
-        .get("workspaceId")
-        .and_then(Value::as_str)
-        .unwrap_or("workspace-default");
     let id = item.get("id").and_then(Value::as_str).unwrap_or("");
-    format!("{kind}:{workspace}/{id}")
+    format!("{kind}:{id}")
 }
 
 /// Incoming and outgoing wiki edges for a node, resolved to display refs.
@@ -476,6 +479,38 @@ mod tests {
     #[test]
     fn prefixed_id_uses_workspace() {
         assert_eq!(prefixed_id(&note("a", "wk", "A")), "wk/a");
+    }
+
+    /// Guards the contract with `graphNodeId()` in `workspace-graph.ts`:
+    /// `<kind>:<id>`, no workspace segment. A workspace prefix here made
+    /// `links_for` miss every node, so backlinks/outlinks were always empty.
+    #[test]
+    fn graph_node_id_matches_workspace_graph() {
+        assert_eq!(graph_node_id("note", &note("a", "wk", "A")), "note:a");
+    }
+
+    #[test]
+    fn links_for_resolves_edges_between_production_node_ids() {
+        let snapshot = json!({
+            "graph": {
+                "nodes": [
+                    { "id": "note:a", "entityId": "a", "kind": "note", "workspaceId": "wk", "title": "A" },
+                    { "id": "note:b", "entityId": "b", "kind": "note", "workspaceId": "wk", "title": "B" }
+                ],
+                "edges": [
+                    { "id": "wiki:note:a->note:b", "source": "note:a", "target": "note:b", "kind": "wiki" }
+                ]
+            }
+        });
+        let (backlinks, outlinks) = links_for(&snapshot, "note:a");
+        assert_eq!(backlinks.len(), 0);
+        assert_eq!(outlinks.len(), 1);
+        assert_eq!(outlinks[0]["id"], "note:b");
+
+        let (backlinks, outlinks) = links_for(&snapshot, "note:b");
+        assert_eq!(backlinks.len(), 1);
+        assert_eq!(backlinks[0]["id"], "note:a");
+        assert_eq!(outlinks.len(), 0);
     }
 
     #[test]
