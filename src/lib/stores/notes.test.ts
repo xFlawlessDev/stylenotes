@@ -314,7 +314,8 @@ describe('applyNotePatch', () => {
 		expect(after.words).toBe(2);
 		expect(after.chars).toBe(11);
 		expect(after.excerpt).toContain('hello world');
-		expect(after.updated).toBe('Just now');
+		expect(after.updated).toBe('just now');
+		expect(typeof after.updatedAt).toBe('number');
 		expect(before.body).toBe('old');
 	});
 

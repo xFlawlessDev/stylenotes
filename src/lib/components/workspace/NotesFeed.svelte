@@ -2,6 +2,7 @@
 	import { Pin, FileText, X, Tag } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { t } from '$lib/i18n/index.svelte';
+	import { noteUpdatedLabel } from '$lib/i18n/format';
 	import { Button, EmptyState, SearchInput, SegmentedControl } from '$lib/components/base';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -230,7 +231,7 @@
 						{note.excerpt}
 					</p>
 					<div class="flex items-center justify-between gap-2">
-						<span class="text-code-sm font-code text-outline">{note.updated}</span>
+						<span class="text-code-sm font-code text-outline">{noteUpdatedLabel(note)}</span>
 						<div class="flex min-w-0 gap-1">
 							{#each note.tags.slice(0, 2) as tag (tag)}
 								<Button

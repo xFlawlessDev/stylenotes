@@ -6,6 +6,7 @@
 	import EditorStatus from '$lib/components/workspace/EditorStatus.svelte';
 	import NoteTags from '$lib/components/note/NoteTags.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { noteUpdatedLabel } from '$lib/i18n/format';
 
 	/**
 	 * The note header: folder chip + move control, the title field, tags, the
@@ -72,7 +73,7 @@
 	/>
 	<div class="flex flex-wrap items-center gap-1.5">
 		<NoteTags tags={note.tags} onchange={onupdatetags} />
-		<span class="text-code-sm font-code text-outline">{note.updated}</span>
+		<span class="text-code-sm font-code text-outline">{noteUpdatedLabel(note)}</span>
 		<span class="ml-auto flex items-center gap-1.5">
 			<AiEditorAssist body={draft} {textarea} onapply={onapplyai} />
 			<EditorStatus {note} />

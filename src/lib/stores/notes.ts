@@ -10,6 +10,7 @@ import {
 } from '$lib/content/content';
 import { foldersRepo, metaRepo, notesRepo } from '$lib/db';
 import { versionsRepo } from '$lib/db/versions';
+import { formatRelative } from '$lib/content/version-format';
 import { isTauri } from '$lib/windows';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
@@ -250,7 +251,8 @@ export type NotePatch = Partial<
 
 /** Applies a patch and keeps the derived preview fields in sync. */
 export function applyNotePatch(note: Note, patch: NotePatch): Note {
-	const next: Note = { ...note, ...patch, updated: 'Just now', updatedAt: Date.now() };
+	const updatedAt = Date.now();
+	const next: Note = { ...note, ...patch, updatedAt, updated: formatRelative(updatedAt) };
 	if (patch.body !== undefined) {
 		next.words = countWords(patch.body);
 		next.chars = patch.body.length;

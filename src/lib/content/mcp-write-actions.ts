@@ -12,6 +12,7 @@
 import { browser } from '$app/environment';
 import { emit } from '@tauri-apps/api/event';
 import { buildExcerpt, countWords, createNote, type Note } from '$lib/content/content';
+import { formatRelative } from '$lib/content/version-format';
 import type { McpErrorCode } from '$lib/content/mcp-types';
 import { dependenciesRepo, foldersRepo, notesRepo, tasksRepo } from '$lib/db';
 import { NOTES_CHANGED } from '$lib/stores/notes';
@@ -145,7 +146,7 @@ export async function createNoteAction(
 		workspaceId: workspace.id,
 		updatedAt: Date.now(),
 	});
-	note.updated = 'Just now';
+	note.updated = formatRelative(note.updatedAt ?? Date.now());
 	try {
 		await notesRepo.upsert(note);
 	} catch {
@@ -170,14 +171,15 @@ export async function updateNoteBodyAction(
 	const found = noteOrError(context, args.id);
 	if (!('found' in found)) return found;
 	const note = found.found;
+	const updatedAt = Date.now();
 	const next = {
 		...note,
 		body: args.body,
 		excerpt: buildExcerpt(args.body),
 		words: countWords(args.body),
 		chars: args.body.length,
-		updated: 'Just now',
-		updatedAt: Date.now(),
+		updated: formatRelative(updatedAt),
+		updatedAt,
 	};
 	try {
 		await notesRepo.upsert(next);

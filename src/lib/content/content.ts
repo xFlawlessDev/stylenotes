@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import { formatRelative } from '$lib/content/version-format';
+
 export type Note = {
 	id: string;
 	workspaceId?: string;
@@ -35,14 +37,14 @@ export function createNote(seed: Partial<Note> = {}): Note {
     title: seed.title?.trim() || 'Untitled note',
     folder: seed.folder ?? 'personal',
     tags: seed.tags ?? [],
-    updated: seed.updated ?? 'Just now',
+    updated: seed.updated ?? formatRelative(seed.updatedAt ?? Date.now()),
     pinned: seed.pinned ?? false,
     overlay: seed.overlay ?? false,
     excerpt: seed.excerpt ?? buildExcerpt(body),
     body,
     words: seed.words ?? countWords(body),
     chars: seed.chars ?? body.length,
-    updatedAt: seed.updatedAt,
+    updatedAt: seed.updatedAt ?? Date.now(),
   };
 }
 
@@ -132,6 +134,7 @@ function buildNote(path: string, raw: string): Note {
     body,
     words: countWords(body),
     chars: body.length,
+    updatedAt: Date.now(),
   };
 }
 
