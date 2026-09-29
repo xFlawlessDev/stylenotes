@@ -44,6 +44,7 @@ describe('defaults', () => {
 			accent: 'steel',
 			editorView: 'preview',
 			taskView: 'write',
+			previewInlineEdit: true,
 			overlayStatus: 'all',
 			overlayPriority: 'all',
 			overlaySort: 'smart',

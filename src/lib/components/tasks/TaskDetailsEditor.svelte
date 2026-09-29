@@ -4,6 +4,9 @@
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
+	import { annotatePreviewLines } from '$lib/content/preview-lines';
+	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
+	import { settings } from '$lib/stores/settings.svelte';
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
@@ -156,7 +159,8 @@
 		void renderNoteHtml(detail, { source: task, notes, tasks, folders })
 			.then(renderNotePreviewHtml)
 			.then((rendered) => {
-				if (!cancelled) html = rendered;
+				if (cancelled) return;
+				html = settings.previewInlineEdit ? annotatePreviewLines(rendered, detail) : rendered;
 			})
 			.catch(() => {
 				if (!cancelled) html = '';
@@ -171,9 +175,16 @@
 		if (!previewEl) return;
 		if (handleExternalLink(event, previewEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, previewEl);
-		if (!wikiClick) return;
-		event.preventDefault();
-		onwikilink?.(wikiClick);
+		if (wikiClick) {
+			event.preventDefault();
+			onwikilink?.(wikiClick);
+			return;
+		}
+		if (!settings.previewInlineEdit || mode !== 'preview') return;
+		const source = detail;
+		startPreviewLineEdit(event, previewEl, source, (value, block) => {
+			detail = replaceLineRange(source, block, value);
+		});
 	}
 </script>
 

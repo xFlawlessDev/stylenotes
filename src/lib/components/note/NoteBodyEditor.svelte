@@ -5,6 +5,8 @@
 	import { transform } from '$lib/content/markdown-commands';
 	import { shortcutCommand } from '$lib/content/markdown-shortcuts';
 	import { clickedCheckboxIndex, enableTaskCheckboxes } from '$lib/content/markdown-preview';
+	import { annotatePreviewLines } from '$lib/content/preview-lines';
+	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
@@ -132,7 +134,12 @@
 
 		void renderNoteHtml(body, { source: note, notes, tasks, folders }).then(renderNotePreviewHtml)
 			.then((rendered) => {
-				if (!cancelled) html = enableTaskCheckboxes(rendered);
+				if (cancelled) return;
+				const enabled = enableTaskCheckboxes(rendered);
+				html =
+					settings.previewInlineEdit && view === 'preview'
+						? annotatePreviewLines(enabled, body)
+						: enabled;
 			})
 			.catch(() => {
 				if (!cancelled) html = '';
@@ -269,9 +276,21 @@
 			return;
 		}
 		const index = clickedCheckboxIndex(previewEl, event.target);
-		if (index < 0) return;
-		event.preventDefault();
-		commitBody(toggleChecklistItem(draft, index));
+		if (index >= 0) {
+			event.preventDefault();
+			commitBody(toggleChecklistItem(draft, index));
+			return;
+		}
+		startLineEdit(event);
+	}
+
+	/** Opens the in-place editor for the clicked preview block, when enabled. */
+	function startLineEdit(event: MouseEvent) {
+		if (!previewEl || !settings.previewInlineEdit || view !== 'preview') return;
+		const source = draft;
+		startPreviewLineEdit(event, previewEl, source, (value, block) => {
+			commitBody(replaceLineRange(source, block, value));
+		});
 	}
 
 	function attachFiles(paths: string[]) {

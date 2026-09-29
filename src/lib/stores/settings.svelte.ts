@@ -28,6 +28,8 @@ export type Settings = {
 	spellcheck: boolean;
 	showWordCount: boolean;
 	confirmDelete: boolean;
+	/** Click a rendered block in Preview to edit its source lines in place. */
+	previewInlineEdit: boolean;
 	overlayStatus: TaskStatus | 'all';
 	overlayPriority: TaskPriorityFilter;
 	overlaySort: OverlaySort;
@@ -61,6 +63,7 @@ const defaults: Settings = {
 	spellcheck: true,
 	showWordCount: true,
 	confirmDelete: true,
+	previewInlineEdit: true,
 	overlayStatus: 'all',
 	overlayPriority: 'all',
 	overlaySort: 'smart',

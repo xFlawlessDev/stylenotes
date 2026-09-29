@@ -268,6 +268,7 @@ describe('settingsRepo', () => {
 			spellcheck: true,
 			showWordCount: true,
 			confirmDelete: true,
+			previewInlineEdit: true,
 			overlayStatus: 'all',
 			overlayPriority: 'all',
 			overlaySort: 'smart',

@@ -40,6 +40,8 @@ export const settings = {
 		showWordCountHint: 'Display live counts in the editor header',
 		confirmDelete: 'Confirm before deleting',
 		confirmDeleteHint: 'Ask before a note is permanently removed',
+		previewInlineEdit: 'Edit lines in preview',
+		previewInlineEditHint: 'Click a block in Preview to edit its lines in place',
 		versioningEnabled: 'Keep version history',
 		versioningEnabledHint: 'Save local snapshots so edits can be restored',
 		shortcuts: 'Shortcuts',

@@ -18,6 +18,8 @@
 	import type { EntityVersion } from '$lib/content/version-types';
 	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
 	import { renderNoteHtml } from '$lib/content/note-actions';
+	import { annotatePreviewLines } from '$lib/content/preview-lines';
+	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
@@ -214,7 +216,12 @@
 		const wiki = note ? { source: note, notes, tasks, folders: customFolders } : undefined;
 		void renderNoteHtml(source, wiki).then(renderNotePreviewHtml)
 			.then((rendered) => {
-				if (!cancelled) html = enableTaskCheckboxes(rendered);
+				if (cancelled) return;
+				const enabled = enableTaskCheckboxes(rendered);
+				html =
+					settings.previewInlineEdit && view === 'preview'
+						? annotatePreviewLines(enabled, source)
+						: enabled;
 			})
 			.catch(() => {
 				if (!cancelled) html = '';
@@ -336,11 +343,24 @@
 			onwikilink?.(wikiClick);
 			return;
 		}
-		if (!note) return;
 		const index = clickedCheckboxIndex(previewEl, event.target);
-		if (index < 0) return;
-		event.preventDefault();
-		commitBody(toggleChecklistItem(draft, index));
+		if (index >= 0) {
+			if (!note) return;
+			event.preventDefault();
+			commitBody(toggleChecklistItem(draft, index));
+			return;
+		}
+		startLineEdit(event);
+	}
+
+	/** Opens the in-place editor for the clicked preview block, when enabled. */
+	function startLineEdit(event: MouseEvent) {
+		if (!previewEl || !note) return;
+		if (!settings.previewInlineEdit || view !== 'preview') return;
+		const source = draft;
+		startPreviewLineEdit(event, previewEl, source, (value, block) => {
+			commitBody(replaceLineRange(source, block, value));
+		});
 	}
 
 	function attachFiles(paths: string[]) {

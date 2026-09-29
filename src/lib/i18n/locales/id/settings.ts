@@ -39,6 +39,8 @@ export const settings: SettingsMessages = {
 		showWordCountHint: 'Tampilkan hitungan langsung di header editor',
 		confirmDelete: 'Konfirmasi sebelum menghapus',
 		confirmDeleteHint: 'Tanya sebelum catatan dihapus permanen',
+		previewInlineEdit: 'Edit baris di pratinjau',
+		previewInlineEditHint: 'Klik blok di Pratinjau untuk mengedit barisnya langsung',
 		versioningEnabled: 'Simpan riwayat versi',
 		versioningEnabledHint: 'Simpan cuplikan lokal agar edit bisa dipulihkan',
 		shortcuts: 'Pintasan',

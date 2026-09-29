@@ -1319,3 +1319,34 @@ html.dark .markdown-body .shiki span {
 	height: 12rem;
 }
 
+/* Click-to-edit: a tagged block in Preview gets a hover affordance, and the
+   in-place editor replaces the rendered element while it is focused. */
+.markdown-body [data-line-block] {
+	cursor: text;
+	border-radius: 0.5rem;
+	transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.markdown-body [data-line-block]:hover {
+	background-color: color-mix(in oklab, var(--color-primary) 8%, transparent);
+	box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.markdown-body [data-line-block]:focus-within {
+	background-color: color-mix(in oklab, var(--color-primary) 6%, transparent);
+	box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.markdown-body .preview-line-editor {
+	display: block;
+	width: 100%;
+	resize: vertical;
+	background: color-mix(in oklab, var(--color-surface-container) 70%, transparent);
+	color: var(--color-on-surface);
+	border-radius: 0.5rem;
+	padding: 0.25rem 0.5rem;
+	outline: none;
+	font: inherit;
+	line-height: inherit;
+}
+

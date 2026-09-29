@@ -173,7 +173,7 @@
 						</div>
 
 						<div class="flex flex-col gap-2">
-							{#each [{ k: 'spellcheck' as const, t: 'settings.editor.spellcheck', d: 'settings.editor.spellcheckHint' }, { k: 'showWordCount' as const, t: 'settings.editor.showWordCount', d: 'settings.editor.showWordCountHint' }, { k: 'confirmDelete' as const, t: 'settings.editor.confirmDelete', d: 'settings.editor.confirmDeleteHint' }, { k: 'versioningEnabled' as const, t: 'settings.editor.versioningEnabled', d: 'settings.editor.versioningEnabledHint' }] as row (row.k)}
+							{#each [{ k: 'spellcheck' as const, t: 'settings.editor.spellcheck', d: 'settings.editor.spellcheckHint' }, { k: 'showWordCount' as const, t: 'settings.editor.showWordCount', d: 'settings.editor.showWordCountHint' }, { k: 'confirmDelete' as const, t: 'settings.editor.confirmDelete', d: 'settings.editor.confirmDeleteHint' }, { k: 'previewInlineEdit' as const, t: 'settings.editor.previewInlineEdit', d: 'settings.editor.previewInlineEditHint' }, { k: 'versioningEnabled' as const, t: 'settings.editor.versioningEnabled', d: 'settings.editor.versioningEnabledHint' }] as row (row.k)}
 								<div
 									class="flex items-center justify-between rounded-2xl bg-surface-container-lowest/30 p-3"
 								>
