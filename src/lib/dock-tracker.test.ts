@@ -105,13 +105,56 @@ describe('createDockCursorTracker', () => {
 		await poll(5);
 		expect(mocks.cursorPosition).not.toHaveBeenCalled();
 
+		// The toggle shows the window: the event is a hint, the tracker confirms
+		// it against the real visibility before polling.
+		mocks.isVisible.mockResolvedValue(true);
 		onVisibility?.({ payload: true });
 		await poll(1);
 		expect(mocks.cursorPosition).toHaveBeenCalledTimes(1);
 
+		mocks.isVisible.mockResolvedValue(false);
 		onVisibility?.({ payload: false });
 		await poll(5);
 		expect(mocks.cursorPosition).toHaveBeenCalledTimes(1);
+	});
+
+	it('recovers polling after a hide/show cycle on a window that was already shown', async () => {
+		// Boot: the dock was revealed by something other than the toggle, so no
+		// visibility event ever arrived.
+		mocks.isVisible.mockResolvedValue(true);
+		const onCursor = vi.fn();
+		const tracker = createDockCursorTracker({ interval: 40, onCursor });
+
+		await settle();
+		await poll(1);
+		expect(onCursor).toHaveBeenCalledTimes(1);
+
+		// Toggled off, then back on. The second show must restart polling even
+		// though `running` was left false by the hide.
+		mocks.isVisible.mockResolvedValue(false);
+		onVisibility?.({ payload: false });
+		await poll(5);
+		expect(onCursor).toHaveBeenCalledTimes(1);
+
+		mocks.isVisible.mockResolvedValue(true);
+		onVisibility?.({ payload: true });
+		await poll(1);
+		expect(onCursor).toHaveBeenCalledTimes(2);
+
+		tracker.dispose();
+	});
+
+	it('self-heals when the show event is missed but the window is visible', async () => {
+		// The event can fire before this webview registered its listener; the
+		// window itself is the source of truth.
+		mocks.isVisible.mockResolvedValue(true);
+		const onCursor = vi.fn();
+		createDockCursorTracker({ interval: 40, onCursor });
+
+		await settle();
+		await poll(1);
+
+		expect(onCursor).toHaveBeenCalledTimes(1);
 	});
 
 	it('skips polls while a drag owns the window position', async () => {

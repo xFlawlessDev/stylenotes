@@ -34,6 +34,11 @@
 		}
 		// Note and task windows reveal themselves once their record is loaded.
 		if (role === 'note' || role === 'task') return;
+		// The dock starts hidden and is shown by the workspace toggle. Revealing
+		// it here would show the window before `DockRail` has sized it and set
+		// its click-through state, leaving it interactive-less until the user
+		// hides and re-shows it by hand.
+		if (role === 'overlay') return;
 		requestAnimationFrame(() => revealCurrentWindow());
 	});
 </script>

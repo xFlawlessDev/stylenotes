@@ -79,6 +79,22 @@ export function createDockCursorTracker(options: DockCursorTrackerOptions): Dock
 		schedule();
 	}
 
+	/**
+	 * (Re)starts polling if the window is visible, stops it otherwise.
+	 *
+	 * `OVERLAY_VISIBILITY_EVENT` can be emitted before this webview has
+	 * registered its listener (the dock is created hidden and shown later), so
+	 * the event alone is not a reliable "it is showing now" signal. Re-reading
+	 * the real visibility on every call makes the loop self-correcting.
+	 */
+	function syncVisibility() {
+		if (disposed) return;
+		void win
+			.isVisible()
+			.then((visible) => (visible ? start() : stop()))
+			.catch(() => undefined);
+	}
+
 	function stop() {
 		running = false;
 		if (timer) {
@@ -101,13 +117,15 @@ export function createDockCursorTracker(options: DockCursorTrackerOptions): Dock
 	track(win.onMoved(({ payload }) => (position = { x: payload.x, y: payload.y })));
 	track(win.onScaleChanged(({ payload }) => (scale = payload.scaleFactor)));
 	// The dock is hidden at launch; only the toggle knows when it shows.
-	track(listen<boolean>(OVERLAY_VISIBILITY_EVENT, ({ payload }) => (payload ? start() : stop())));
-	void win
-		.isVisible()
-		.then((visible) => {
-			if (visible) start();
+	track(
+		listen<boolean>(OVERLAY_VISIBILITY_EVENT, ({ payload }) => {
+			if (payload) start();
+			else stop();
+			// The payload is a hint; the window is the source of truth.
+			if (payload) syncVisibility();
 		})
-		.catch(() => undefined);
+	);
+	syncVisibility();
 
 	return {
 		refresh,

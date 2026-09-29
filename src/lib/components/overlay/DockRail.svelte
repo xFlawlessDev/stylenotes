@@ -8,7 +8,12 @@
 	} from '@tauri-apps/api/window';
 	import { listen } from '@tauri-apps/api/event';
 	import type { Note } from '$lib/content/content';
-	import { isTauri, openNoteWindow, openTaskWindow } from '$lib/windows';
+	import {
+		isTauri,
+		openNoteWindow,
+		openTaskWindow,
+		OVERLAY_VISIBILITY_EVENT
+	} from '$lib/windows';
 	import {
 		DOCK_EXPANDED,
 		DOCK_MIN_LENGTH,
@@ -167,8 +172,29 @@
 	}
 
 	async function reload() {
-		await loadDockItems();
+		try {
+			await loadDockItems();
+		} catch {
+			/* keep the last known dock when the database is busy */
+		}
 		syncHovered();
+	}
+
+	/**
+	 * Reloads the dock, then re-fits the window. Used when the dock becomes
+	 * visible: the first mount can race the workspace hydration, so the dock
+	 * re-reads the records and re-measures once the toggle actually shows it.
+	 *
+	 * It also re-asserts the click-through state with `force`, because on
+	 * Windows an `ignore` applied before the window was ever shown can stick
+	 * even after a later `false` — which left the freshly revealed dock
+	 * unresponsive until the user hid and re-showed it by hand.
+	 */
+	async function showDock() {
+		await reload();
+		await tick();
+		fitRail(true);
+		await setIgnore(collapsed, true);
 	}
 
 	async function toggleProgress(task: Task) {
@@ -277,11 +303,16 @@
 	 * back. Committing early (the old behaviour) left the window permanently
 	 * click-through whenever a call rejected — hover still worked because it is
 	 * driven by the poller, but no click ever reached the webview.
+	 *
+	 * `force` re-applies the value even when `ignoring` already matches. The
+	 * Windows backend can drop an `ignore` applied to a window that was not
+	 * shown yet, so the flag and the OS state can disagree; a forced call
+	 * re-syncs them.
 	 */
-	function setIgnore(value: boolean): Promise<void> {
+	function setIgnore(value: boolean, force = false): Promise<void> {
 		if (!isTauri) return Promise.resolve();
 		ignoreChain = ignoreChain.then(async () => {
-			if (ignoring === value) return;
+			if (!force && ignoring === value) return;
 			try {
 				await getCurrentWindow().setIgnoreCursorEvents(value);
 				ignoring = value;
@@ -315,10 +346,10 @@
 	 * and hover targets. Runs once per tick while the dock window is visible.
 	 */
 	async function handleCursor({ x, y }: DockPoint) {
-		// Before the rail mounts there is nothing to hit-test against; keep the
-		// mount-time click-through state instead of deciding on empty rects
-		// (which would pin the window as ignored until the pointer left and
-		// returned).
+		// Before the rail mounts there is nothing to hit-test against. The
+		// window is already hidden or click-through at this point, so leave the
+		// state alone rather than deciding on empty rects; the first tick after
+		// the rail mounts re-evaluates it.
 		if (!railEl) return;
 
 		const overRail = inRect(railEl, x, y);
@@ -390,60 +421,80 @@
 	}
 
 	onMount(() => {
+		let disposed = false;
+		/** Wraps a listener registration so it is released even past unmount. */
+		function track(registration: Promise<() => void>) {
+			void registration
+				.then((fn) => {
+					if (disposed) fn();
+					else unlisteners.push(fn);
+				})
+				.catch(() => undefined);
+		}
+
 		void (async () => {
 			await hydrateWorkspaces();
 			await startWorkspaceSync();
-			await reload();
+			// The dock window boots alongside the workspace window; reload once
+			// more after the sync is up so a race on the first read self-heals.
+			if (!disposed) await reload();
 		})();
 
-		let unlistenFocus: (() => void) | undefined;
-		let unlistenTasks: (() => void) | undefined;
-		let unlistenNotes: (() => void) | undefined;
-		let unlistenSettings: (() => void) | undefined;
-		let unlistenCapture: (() => void) | undefined;
-		let unlistenBrowser: (() => void) | undefined;
+		const unlisteners: (() => void)[] = [];
 
 		if (isTauri) {
-			void getCurrentWindow()
-				.onFocusChanged(({ payload: focused }) => {
+			track(
+				getCurrentWindow().onFocusChanged(({ payload: focused }) => {
 					if (focused) void reload();
 				})
-				.then((fn) => (unlistenFocus = fn));
-			void listen(TASKS_CHANGED, () => void reload()).then((fn) => (unlistenTasks = fn));
-			void listen(NOTES_CHANGED, () => void reload()).then((fn) => (unlistenNotes = fn));
-			void listenQuickCapture((kind) => void createDockItem(kind)).then(
-				(fn) => (unlistenCapture = fn)
 			);
-			void listen<Settings>(SETTINGS_CHANGED, (event) => {
-				const edgeChanged = event.payload?.overlayPosition !== settings.overlayPosition;
-				applySettingsSnapshot(event.payload);
-				applyDockFilters();
-				syncHovered();
-				if (edgeChanged) {
-					hovered = null;
-					closeCaptureMenu();
-					// The rail re-renders along the other axis; re-fit and always
-					// re-pin, since a side→side switch keeps the window size.
-					void tick().then(() => fitRail(true));
-				}
-			}).then((fn) => (unlistenSettings = fn));
+			track(listen(TASKS_CHANGED, () => void reload()));
+			track(listen(NOTES_CHANGED, () => void reload()));
+			track(listenQuickCapture((kind) => void createDockItem(kind)));
+			// The toggle emits this from the workspace window. The overlay starts
+			// hidden, so its first read can happen before the workspace has
+			// written its state; re-read on every show instead of trusting the
+			// mount-time snapshot.
+			track(
+				listen<boolean>(OVERLAY_VISIBILITY_EVENT, ({ payload }) => {
+					if (payload) void showDock();
+					else {
+						hovered = null;
+						closeCaptureMenu();
+					}
+				})
+			);
+			track(
+				listen<Settings>(SETTINGS_CHANGED, (event) => {
+					const edgeChanged = event.payload?.overlayPosition !== settings.overlayPosition;
+					applySettingsSnapshot(event.payload);
+					applyDockFilters();
+					syncHovered();
+					if (edgeChanged) {
+						hovered = null;
+						closeCaptureMenu();
+						// The rail re-renders along the other axis; re-fit and always
+						// re-pin, since a side→side switch keeps the window size.
+						void tick().then(() => fitRail(true));
+					}
+				})
+			);
 		} else {
 			const onFocus = () => void reload();
 			window.addEventListener('focus', onFocus);
-			unlistenBrowser = () => window.removeEventListener('focus', onFocus);
+			unlisteners.push(() => window.removeEventListener('focus', onFocus));
 		}
 
 		const cleanupListeners = () => {
-			unlistenFocus?.();
-			unlistenTasks?.();
-			unlistenNotes?.();
-			unlistenSettings?.();
-			unlistenCapture?.();
-			unlistenBrowser?.();
+			for (const unlisten of unlisteners) unlisten();
+			unlisteners.length = 0;
 		};
 
 		if (!isTauri) {
-			return cleanupListeners;
+			return () => {
+				disposed = true;
+				cleanupListeners();
+			};
 		}
 
 		tracker = createDockCursorTracker({
@@ -456,9 +507,19 @@
 		if (railEl) railObserver.observe(railEl);
 
 		void fitRail();
-		void setIgnore(true);
+		// The dock is hidden at launch, so it starts click-through. If it is
+		// already visible (a re-mount, or the toggle beat this mount) the
+		// cursor poller owns the state instead; `handleCursor` will correct it.
+		void getCurrentWindow()
+			.isVisible()
+			.then((visible) => {
+				if (disposed) return;
+				void setIgnore(visible ? collapsed : true, true);
+			})
+			.catch(() => void setIgnore(true, true));
 
 		return () => {
+			disposed = true;
 			railObserver?.disconnect();
 			railObserver = undefined;
 			tracker?.dispose();
