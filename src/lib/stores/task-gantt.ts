@@ -2,6 +2,7 @@ import {
 	addDays,
 	diffDays,
 	formatTimelineMonth,
+	formatTimelineMonthYear,
 	startOfDay,
 	taskBar,
 	type Task,
@@ -144,7 +145,7 @@ export function ganttTimelineColumns(
 			title:
 				scale === 'week'
 					? `Week of ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-					: start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+					: formatTimelineMonthYear(start),
 			weekendStart: false
 		};
 	});
@@ -152,7 +153,7 @@ export function ganttTimelineColumns(
 
 /** Top-strip label for the month/year a timeline column belongs to. */
 export function ganttScaleContext(date: Date): string {
-	return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+	return formatTimelineMonthYear(date);
 }
 
 /** A labelled run of consecutive days in the header strip. */

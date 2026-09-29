@@ -388,6 +388,20 @@ export function fromDateInput(value: string, time = 9): string | null {
 }
 
 const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLong = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
 
 export function formatTaskDate(value: string | null): string {
 	const date = parseTaskDate(value);
@@ -401,6 +415,14 @@ export function formatTimelineDay(date: Date): string {
 
 export function formatTimelineMonth(date: Date): string {
 	return monthShort[date.getMonth()];
+}
+
+/**
+ * Long month + year, locale-independent so the label does not change with the
+ * test runner or OS locale. Exported for reuse by the Gantt header strips.
+ */
+export function formatTimelineMonthYear(date: Date): string {
+	return `${monthLong[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 export function addDays(value: Date, days: number): Date {
