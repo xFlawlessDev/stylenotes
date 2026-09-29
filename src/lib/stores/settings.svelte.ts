@@ -9,6 +9,8 @@ export type ThemeMode = 'dark' | 'light';
 export type Accent = 'steel' | 'sage' | 'sand' | 'rose';
 export type Density = 'comfortable' | 'compact';
 export type EditorView = 'split' | 'write' | 'preview';
+/** Details/editor view for a task's markdown body. */
+export type TaskView = EditorView;
 
 export type Settings = {
 	mode: ThemeMode;
@@ -16,6 +18,8 @@ export type Settings = {
 	density: Density;
 	reduceMotion: boolean;
 	editorView: EditorView;
+	/** Task window layout: focus on the details editor, or a meta/details split. */
+	taskView: TaskView;
 	focusMode: boolean;
 	spellcheck: boolean;
 	showWordCount: boolean;
@@ -47,6 +51,7 @@ const defaults: Settings = {
 	density: 'comfortable',
 	reduceMotion: false,
 	editorView: 'preview',
+	taskView: 'write',
 	focusMode: false,
 	spellcheck: true,
 	showWordCount: true,

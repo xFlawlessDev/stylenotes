@@ -42,6 +42,7 @@ describe('defaults', () => {
 			mode: 'dark',
 			accent: 'steel',
 			editorView: 'preview',
+			taskView: 'write',
 			overlayStatus: 'all',
 			overlayPriority: 'all',
 			overlaySort: 'smart',

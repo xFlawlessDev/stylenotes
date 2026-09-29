@@ -1,6 +1,6 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { describe, expect, it } from 'vitest';
-import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
+import DialogHost from '$lib/components/tasks/dialog-test-host.svelte';
 import GanttHost from '$lib/components/tasks/gantt-test-host.svelte';
 import type { Note } from '$lib/content/content';
 import { createTask, type Task, type TaskDependency } from '$lib/stores/tasks';
@@ -75,7 +75,7 @@ describe('task dependency UI', () => {
 		const target = document.createElement('div');
 		document.body.appendChild(target);
 
-		const app = mount(TaskDialog, {
+		const app = mount(DialogHost, {
 			target,
 			props: {
 				open: true,
@@ -110,7 +110,7 @@ describe('task dependency UI', () => {
 		document.body.appendChild(target);
 
 		let submittedNoteIds: string[] | null = null;
-		const app = mount(TaskDialog, {
+		const app = mount(DialogHost, {
 			target,
 			props: {
 				open: true,
@@ -133,6 +133,38 @@ describe('task dependency UI', () => {
 		submit?.click();
 		flushSync();
 		expect(submittedNoteIds).toEqual(['n1', 'n2']);
+
+		unmount(app);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		target.remove();
+	});
+
+	it('shows the details view switcher and switches to the split layout', async () => {
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+
+		const app = mount(DialogHost, {
+			target,
+			props: {
+				open: true,
+				task: createTask({ id: 't1', title: 'Ship it', notes: 'Some details' }),
+				folders: [],
+				notes: [],
+				onsubmit: noop
+			}
+		});
+		flushSync();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+
+		const switcher = document.querySelector('[aria-label="Split"]');
+		expect(switcher).not.toBeNull();
+		expect(document.querySelector('[aria-label="Write"]')).not.toBeNull();
+		expect(document.querySelector('[aria-label="Preview"]')).not.toBeNull();
+
+		(switcher as HTMLButtonElement | null)?.click();
+		flushSync();
+		// Split renders the fields column and the details surface side by side.
+		expect(document.querySelector('.grid')?.className).toContain('lg:grid-cols-');
 
 		unmount(app);
 		await new Promise((resolve) => setTimeout(resolve, 20));

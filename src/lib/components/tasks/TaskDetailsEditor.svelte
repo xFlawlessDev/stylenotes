@@ -6,6 +6,7 @@
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
+	import type { TaskView } from '$lib/stores/settings.svelte';
 	import { SegmentedControl, Textarea } from '$lib/components/base';
 	import WikiLinkPopover from '$lib/components/note/WikiLinkPopover.svelte';
 	import {
@@ -23,28 +24,54 @@
 		tasks = [],
 		folders = [],
 		preview = false,
+		view = $bindable('write' as TaskView),
+		fill = false,
 		compact = false,
 		idPrefix = 'task',
-		onwikilink,
+		onwikilink
 	}: {
 		detail?: string;
 		task?: Task | null;
 		notes?: Note[];
 		tasks?: Task[];
 		folders?: CustomFolder[];
-		/** Renders a Write/Preview switch; the preview resolves wiki links. */
+		/** Renders a Write/Split/Preview switch; the preview resolves wiki links. */
 		preview?: boolean;
+		/** Internal view when `preview` is set; the header switcher owns it otherwise. */
+		view?: TaskView;
+		/** Fills the parent height with an internal scroll area (window layout). */
+		fill?: boolean;
 		compact?: boolean;
 		idPrefix?: string;
 		onwikilink?: (click: WikiClick) => void;
 	} = $props();
 
-	let mode = $state<'write' | 'preview'>('write');
+	/** Local view used when the parent does not own one (dialog). */
+	let localView = $state<TaskView>('write');
 	let html = $state('');
 	let previewEl = $state<HTMLDivElement>();
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let suggestions = $state<WikiSuggestionSet | null>(null);
 	let activeIndex = $state(0);
+
+	/** The effective view: the bound one when filled, the local one in a dialog. */
+	const mode = $derived<TaskView>(fill ? view : localView);
+	const writes = $derived(mode !== 'preview');
+	const showSplit = $derived(mode === 'split');
+	const showWrite = $derived(mode === 'write' || mode === 'split');
+	/** How the Write surface scrolls: the textarea itself, or the wrapping well. */
+	const textareaClass = $derived(
+		fill
+			? 'scrollbar-none h-full w-full px-3 py-2.5 leading-relaxed text-on-surface-variant'
+			: compact
+				? 'py-1.5'
+				: 'py-2'
+	);
+	const previewClass = $derived(
+		fill
+			? 'scrollbar-none h-full overflow-y-auto px-3 py-2.5'
+			: 'scrollbar-none max-h-64 overflow-y-auto rounded-xl bg-surface-container-low/50 px-3 py-2'
+	);
 
 	/** Workspace-scoped pools; a task never links to itself. */
 	const wikiContext = $derived({
@@ -64,7 +91,7 @@
 	/** Recomputes the query from the live caret. */
 	function refreshSuggestions() {
 		const el = textareaEl;
-		if (!el || mode !== 'write') {
+		if (!el || !writes) {
 			suggestions = null;
 			return;
 		}
@@ -120,7 +147,7 @@
 
 	$effect(() => {
 		let cancelled = false;
-		if (!preview || mode !== 'preview' || !task || !detail.trim()) {
+		if (mode !== 'preview' || !task || !detail.trim()) {
 			html = '';
 			return;
 		}
@@ -149,28 +176,89 @@
 	}
 </script>
 
-{#if preview}
+{#if preview && !fill}
 	<div class="mb-1.5 flex justify-end">
 		<SegmentedControl
 			size="xs"
 			ariaLabel="Task details view"
 			items={[
 				{ id: 'write', label: 'Write' },
+				{ id: 'split', label: 'Split' },
 				{ id: 'preview', label: 'Preview' },
 			]}
-			value={mode}
-			onchange={(id) => (mode = id as 'write' | 'preview')}
+			value={localView}
+			onchange={(id) => (localView = id as TaskView)}
 		/>
 	</div>
 {/if}
 
-{#if preview && mode === 'preview'}
+{#if fill}
+	<div class="grid min-h-0 flex-1 overflow-hidden">
+		{#if showSplit}
+			<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
+				<Textarea
+					id="{idPrefix}-notes"
+					bind:ref={textareaEl}
+					bind:value={detail}
+					oninput={refreshSuggestions}
+					onkeydown={handleKeydown}
+					onkeyup={refreshFromKeyup}
+					onclick={refreshSuggestions}
+					onblur={() => (suggestions = null)}
+					variant="bare"
+					size="sm"
+					class={textareaClass}
+					placeholder="Context, links, next steps. Type [[ to link a note or task."
+				/>
+				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+				<div bind:this={previewEl} class={previewClass} onclick={handlePreviewClick}>
+					{#if html}
+						<div class="markdown-body">{@html html}</div>
+					{:else}
+						<p class="text-body-sm font-body text-outline">Nothing to preview yet.</p>
+					{/if}
+				</div>
+			</div>
+		{:else if showWrite}
+			<Textarea
+				id="{idPrefix}-notes"
+				bind:ref={textareaEl}
+				bind:value={detail}
+				oninput={refreshSuggestions}
+				onkeydown={handleKeydown}
+				onkeyup={refreshFromKeyup}
+				onclick={refreshSuggestions}
+				onblur={() => (suggestions = null)}
+				variant="bare"
+				size="sm"
+				class={textareaClass}
+				placeholder="Context, links, next steps. Type [[ to link a note or task."
+			/>
+		{:else}
+			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+			<div bind:this={previewEl} class={previewClass} onclick={handlePreviewClick}>
+				{#if html}
+					<div class="markdown-body">{@html html}</div>
+				{:else}
+					<p class="text-body-sm font-body text-outline">
+						This task has no details yet. Switch to Write to start.
+					</p>
+				{/if}
+			</div>
+		{/if}
+
+		<WikiLinkPopover
+			{open}
+			target={textareaEl}
+			items={suggestions?.items ?? []}
+			index={activeIndex}
+			onselect={choose}
+			onhover={(position) => (activeIndex = position)}
+		/>
+	</div>
+{:else if mode === 'preview'}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-	<div
-		bind:this={previewEl}
-		class="scrollbar-none max-h-64 overflow-y-auto rounded-xl bg-surface-container-low/50 px-3 py-2 [&_input[type='checkbox']]:pointer-events-none"
-		onclick={handlePreviewClick}
-	>
+	<div bind:this={previewEl} class={previewClass} onclick={handlePreviewClick}>
 		{#if html}
 			<div class="markdown-body">{@html html}</div>
 		{:else}

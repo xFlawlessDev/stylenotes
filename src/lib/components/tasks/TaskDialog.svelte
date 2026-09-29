@@ -6,7 +6,6 @@
 	import type { Folder } from '$lib/stores/notes';
 	import {
 		fromDateInput,
-		isTaskBlocked,
 		taskNoteIds,
 		taskPriority,
 		taskStatus,
@@ -18,7 +17,7 @@
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
-	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
+	import TaskDialogBody from '$lib/components/tasks/TaskDialogBody.svelte';
 	import DependencyEditor from '$lib/components/tasks/DependencyEditor.svelte';
 
 	let {
@@ -64,6 +63,8 @@
 
 	const folderOptions = $derived(folders.filter((item) => item.id !== 'all'));
 	const dateError = $derived(!!startDate && !!dueDate && dueDate < startDate);
+	/** Compact dialogs (small kanban windows) stay in one narrow column. */
+	const sideBySide = $derived(!compact);
 
 	$effect(() => {
 		if (open) {
@@ -147,45 +148,45 @@
 					? 'gap-3'
 					: 'gap-4'}"
 			>
-				<TaskFormFields
-					bind:title
-					bind:detail
-					bind:status
-					bind:priority
-					bind:folder
-					bind:noteIds
-					bind:startDate
-					bind:dueDate
-					{folders}
-					{notes}
-					{compact}
-					idPrefix="task-dialog"
-					autofocus
-				/>
+				{#if sideBySide}
+					<TaskDialogBody
+						task={task}
+						{folders}
+						{notes}
+						customFolders={[]}
+						allTasks={tasks}
+						{dependencies}
+						bind:title
+						bind:detail
+						bind:status
+						bind:priority
+						bind:folder
+						bind:noteIds
+						bind:startDate
+						bind:dueDate
+						onadddependency={onadddependency ? addDependencyFor : undefined}
+						onremovedependency={onremovedependency}
+					/>
+				{:else}
+					<TaskFormFields
+						bind:title
+						bind:detail
+						bind:status
+						bind:priority
+						bind:folder
+						bind:noteIds
+						bind:startDate
+						bind:dueDate
+						{folders}
+						{notes}
+						{compact}
+						idPrefix="task-dialog"
+						autofocus
+					/>
 
-				{#if onadddependency}
-					<section class="flex flex-col gap-2 rounded-xl bg-surface-container-low/60 p-2.5">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="text-label-md font-label font-medium text-on-surface">Dependencies</h3>
-							{#if task}
-								<BlockedIndicator blocked={isTaskBlocked(task, tasks, dependencies)} />
-							{/if}
-						</div>
-						{#if task}
-							{@const current = task}
-							<DependencyEditor
-								task={current}
-								{tasks}
-								{dependencies}
-								onadd={addDependencyFor}
-								onremove={onremovedependency}
-							/>
-						{:else}
-							<p class="text-label-sm font-label text-outline">
-								Save the task first, then edit it to add dependencies.
-							</p>
-						{/if}
-					</section>
+					{#if onadddependency}
+						{@render dependencySection()}
+					{/if}
 				{/if}
 			</div>
 
@@ -209,3 +210,20 @@
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
+
+{#snippet dependencySection()}
+	{#if task}
+		{@const current = task}
+		<DependencyEditor
+			task={current}
+			tasks={tasks}
+			{dependencies}
+			onadd={addDependencyFor}
+			onremove={onremovedependency}
+		/>
+	{:else}
+		<p class="text-label-sm font-label text-outline">
+			Save the task first, then edit it to add dependencies.
+		</p>
+	{/if}
+{/snippet}

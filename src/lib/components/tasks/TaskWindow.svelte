@@ -1,28 +1,30 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { emitTo, listen } from '@tauri-apps/api/event';
+	import { listen } from '@tauri-apps/api/event';
 	import { ListTodo, NotebookPen, History } from '@lucide/svelte';
-	import { createNote, type Note } from '$lib/content/content';
-	import { foldersFor, listNotes, loadFolders, persistNote, type CustomFolder } from '$lib/stores/notes';
+	import type { Note } from '$lib/content/content';
+	import { foldersFor, listNotes, loadFolders, type CustomFolder } from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
 	import { registerQuitFlush } from '$lib/stores/quit-flush';
 	import { versioning } from '$lib/stores/versioning';
 	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
+	import { createWikiController } from '$lib/content/wiki-controller';
+	import type { WikiEntity } from '$lib/content/wiki-links';
 	import {
 		applySettingsSnapshot,
 		hydrateSettings,
 		settings,
 		SETTINGS_CHANGED,
 		updateSettings,
-		type Settings
+		type Settings,
+		type TaskView
 	} from '$lib/stores/settings.svelte';
 	import {
 		applyTaskPatch,
 		fromDateInput,
 		taskPriority,
 		taskStatus,
-		isTaskBlocked,
 		taskNoteIds,
 		toDateInput,
 		type Task,
@@ -31,9 +33,9 @@
 		type TaskStatus
 	} from '$lib/stores/tasks';
 	import { persistTask, TASKS_CHANGED } from '$lib/stores/tasks.svelte';
-	import { detailWorkspaceId, listAllTasks, listWorkspaceTasks } from '$lib/stores/tasks.svelte';	import {
+	import { detailWorkspaceId, listAllTasks, listWorkspaceTasks } from '$lib/stores/tasks.svelte';
+	import {
 		addDependency,
-		dependencyStore,
 		DEPENDENCIES_CHANGED,
 		refreshDependencies,
 		removeDependency
@@ -41,21 +43,14 @@
 	import {
 		currentTaskId,
 		isTauri,
-		NOTE_HEADING_EVENT,
-		NOTE_WINDOW_PREFIX,
 		openNoteWindow,
-		openTaskInWorkspace,
 		revealAndFocusCurrentWindow
 	} from '$lib/windows';
-	import type { WikiClick, WikiEntity } from '$lib/content/wiki-links';
-	import { planWikiClick } from '$lib/content/wiki-navigation';
 	import { hydrateWorkspaces, workspaceStore } from '$lib/stores/workspaces.svelte';
 	import { startWorkspaceSync, workspaceLookup } from '$lib/workspace-sync.svelte';
-	import WorkspaceBadge from '$lib/components/workspace/WorkspaceBadge.svelte';
 	import DetailWindowHeader from '$lib/components/detail/DetailWindowHeader.svelte';
-	import TaskFormFields from '$lib/components/tasks/TaskFormFields.svelte';
-	import DependencyEditor from '$lib/components/tasks/DependencyEditor.svelte';
-	import BlockedIndicator from '$lib/components/tasks/BlockedIndicator.svelte';
+	import TaskWindowBody from '$lib/components/tasks/TaskWindowBody.svelte';
+	import TaskViewSwitcher from '$lib/components/tasks/TaskViewSwitcher.svelte';
 	import AmbiguousWikiDialog from '$lib/components/dialogs/AmbiguousWikiDialog.svelte';
 	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
 	import type { EntityVersion } from '$lib/content/version-types';
@@ -84,6 +79,8 @@
 	let candidateEntities = $state<WikiEntity[]>([]);
 	let candidatesOpen = $state(false);
 	let pendingHeading = $state<string | null>(null);
+	/** The window honors the setting on load, then owns the choice locally. */
+	let view = $state<TaskView>('write');
 	/** Workspace of the shown task; the window may follow a different one. */
 	let recordWorkspaceId = $state('workspace-default');
 
@@ -100,6 +97,15 @@
 	const foreignWorkspace = $derived(
 		!!task && (task.workspaceId ?? 'workspace-default') !== workspaceStore.activeId
 	);
+
+	const wiki = createWikiController({
+		flush: () => queue.flush(),
+		source: () => task,
+		notes: () => notes,
+		tasks: () => allTasks,
+		folders: () => customFolders,
+		onnotes: (next) => (notes = next)
+	});
 
 	/** Mirrors the loaded task into the form fields. */
 	$effect(() => {
@@ -214,43 +220,18 @@
 		return (await removeDependency(dependency)) ? null : 'Could not remove dependency.';
 	}
 
-	function showAmbiguous(entities: WikiEntity[], heading: string | null) {
-		candidateEntities = entities;
-		pendingHeading = heading;
-		candidatesOpen = entities.length > 0;
+	function handleWikiClick(click: Parameters<typeof wiki.resolve>[0]) {
+		const result = wiki.resolve(click);
+		if (result.status === 'choose') {
+			candidateEntities = result.entities;
+			pendingHeading = result.heading;
+			candidatesOpen = result.entities.length > 0;
+		}
 	}
 
-	async function openWikiTarget(entity: WikiEntity, heading: string | null) {
-		await queue.flush();
-		if (entity.kind === 'task') {
-			await openTaskInWorkspace(entity.id);
-			return;
-		}
-		await openNoteWindow(entity.id);
-		if (heading) await emitTo(`${NOTE_WINDOW_PREFIX}${entity.id}`, NOTE_HEADING_EVENT, { heading });
-	}
-
-	async function handleWikiClick(click: WikiClick) {
-		const current = task;
-		if (!current) return;
-		const plan = planWikiClick(click, current, notes, customFolders, allTasks);
-		if (!plan) return;
-		if (plan.status === 'open') {
-			await openWikiTarget(plan.entity, plan.heading);
-			return;
-		}
-		if (plan.status === 'choose') {
-			showAmbiguous(plan.entities, plan.heading);
-			return;
-		}
-		const created = createNote({
-			title: plan.title,
-			folder: plan.folder,
-			workspaceId: current.workspaceId,
-		});
-		if (!(await persistNote(created))) return;
-		notes = [created, ...notes];
-		await openWikiTarget({ ...created, kind: 'note' }, plan.heading);
+	function changeView(next: TaskView) {
+		view = next;
+		updateSettings({ taskView: next });
 	}
 
 	function toggleDock() {
@@ -303,6 +284,7 @@
 			await hydrateWorkspaces();
 			await startWorkspaceSync();
 			await hydrateSettings();
+			view = settings.taskView;
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
 			if (disposed) return;
@@ -364,6 +346,7 @@
 		onclose={closeWindow}
 	>
 		{#snippet actions()}
+			<TaskViewSwitcher {view} onview={changeView} />
 			{#if task && settings.versioningEnabled}
 				<Button
 					bare
@@ -397,46 +380,29 @@
 
 	{#if task}
 		{@const current = task}
-		<div class="scrollbar-none min-h-0 flex-1 overflow-y-auto p-3">
-			<TaskFormFields
-				bind:title
-				bind:detail
-				bind:status
-				bind:priority
-				bind:folder
-				bind:noteIds
-				bind:startDate
-				bind:dueDate
-				{folders}
-				{notes}
-				{task}
-				tasks={allTasks}
-				preview
-				onwikilink={handleWikiClick}
-				idPrefix="task-window"
-				autofocus={revealed}
-			/>
-			<section class="flex flex-col gap-2 rounded-xl bg-surface-container-low/60 p-2.5">
-				<div class="flex items-center justify-between gap-2">
-					<h2 class="text-label-md font-label font-medium text-on-surface">Task dependencies</h2>
-					<WorkspaceBadge
-						name={taskWorkspace.name}
-						color={taskWorkspace.color}
-						foreign={foreignWorkspace}
-					/>
-					<BlockedIndicator
-						blocked={isTaskBlocked(current, allTasks, dependencyStore.items)}
-					/>
-				</div>
-				<DependencyEditor
-					task={current}
-					tasks={allTasks}
-					dependencies={dependencyStore.items}
-					onadd={(id) => addTaskDependency(current.id, id)}
-					onremove={removeTaskDependency}
-				/>
-			</section>
-		</div>
+		<TaskWindowBody
+			task={current}
+			{view}
+			{folders}
+			{notes}
+			{customFolders}
+			{allTasks}
+			workspaceName={taskWorkspace.name}
+			workspaceColor={taskWorkspace.color}
+			{foreignWorkspace}
+			autofocus={revealed}
+			bind:title
+			bind:detail
+			bind:status
+			bind:priority
+			bind:folder
+			bind:noteIds
+			bind:startDate
+			bind:dueDate
+			onwikilink={handleWikiClick}
+			onadddependency={(id) => addTaskDependency(current.id, id)}
+			onremovedependency={removeTaskDependency}
+		/>
 	{:else}
 		<EmptyState
 			size="md"
@@ -459,7 +425,7 @@
 		bind:open={candidatesOpen}
 		entities={candidateEntities}
 		heading={pendingHeading}
-		onselect={(entity, heading) => void openWikiTarget(entity, heading)}
+		onselect={(entity, heading) => void wiki.open(entity, heading)}
 	/>
 	{#if task}
 		<RecordHistoryDialog

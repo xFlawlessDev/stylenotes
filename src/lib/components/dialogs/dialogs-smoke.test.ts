@@ -5,7 +5,7 @@ import AddTagDialog from './AddTagDialog.svelte';
 import ConfirmDialog from './ConfirmDialog.svelte';
 import CreateNoteDialog from './CreateNoteDialog.svelte';
 import MarkdownGuideDialog from './MarkdownGuideDialog.svelte';
-import TaskDialog from '$lib/components/tasks/TaskDialog.svelte';
+import TaskDialogHost from '$lib/components/tasks/dialog-test-host.svelte';
 
 const noop = () => {};
 
@@ -16,7 +16,8 @@ describe('dialogs', () => {
 			['AddFolderDialog', AddFolderDialog, { open: true, labels: [], onsubmit: noop }],
 			['CreateNoteDialog', CreateNoteDialog, { open: true, folders: [], onsubmit: noop }],
 			['MarkdownGuideDialog', MarkdownGuideDialog, { open: true }],
-			['TaskDialog', TaskDialog, { open: true, folders: [], notes: [], onsubmit: noop }],
+			// The view switcher's tooltips need the provider the app layout supplies.
+			['TaskDialog', TaskDialogHost, { open: true, folders: [], notes: [], onsubmit: noop }],
 			[
 				'ConfirmDialog',
 				ConfirmDialog,

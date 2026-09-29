@@ -23,6 +23,7 @@
 		updateSettings,
 		resetSettings,
 		type EditorView,
+		type TaskView,
 	} from '$lib/stores/settings.svelte';
 	import { appInfo } from '$lib/app-info';
 	import AppearanceSettings from '$lib/components/workspace/AppearanceSettings.svelte';
@@ -58,6 +59,12 @@
 	];
 
 	const views: { id: EditorView; label: string; icon: typeof Eye }[] = [
+		{ id: 'write', label: 'Write', icon: PenLine },
+		{ id: 'split', label: 'Split', icon: Columns2 },
+		{ id: 'preview', label: 'Preview', icon: Eye },
+	];
+
+	const taskViews: { id: TaskView; label: string; icon: typeof Eye }[] = [
 		{ id: 'write', label: 'Write', icon: PenLine },
 		{ id: 'split', label: 'Split', icon: Columns2 },
 		{ id: 'preview', label: 'Preview', icon: Eye },
@@ -141,6 +148,24 @@
 										class="py-3"
 										active={settings.editorView === item.id}
 										onclick={() => updateSettings({ editorView: item.id })}
+									/>
+								{/each}
+							</div>
+						</div>
+
+						<div class="flex flex-col gap-2.5">
+							<span class="text-label-sm font-label tracking-wider text-outline uppercase"
+								>Task window</span
+							>
+							<div class="grid grid-cols-3 gap-2">
+								{#each taskViews as item (item.id)}
+									<ChoiceTile
+										layout="stack"
+										icon={item.icon}
+										label={item.label}
+										class="py-3"
+										active={settings.taskView === item.id}
+										onclick={() => updateSettings({ taskView: item.id })}
 									/>
 								{/each}
 							</div>
