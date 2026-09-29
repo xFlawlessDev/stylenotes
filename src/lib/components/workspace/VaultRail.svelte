@@ -87,8 +87,16 @@
 		? 'max-lg:translate-x-0'
 		: 'max-lg:-translate-x-[120%]'}"
 >
-	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain">
-		<div class="flex items-center gap-2.5 px-1 py-1">
+	<!--
+		No single scrolling wrapper here. A rounded, padding-bearing parent clips
+		its children at the border box, so an inner scroll area taller than the
+		rail has its first and last rows shaved off by the corner radius. Each
+		region below therefore owns its own scroll inside a shrinking (but never
+		growing) flex column, and the rail keeps a floor so the row is always
+		reachable rather than collapsed.
+	-->
+	<div class="flex min-h-0 flex-1 flex-col gap-3 min-[420px]:min-h-[13.5rem]">
+		<div class="flex shrink-0 items-center gap-2.5 px-1 py-1">
 			<div
 				class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-hairline"
 			>
@@ -113,7 +121,7 @@
 			size="lg"
 			shape="tile"
 			block
-			class="justify-between px-3 active:scale-[0.99]"
+			class="shrink-0 justify-between px-3 active:scale-[0.99]"
 			onclick={oncreate}
 		>
 			<span class="flex items-center gap-2">
@@ -148,7 +156,7 @@
 				</div>
 			</div>
 			<nav
-				class="scrollbar-none flex min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
+				class="scrollbar-none flex max-h-[38vh] min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5 min-[420px]:shrink min-[420px]:max-h-none"
 				aria-label={t('notes.folders')}
 				use:reorder
 			>
@@ -182,7 +190,7 @@
 		</div>
 
 		{#if tags.length}
-			<div class="flex flex-col gap-2 border-t border-hairline px-1 pt-3">
+			<div class="flex shrink-0 flex-col gap-2 border-t border-hairline px-1 pt-3">
 				<div class="flex items-center justify-between">
 					<span class="text-label-sm font-label tracking-wider text-outline uppercase">{t('notes.tags')}</span>
 					{#if activeTag}
@@ -197,7 +205,7 @@
 					{/if}
 				</div>
 				<div
-					class="scrollbar-none flex max-h-[40vh] flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
+					class="scrollbar-none flex min-h-0 max-h-[32vh] flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
 				>
 					{#each tags as tag, i}
 						<Button
