@@ -13,7 +13,7 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 
 use crate::ai::crypto::CredentialCipher;
-use crate::ai::prompts::with_system_prompt;
+use crate::ai::prompts::{with_system_prompt, with_system_prompt_for_now};
 use crate::ai::provider::provider_for;
 use crate::ai::types::{AiError, ChatMessage, ProviderConfig, Role, StreamEvent, Task, ToolCall};
 
@@ -59,6 +59,10 @@ pub struct AiStreamRequest {
     pub messages: Vec<ChatMessage>,
     pub task: Task,
     pub instruction: Option<String>,
+    /// The user's wall clock in their timezone, pre-formatted by the frontend.
+    /// Absent (or blank) falls back to the machine's UTC clock.
+    #[serde(default)]
+    pub current_time: Option<String>,
     /// Carries the decrypted API key for this request only; never persisted.
     pub config: ProviderConfig,
 }
@@ -142,11 +146,21 @@ pub async fn ai_stream(
     on_event: Channel<EmittedEvent>,
 ) -> Result<(), String> {
     let request_id = request.request_id.clone();
-    let messages = with_system_prompt(
-        request.task,
-        request.instruction.as_deref(),
-        request.messages,
-    );
+    // The frontend resolves the timestamp against `settings.timezone`; a client
+    // that sends none falls back to the machine's UTC clock.
+    let messages = match request.current_time.as_deref().map(str::trim) {
+        Some(now) if !now.is_empty() => with_system_prompt_for_now(
+            request.task,
+            request.instruction.as_deref(),
+            now,
+            request.messages,
+        ),
+        _ => with_system_prompt(
+            request.task,
+            request.instruction.as_deref(),
+            request.messages,
+        ),
+    };
     let config = request.config;
     let provider = provider_for(&config);
 

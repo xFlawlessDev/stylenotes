@@ -53,6 +53,10 @@ describe('defaults', () => {
 		});
 		expect(accents.map((a) => a.id)).toContain('sage');
 	});
+
+	it('defaults the timezone to automatic', () => {
+		expect(defaultSettings().timezone).toBe('');
+	});
 });
 
 describe('applySettings', () => {
@@ -72,6 +76,12 @@ describe('applySettings', () => {
 		applySettings();
 		expect(document.documentElement.lang).toBe('id');
 		expect(localStorage.getItem('stylenotes.locale.v1')).toBe('id');
+	});
+
+	it('mirrors the timezone for a pre-hydration AI request', () => {
+		Object.assign(settings, { timezone: 'Asia/Jakarta' });
+		applySettings();
+		expect(localStorage.getItem('stylenotes.timezone.v1')).toBe('Asia/Jakarta');
 	});
 
 	it('mirrors a prepaint snapshot for the next launch', () => {

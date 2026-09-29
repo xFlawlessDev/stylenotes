@@ -41,6 +41,7 @@
 		onworkspacecreate,
 		onworkspacerename,
 		onworkspacedelete,
+		onworkspaceunsaved,
 	}: {
 		title?: string;
 		mode?: ThemeMode;
@@ -62,6 +63,13 @@
 		onworkspacecreate?: (name: string) => boolean | Promise<boolean>;
 		onworkspacerename?: (id: string, name: string) => boolean | Promise<boolean>;
 		onworkspacedelete?: (id: string) => boolean | Promise<boolean>;
+		/**
+		 * Dirty notes and tasks of a workspace, so the manage dialog can warn
+		 * before a delete throws away edits another window has not saved yet.
+		 */
+		onworkspaceunsaved?: (
+			id: string
+		) => { notes: string[]; tasks: string[] } | Promise<{ notes: string[]; tasks: string[] }>;
 	} = $props();
 
 	const sections = [
@@ -133,6 +141,7 @@
 				oncreate={onworkspacecreate}
 				onrename={onworkspacerename}
 				ondelete={onworkspacedelete}
+				unsaved={onworkspaceunsaved}
 			/>
 		{/if}
 

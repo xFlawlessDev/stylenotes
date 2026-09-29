@@ -9,6 +9,7 @@
 		type Density,
 	} from '$lib/stores/settings.svelte';
 	import LanguageSettings from './LanguageSettings.svelte';
+	import TimezoneSettings from './TimezoneSettings.svelte';
 	import UiPlugins from './UiPlugins.svelte';
 
 	const densities: { id: Density; key: string; icon: typeof Rows3 }[] = [
@@ -19,6 +20,7 @@
 
 <div class="flex min-w-0 flex-col gap-6">
 	<LanguageSettings />
+	<TimezoneSettings />
 
 	<Field label={t('settings.appearance.theme')} legend class="gap-2.5">
 		<div class="grid grid-cols-2 gap-2">

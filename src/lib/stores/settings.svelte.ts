@@ -42,6 +42,11 @@ export type Settings = {
 	detailAlwaysOnTop: boolean;
 	/** Keeps a local version history of note and task edits (Phase B). */
 	versioningEnabled: boolean;
+	/**
+	 * IANA timezone used for the assistant's "current time"
+	 * (`Asia/Jakarta`), or an empty string to follow the OS zone.
+	 */
+	timezone: string;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -73,6 +78,7 @@ const defaults: Settings = {
 	kanbanBoards: [],
 	detailAlwaysOnTop: true,
 	versioningEnabled: true,
+	timezone: '',
 };
 
 export function defaultSettings(): Settings {
@@ -138,6 +144,24 @@ export function persistSettings() {
 const PREPAINT_KEY = 'stylenotes.theme.v1';
 /** Mirror of the chosen language, read before paint in `app.html`. */
 const PREPAINT_LOCALE_KEY = 'stylenotes.locale.v1';
+/** Mirror of the chosen timezone, so the AI prompt can use it before hydration. */
+const PREPAINT_TIMEZONE_KEY = 'stylenotes.timezone.v1';
+
+/**
+ * Timezone preference for the assistant's current time: an IANA zone, or an
+ * empty string for the OS zone. Mirrored in `localStorage` so a request made
+ * before settings hydrate still uses the user's choice.
+ */
+export function timezonePreference(): string {
+	const chosen = settings.timezone;
+	if (chosen) return chosen;
+	if (!browser) return '';
+	try {
+		return localStorage.getItem(PREPAINT_TIMEZONE_KEY) ?? '';
+	} catch {
+		return '';
+	}
+}
 
 export function applySettings() {
 	if (!browser) return;
@@ -159,6 +183,7 @@ export function applySettings() {
 			})
 		);
 		localStorage.setItem(PREPAINT_LOCALE_KEY, settings.language);
+		localStorage.setItem(PREPAINT_TIMEZONE_KEY, settings.timezone);
 	} catch {
 		/* ignore */
 	}

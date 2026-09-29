@@ -130,6 +130,12 @@ export type AiStreamRequest = {
 	task: AiTask;
 	/** Optional extra instruction for `rewrite`/`custom`. */
 	instruction?: string;
+	/**
+	 * The user's current wall clock, pre-formatted with their timezone
+	 * (`2026-09-29 15:04:05 UTC+07:00`). Rust hydrates it into the system
+	 * prompt so the model knows "now".
+	 */
+	currentTime?: string;
 };
 
 /** One chunk delivered over the Tauri channel while streaming. */

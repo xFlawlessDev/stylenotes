@@ -22,6 +22,8 @@ import { aiRepo } from '$lib/db/ai';
 import { sanitizeThreadTitle, titlePrompt } from '$lib/content/ai-assistant';
 import { isTauri } from '$lib/windows';
 import { t } from '$lib/i18n/index.svelte';
+import { formatTimestampInZone, effectiveTimezone } from '$lib/content/timezone';
+import { timezonePreference } from '$lib/stores/settings.svelte';
 import {
 	AI_CHANGED,
 	aiReady,
@@ -155,6 +157,8 @@ export async function streamCompletion(options: {
 	messages: AiMessage[];
 	task: AiTask;
 	instruction?: string;
+	/** Overrides the hydrated clock; tests pin it for determinism. */
+	currentTime?: string;
 	onDelta?: (text: string) => void;
 	/** Called for each chain-of-thought chunk; never mixed into the answer. */
 	onReasoning?: (text: string) => void;
@@ -181,12 +185,15 @@ export async function streamCompletion(options: {
 	config.tools = options.tools ?? [];
 
 	const history = options.messages.slice(-AI_MAX_CONTEXT_MESSAGES).map((message) => ({ ...message }));
+	// One timestamp per completion, so every provider turn in a tool loop
+	// reports the same "now".
+	const currentTime = options.currentTime ?? currentTimeString();
 
 	aiStore.streaming = true;
 	try {
 		let full = '';
 		for (let step = 0; step < AI_MAX_TOOL_STEPS; step += 1) {
-			const turn = await runProviderTurn(config, history, options);
+			const turn = await runProviderTurn(config, history, { ...options, currentTime });
 			full += turn.text;
 
 			if (!turn.toolCalls.length) return full;
@@ -213,11 +220,23 @@ export async function streamCompletion(options: {
 	}
 }
 
+/** The user's wall clock in their chosen timezone, for the system prompt. */
+function currentTimeString(): string {
+	const zone = effectiveTimezone(timezonePreference());
+	return formatTimestampInZone(new Date(), zone);
+}
+
 /** One provider turn: text plus any fully assembled tool calls. */
 async function runProviderTurn(
 	config: Awaited<ReturnType<typeof providerConfig>>,
 	messages: AiMessage[],
-	options: { task: AiTask; instruction?: string; onDelta?: (text: string) => void; onReasoning?: (text: string) => void }
+	options: {
+		task: AiTask;
+		instruction?: string;
+		currentTime?: string;
+		onDelta?: (text: string) => void;
+		onReasoning?: (text: string) => void;
+	}
 ): Promise<{ text: string; toolCalls: AiToolCall[] }> {
 	const requestId = crypto.randomUUID();
 	let text = '';
@@ -246,6 +265,7 @@ async function runProviderTurn(
 		messages,
 		task: options.task,
 		instruction: options.instruction,
+		currentTime: options.currentTime,
 		config
 	};
 	await invoke('ai_stream', { request, onEvent: channel });
