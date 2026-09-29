@@ -11,6 +11,7 @@
  * ------------------------------------------------------------------ */
 :root,
 .dark {
+	color-scheme: dark;
 	--background: #0e1116;
 	--foreground: #dce3ee;
 	--card: #161b23;
@@ -137,6 +138,7 @@
  * Light mode (day / paper)                                          *
  * ------------------------------------------------------------------ */
 html.light {
+	color-scheme: light;
 	--background: #eef1f6;
 	--foreground: #1a222d;
 	--card: #ffffff;
