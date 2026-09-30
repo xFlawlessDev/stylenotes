@@ -1,9 +1,11 @@
 /**
  * Remote MCP orchestration (docs/design/constella-features.md #D12).
  *
- * Owns the listener lifecycle, the token (shown once, stored as a hash), and the
- * exposure mode. Switching mode rotates the token, because a token that was
- * visible on a narrower interface must not carry to a wider one.
+ * Owns the listener lifecycle, the token (encrypted at rest, shown once), and
+ * the exposure mode. The token is **reused across restarts** so a client
+ * config survives a laptop being closed and reopened; it is rotated only on an
+ * explicit rotate, or when the exposure mode changes — a credential seen on a
+ * narrower interface must not carry to a wider one.
  *
  * Device-local and secret-bearing: this state never enters the synced settings.
  */
@@ -50,34 +52,68 @@ export async function hydrateRemoteMcp(): Promise<void> {
 	const record = await remoteMcpRepo.load();
 	remoteMcpStore.mode = record.mode;
 	remoteMcpStore.tokenHint = record.tokenHint;
-	// A listener does not survive an app restart, so a stored `enabled: true` is
-	// reported as off rather than pretending the endpoint is live.
-	remoteMcpStore.enabled = false;
+	// Whether the listener is live is decided by `resumeRemoteMcp`; hydration
+	// only reflects the stored preference.
+	remoteMcpStore.enabled = record.enabled;
 	remoteMcpStore.running = false;
 	remoteMcpStore.hydrated = true;
 }
 
 /**
+ * Encrypts a token for storage, so the plaintext never lands in SQLite.
+ *
+ * Reuses the AI cipher: Rust owns crypto, the frontend owns persistence.
+ */
+async function sealToken(token: string): Promise<string | null> {
+	try {
+		return await invoke<string>('ai_encrypt_key', { key: token });
+	} catch {
+		return null;
+	}
+}
+
+/** Decrypts a stored token; `null` when it is missing or cannot be opened. */
+async function openToken(stored: string): Promise<string | null> {
+	if (!stored) return null;
+	try {
+		return await invoke<string>('ai_decrypt_key', { stored });
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Turns remote MCP on at `mode`.
  *
- * Returns the token once so the UI can show it; only the hash is persisted. The
- * listener binds loopback for `local`/`tunnel` and a detected private interface
- * for `lan` (never `0.0.0.0`).
+ * `token` is reused when supplied (a resume); otherwise a fresh one is minted,
+ * which is what a mode change or an explicit rotate wants. Only the encrypted
+ * token and its hash are persisted.
  */
-export async function enableRemoteMcp(mode: RemoteMcpMode): Promise<boolean> {
+export async function enableRemoteMcp(
+	mode: RemoteMcpMode,
+	token?: string | null
+): Promise<boolean> {
 	if (!browser || !isTauri) return false;
 	remoteMcpStore.busy = true;
 	remoteMcpStore.error = null;
 	try {
+		const args: { mode: string; token?: string } = { mode };
+		if (token) args.token = token;
 		const result = await invoke<{
 			token: string;
 			hash: string;
 			hint: string;
 			mode: string;
 			addresses: string[];
-		}>('remote_mcp_start', { mode });
+		}>('remote_mcp_start', args);
 
-		const saved = await remoteMcpRepo.saveToken(result.hash, result.hint);
+		const enc = await sealToken(result.token);
+		if (enc === null) {
+			await invoke('remote_mcp_stop').catch(() => undefined);
+			remoteMcpStore.error = 'Could not encrypt the token';
+			return false;
+		}
+		const saved = await remoteMcpRepo.saveToken(result.hash, result.hint, enc);
 		if (!saved) {
 			await invoke('remote_mcp_stop').catch(() => undefined);
 			remoteMcpStore.error = 'Could not store the token';
@@ -91,7 +127,9 @@ export async function enableRemoteMcp(mode: RemoteMcpMode): Promise<boolean> {
 
 		remoteMcpStore.enabled = true;
 		remoteMcpStore.mode = mode;
-		remoteMcpStore.token = result.token;
+		// Only surface the token when it is newly minted; a resume keeps the one
+		// the user already copied.
+		if (!token) remoteMcpStore.token = result.token;
 		remoteMcpStore.tokenHint = result.hint;
 		remoteMcpStore.addresses = result.addresses;
 		remoteMcpStore.running = true;
@@ -104,18 +142,35 @@ export async function enableRemoteMcp(mode: RemoteMcpMode): Promise<boolean> {
 	}
 }
 
-/** Stops the listener and forgets the token. The kill switch (#D12). */
+/**
+ * Restores the listener at app start when the user last left it enabled.
+ *
+ * Cheap enough to call from the workspace window: if remote MCP is off, or the
+ * stored token cannot be opened, it is a no-op.
+ */
+export async function resumeRemoteMcp(): Promise<void> {
+	if (!browser || !isTauri) return;
+	await hydrateRemoteMcp();
+	if (!remoteMcpStore.enabled || remoteMcpStore.running) return;
+	const record = await remoteMcpRepo.load();
+	if (!record.enabled) return;
+	const token = await openToken(record.tokenEnc);
+	if (!token) return;
+	await enableRemoteMcp(record.mode, token);
+}
+
+/** Stops the listener while keeping the token, so it can resume later. */
 export async function disableRemoteMcp(): Promise<boolean> {
 	if (!browser || !isTauri) return false;
 	remoteMcpStore.busy = true;
 	try {
 		await invoke('remote_mcp_stop');
+		// Keep the token: turning remote MCP back on should not force the user
+		// to update every client. The kill switch is "stop", not "forget".
 		const ok = await remoteMcpRepo.saveState({ enabled: false, mode: remoteMcpStore.mode });
-		await remoteMcpRepo.clearToken();
 		remoteMcpStore.enabled = false;
 		remoteMcpStore.running = false;
 		remoteMcpStore.token = null;
-		remoteMcpStore.tokenHint = '';
 		remoteMcpStore.addresses = [];
 		return ok;
 	} catch (error) {
@@ -133,7 +188,8 @@ export async function disableRemoteMcp(): Promise<boolean> {
 export async function changeRemoteMode(mode: RemoteMcpMode): Promise<boolean> {
 	if (mode === remoteMcpStore.mode && remoteMcpStore.running) return true;
 	if (remoteMcpStore.enabled) {
-		// Restart at the new mode, which mints and persists a fresh token.
+		// Restart at the new mode with no token, which mints and persists a fresh
+		// one; the old credential must not reach a wider interface.
 		return enableRemoteMcp(mode);
 	}
 	remoteMcpStore.mode = mode;
@@ -144,14 +200,25 @@ export async function changeRemoteMode(mode: RemoteMcpMode): Promise<boolean> {
 export async function rotateRemoteToken(): Promise<boolean> {
 	if (!browser || !isTauri) return false;
 	remoteMcpStore.busy = true;
+	remoteMcpStore.error = null;
 	try {
 		const result = await invoke<{ token: string; hash: string; hint: string }>(
 			'remote_mcp_rotate'
 		);
-		const saved = await remoteMcpRepo.saveToken(result.hash, result.hint);
+		const enc = await sealToken(result.token);
+		if (enc === null) {
+			remoteMcpStore.error = 'Could not encrypt the token';
+			return false;
+		}
+		const saved = await remoteMcpRepo.saveToken(result.hash, result.hint, enc);
 		if (!saved) {
 			remoteMcpStore.error = 'Could not store the token';
 			return false;
+		}
+		if (remoteMcpStore.running) {
+			// The live listener still holds the old hash; restart with the new
+			// token so the rotation takes effect immediately.
+			await enableRemoteMcp(remoteMcpStore.mode, result.token);
 		}
 		remoteMcpStore.token = result.token;
 		remoteMcpStore.tokenHint = result.hint;

@@ -193,32 +193,7 @@ fn grant_from_app_info(info: Option<&bridge::AppInfo>) -> Grant {
 }
 
 fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
-    let workspace = read::workspace_arg(args);
-    match name {
-        "list_notes" => read::list_notes(bridge, args),
-        "search_notes" => read::search_notes(bridge, args),
-        "get_note" => read::get_note(bridge, args, workspace.as_deref()),
-        "context" => read::context(bridge, args),
-        "list_tasks" => read_tasks::list_tasks(bridge, args),
-        "get_task" => read_tasks::get_task(bridge, args, workspace.as_deref()),
-        "task_board" => read_tasks::task_board(bridge, args),
-        "daily_summary" => read_tasks::daily_summary(bridge, args),
-        "list_dependencies" => read_deps::list_dependencies(bridge, args),
-        "critical_path" => read_deps::critical_path(bridge, args),
-        "graph_query" => read_graph::graph_query(bridge, args),
-        "list_workspaces" => read_workspaces::list_workspaces(bridge, args),
-        "list_folders" => read_workspaces::list_folders(bridge, args),
-        "list_tags" => read_workspaces::list_tags(bridge, args),
-        // Semantic tools execute inside the app (docs/design/constella-features.md
-        // #D15): vectors never enter the snapshot, so the shim has nothing to
-        // filter. The in-app assistant uses them through its own memory hook;
-        // an external client gets a clear reason instead of "unknown tool".
-        "semantic_search" | "related_notes" | "list_themes" | "find_contradictions" => protocol::tool_error(
-            "semantic_app_only",
-            "Semantic tools run inside StyleNotes. Use the in-app assistant, or ask the user to enable them.",
-        ),
-        other => protocol::tool_error("unknown_tool", format!("Unknown read tool `{other}`.")),
-    }
+    read::dispatch(name, bridge, args)
 }
 
 /// Protocol version this shim speaks; mirrors `mcp_host::MCP_PROTOCOL`.

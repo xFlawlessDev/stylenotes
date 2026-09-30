@@ -131,6 +131,14 @@ impl Bridge {
         self.root.join("app-info.json")
     }
 
+    /// Points the bridge at a known root (the app's `mcp/` directory).
+    ///
+    /// The remote HTTP listener runs inside the app and already knows that
+    /// directory from its `AppHandle`, so it does not guess like the shim does.
+    #[allow(dead_code)] // used by the app, not the shim binary sharing this file
+    pub fn at(root: PathBuf) -> Bridge {
+        Bridge { root }
+    }
     pub fn snapshot_path(&self) -> PathBuf {
         self.root.join("snapshot.json")
     }

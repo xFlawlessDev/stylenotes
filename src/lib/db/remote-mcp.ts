@@ -1,9 +1,10 @@
 /**
  * Storage for remote MCP (docs/design/constella-features.md #D12).
  *
- * Device-local and secret-bearing: the token is kept as a hash with a short
- * hint, so a leaked database file does not leak a usable credential. This row
- * must never enter the synced `settings` row.
+ * Device-local and secret-bearing: the token is kept encrypted at rest
+ * (`enc:v1:`, via the AI cipher), with a short hint for display. The hash is
+ * still stored so the listener can compare without decrypting. This row must
+ * never enter the synced `settings` row.
  *
  * Every write resolves to `boolean` so callers can surface a failure.
  */
@@ -17,6 +18,7 @@ type RemoteMcpRow = {
 	mode: string;
 	token_hash: string;
 	token_hint: string;
+	token_enc: string;
 	created_at: number | null;
 	rotated_at: number | null;
 };
@@ -30,6 +32,8 @@ export type RemoteMcpRecord = {
 	/** Never the token itself; only the hash is stored. */
 	tokenHash: string;
 	tokenHint: string;
+	/** The token encrypted at rest (`enc:v1:`), so it survives a restart. */
+	tokenEnc: string;
 	createdAt: number | null;
 	rotatedAt: number | null;
 };
@@ -39,8 +43,9 @@ const DEFAULT: RemoteMcpRecord = {
 	mode: 'local',
 	tokenHash: '',
 	tokenHint: '',
+	tokenEnc: '',
 	createdAt: null,
-	rotatedAt: null,
+	rotatedAt: null
 };
 
 function modeOf(raw: string): RemoteMcpMode {
@@ -53,8 +58,9 @@ function toRecord(row: RemoteMcpRow): RemoteMcpRecord {
 		mode: modeOf(row.mode),
 		tokenHash: row.token_hash ?? '',
 		tokenHint: row.token_hint ?? '',
+		tokenEnc: row.token_enc ?? '',
 		createdAt: row.created_at ?? null,
-		rotatedAt: row.rotated_at ?? null,
+		rotatedAt: row.rotated_at ?? null
 	};
 }
 
@@ -84,7 +90,7 @@ export const remoteMcpRepo = {
 			await ensureRow(db);
 			await db.execute('UPDATE remote_mcp SET enabled = $1, mode = $2 WHERE id = 1', [
 				state.enabled ? 1 : 0,
-				state.mode,
+				state.mode
 			]);
 			return true;
 		} catch {
@@ -93,18 +99,18 @@ export const remoteMcpRepo = {
 	},
 
 	/**
-	 * Stores a fresh token hash and hint. Called on enable and on every mode
-	 * change, because changing exposure must rotate the token (#D12).
+	 * Stores a token hash, hint and encrypted copy. The hash is what the
+	 * listener compares; `enc` is what lets the token survive a restart (#D12).
 	 */
-	async saveToken(hash: string, hint: string): Promise<boolean> {
+	async saveToken(hash: string, hint: string, enc: string): Promise<boolean> {
 		try {
 			const db = await getDb();
 			await ensureRow(db);
 			const now = Date.now();
 			await db.execute(
-				`UPDATE remote_mcp SET token_hash = $1, token_hint = $2,
-				 created_at = COALESCE(created_at, $3), rotated_at = $3 WHERE id = 1`,
-				[hash, hint, now]
+				`UPDATE remote_mcp SET token_hash = $1, token_hint = $2, token_enc = $3,
+				 created_at = COALESCE(created_at, $4), rotated_at = $4 WHERE id = 1`,
+				[hash, hint, enc, now]
 			);
 			return true;
 		} catch {
@@ -112,18 +118,18 @@ export const remoteMcpRepo = {
 		}
 	},
 
-	/** Forgets the token, e.g. on disable, so a stale hash never lingers. */
+	/** Forgets the token, e.g. on disable, so a stale secret never lingers. */
 	async clearToken(): Promise<boolean> {
 		try {
 			const db = await getDb();
 			await ensureRow(db);
 			await db.execute(
-				'UPDATE remote_mcp SET token_hash = ?, token_hint = ? WHERE id = 1',
-				['', '']
+				'UPDATE remote_mcp SET token_hash = ?, token_hint = ?, token_enc = ? WHERE id = 1',
+				['', '', '']
 			);
 			return true;
 		} catch {
 			return false;
 		}
-	},
+	}
 };

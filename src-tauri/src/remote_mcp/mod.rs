@@ -15,8 +15,3 @@ pub mod http;
 pub mod net;
 
 pub use net::REMOTE_MCP_PORT;
-
-// The shared protocol is compiled into both the shim and the app; a helper the
-// app does not call is still needed by the shim, so it is not dead code.
-#[allow(unused_imports)]
-pub use http::protocol;

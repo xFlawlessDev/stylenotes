@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use rand::RngCore;
 
 use crate::remote_mcp::http::{self, ListenerHandle};
-use crate::remote_mcp::net::{token_from_entropy, ExposureMode};
+use crate::remote_mcp::net::{hash_token, token_from_entropy, ExposureMode};
 
 /// Live listener, if any. `None` means remote MCP is off.
 #[derive(Default)]
@@ -54,24 +54,36 @@ fn mode_of(raw: &str) -> ExposureMode {
     ExposureMode::parse(raw)
 }
 
-/// Starts the listener and returns the new token. `mode` selects the bind.
+/// Starts the listener. With no `token`, mints a fresh one; with a stored
+/// `token`, reuses it so a restart does not invalidate the client config (#D12
+/// revised). `mode` selects the bind.
 ///
-/// The token is generated here and returned exactly once; the caller persists
-/// the hash that comes back in `RemoteStartResult`.
+/// The token is returned so the caller can persist it encrypted; only the hash
+/// is needed at request time.
 #[tauri::command]
 pub async fn remote_mcp_start(
     app: tauri::AppHandle,
     state: tauri::State<'_, RemoteState>,
     mode: String,
+    token: Option<String>,
 ) -> Result<RemoteStartResult, String> {
     let mode = mode_of(&mode);
-    // Rotate on every start: a stopped listener's token has no reason to live.
-    let mut entropy = [0_u8; 24];
-    rand::thread_rng().fill_bytes(&mut entropy);
-    let (token, record) = token_from_entropy(&entropy);
+    // Reuse a persisted token when given one; otherwise mint a new one. A mode
+    // change still passes no token, so the old credential cannot travel to a
+    // wider interface.
+    let token = match token.filter(|value| !value.trim().is_empty()) {
+        Some(existing) => existing,
+        None => {
+            let mut entropy = [0_u8; 24];
+            rand::thread_rng().fill_bytes(&mut entropy);
+            token_from_entropy(&entropy).0
+        }
+    };
+    let hint = format!("…{}", &token[token.len().saturating_sub(6)..]);
+    let hash = hash_token(&token);
 
     stop_listener(&state);
-    let handle = http::start(app, mode, record.hash.clone()).await?;
+    let handle = http::start(app, mode, hash.clone()).await?;
     // Report the address the listener actually bound, not the one we intended:
     // if the OS picked a different interface, the user must see the truth.
     let addresses = vec![format!("http://{}", handle.addr)];
@@ -82,8 +94,8 @@ pub async fn remote_mcp_start(
 
     Ok(RemoteStartResult {
         token,
-        hash: record.hash,
-        hint: record.hint,
+        hash,
+        hint,
         mode: mode.as_str().to_string(),
         addresses,
     })

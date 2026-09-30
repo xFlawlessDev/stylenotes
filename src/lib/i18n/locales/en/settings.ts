@@ -233,7 +233,7 @@ export const settings = {
 		},
 		remote: {
 			title: 'Remote access',
-			hint: 'Reach this app from another machine over HTTP. Off by default; loopback unless you choose otherwise.',
+			hint: 'Reach this app from another machine over HTTP. Off by default; loopback unless you choose otherwise. Stays on across restarts once enabled.',
 			exposure: 'Exposure',
 			mode: { local: 'This device', lan: 'Local network', tunnel: 'Tunnel' },
 			lanWarning:
@@ -247,7 +247,8 @@ export const settings = {
 			address: 'Endpoint',
 			token: 'Token',
 			tokenHint: 'Current token ends {hint}',
-			tokenOnce: 'Copy it now - it is shown once and never stored in full.',
+			tokenOnce:
+				'Copy it now - the full token is hidden after this. It stays the same across restarts until you rotate it.',
 			copy: 'Copy',
 			hide: 'Hide',
 			rotate: 'Rotate token',

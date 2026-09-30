@@ -13,6 +13,35 @@ mod mcp_watch;
 mod quit;
 mod remote_mcp;
 
+// The stdio shim's read side, compiled into the app as well so the remote HTTP
+// listener can answer reads from the snapshot exactly like the shim does (#D2,
+// #D3). These resolve `crate::bridge`/`crate::read`/`crate::protocol`, so they
+// must sit at the crate root. Only the read dispatch is used here; the rest of
+// each file exists for the shim binary, hence the shared-source allowance.
+#[allow(dead_code)]
+#[path = "mcp/bridge.rs"]
+mod bridge;
+#[allow(dead_code)]
+#[path = "mcp/protocol.rs"]
+mod protocol;
+#[allow(dead_code)]
+#[path = "mcp/read.rs"]
+mod read;
+#[allow(dead_code)]
+#[path = "mcp/read_deps.rs"]
+mod read_deps;
+#[allow(dead_code)]
+#[path = "mcp/read_graph.rs"]
+mod read_graph;
+#[allow(dead_code)]
+#[path = "mcp/read_tasks.rs"]
+mod read_tasks;
+#[allow(dead_code)]
+#[path = "mcp/read_workspaces.rs"]
+mod read_workspaces;
+#[path = "mcp/registry.rs"]
+mod registry;
+
 const DB_URL: &str = "sqlite:stylenotes.db";
 const WORKSPACE_LABEL: &str = "workspace";
 const OVERLAY_LABEL: &str = "overlay";
@@ -726,6 +755,20 @@ fn migrations() -> Vec<Migration> {
                 );
 
                 ALTER TABLE mcp_audit ADD COLUMN remote_addr TEXT NOT NULL DEFAULT '';
+            ",
+            kind: MigrationKind::Up,
+        },
+        // Persistent remote-MCP token (#D12, revised). The one-shot hash forced
+        // a new token on every enable, so a restart invalidated the client
+        // config. `token_enc` stores the same token encrypted at rest with the
+        // AI cipher (`enc:v1:` + `ai/secrets.key`); `token_hash` stays for
+        // back-compat but is no longer required to be the only copy. Still
+        // device-local: it must never reach the synced `settings` row.
+        Migration {
+            version: 23,
+            description: "remote_mcp_persistent_token",
+            sql: "
+                ALTER TABLE remote_mcp ADD COLUMN token_enc TEXT NOT NULL DEFAULT '';
             ",
             kind: MigrationKind::Up,
         },

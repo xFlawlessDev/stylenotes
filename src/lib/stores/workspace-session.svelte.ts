@@ -24,6 +24,7 @@ import {
 } from '$lib/workspace-sync.svelte';
 import { DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
 import { hydrateMemory, reindexEntity, startMemorySync } from '$lib/stores/memory.svelte';
+import { resumeRemoteMcp } from '$lib/stores/remote-mcp.svelte';
 
 /** The slice of workspace state the session hydration and listeners write to. */
 export type WorkspaceSessionState = {
@@ -53,6 +54,9 @@ export function startWorkspaceSession(
 			await hydrateWorkspaces();
 			await hydrateSettings();
 			await hydrateMemory().catch(() => undefined);
+			// Bring the remote MCP listener back if the user left it on, so a
+			// restart does not silently drop a running agent (#D12).
+			void resumeRemoteMcp().catch(() => undefined);
 			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),
 				loadFolders(),

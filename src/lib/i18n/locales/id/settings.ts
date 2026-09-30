@@ -233,7 +233,7 @@ export const settings: SettingsMessages = {
 		},
 		remote: {
 			title: 'Akses jarak jauh',
-			hint: 'Akses aplikasi ini dari mesin lain lewat HTTP. Nonaktif secara bawaan; hanya loopback kecuali kamu memilih lain.',
+			hint: 'Akses aplikasi ini dari mesin lain lewat HTTP. Nonaktif secara bawaan; hanya loopback kecuali kamu memilih lain. Tetap aktif setelah restart bila dinyalakan.',
 			exposure: 'Eksposur',
 			mode: { local: 'Perangkat ini', lan: 'Jaringan lokal', tunnel: 'Tunnel' },
 			lanWarning:
@@ -247,7 +247,8 @@ export const settings: SettingsMessages = {
 			address: 'Endpoint',
 			token: 'Token',
 			tokenHint: 'Token saat ini berakhiran {hint}',
-			tokenOnce: 'Salin sekarang - ditampilkan sekali dan tidak pernah disimpan utuh.',
+			tokenOnce:
+				'Salin sekarang - token utuh disembunyikan setelah ini. Token tetap sama setelah restart sampai kamu merotasinya.',
 			copy: 'Salin',
 			hide: 'Sembunyikan',
 			rotate: 'Rotasi token',

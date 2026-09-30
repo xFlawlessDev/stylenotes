@@ -374,10 +374,15 @@ di rumah/kantor (LAN) tanpa kami memaksa bind publik yang berbahaya.
 
 Prinsip yang dipertahankan di **semua** tingkat:
 
-- **Bearer token wajib.** Dibuat aplikasi, disimpan device-local (migrasi 22),
-  rotasi satu klik. Wajib bahkan untuk loopback — mencegah web lokal memanggil
-  API secara buta.
-- **Default mati**; satu toggle + dialog konfirmasi.
+- **Bearer token wajib.** Dibuat aplikasi, disimpan device-local (migrasi 22,
+  23), rotasi satu klik. Wajib bahkan untuk loopback — mencegah web lokal
+  memanggil API secara buta. **Token persisten antar restart** (revisi): disimpan
+  terenkripsi (`enc:v1:` + `ai/secrets.key`), bukan hanya hash, supaya config
+  klien tidak basi setiap kali laptop dibuka-tutup. Rotasi hanya pada klik
+  manual atau perpindahan tingkat, bukan pada setiap start.
+- **Default mati**; satu toggle + dialog konfirmasi. **Resume otomatis**: bila
+  user terakhir meninggalkannya menyala, listener dihidupkan lagi di mode
+  tersimpan saat app start (#D12 revisi).
 - **Plus/Pro saja** (#D13). Free tetap stdio saja.
 - **Transport Streamable HTTP** (MCP 2025-06-18).
 - Tetap **satu pintu tulis**: listener memanggil `mcp_host.rs` yang ada (job file
@@ -396,7 +401,8 @@ Prinsip yang dipertahankan di **semua** tingkat:
    mengubah catatanmu."* Tidak ada default, tidak ada "ingat pilihan".
 3. **Token berumur pendek + wajib rotasi pada perpindahan tingkat.** Naik dari
    Local ke LAN mengganti token, sehingga token lama yang mungkin bocor tidak
-   ikut terpapar ke jaringan.
+   ikut terpapar ke jaringan. (Token tetap stabil antar restart; yang merotasi
+   hanya perpindahan tingkat, bukan setiap start — lihat catatan revisi #D12.)
 4. **Rate limit per-IP** di tingkat listener (mis. 60 req/menit) untuk membatasi
    penyalahgunaan bila token bocor.
 5. **Audit mencatat alamat asal.** `mcp_audit` yang ada menambah kolom `remote_addr`,
@@ -555,6 +561,7 @@ konfirmasi → note dibuat/folder dibuat → graph langsung memperlihatkan tauta
 | **20** | `graph_suggestions` (lihat #D7). Index `(status)`, unik `(source_kind,source_id,target_kind,target_id,edge_kind)`. |
 | **21** | `clusters` (id, label, entity_kind, entity_id, run_id, score) — hasil clustering terakhir; kolom `run_id` supaya siklus lama bisa dibuang atomik. |
 | **22** | `remote_mcp` (mode `local|lan|tunnel`, token hash + hint, `created_at`, `rotated_at`) — device-local, berisi rahasia. Plus `ALTER TABLE mcp_audit ADD COLUMN remote_addr TEXT` untuk tingkat LAN (#D12). |
+| **23** | `ALTER TABLE remote_mcp ADD COLUMN token_enc TEXT` — token tersimpan terenkripsi (`enc:v1:` + `ai/secrets.key`) supaya persisten antar restart (#D12 revisi). `token_hash` tetap untuk perbandingan; device-local. |
 
 Catatan:
 - **Preferensi memory lewat `metaRepo`, bukan tabel baru (#Q2).** Embedder

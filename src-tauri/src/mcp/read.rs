@@ -464,6 +464,42 @@ fn score_context(note: &Value, needle: &str, body: bool) -> i64 {
     title_hits * 4 + tag_hits * 2 + body_hits
 }
 
+/// Runs one read tool against the snapshot, so the stdio shim and the remote
+/// HTTP listener share a single implementation (#D2, #D3).
+///
+/// `name` is guaranteed to be a registered read tool by the caller; an unknown
+/// name still answers with a clear `unknown_tool` error rather than panicking.
+pub fn dispatch(name: &str, bridge: &Bridge, args: &Value) -> Value {
+    let workspace = workspace_arg(args);
+    match name {
+        "list_notes" => list_notes(bridge, args),
+        "search_notes" => search_notes(bridge, args),
+        "get_note" => get_note(bridge, args, workspace.as_deref()),
+        "context" => context(bridge, args),
+        "list_tasks" => crate::read_tasks::list_tasks(bridge, args),
+        "get_task" => crate::read_tasks::get_task(bridge, args, workspace.as_deref()),
+        "task_board" => crate::read_tasks::task_board(bridge, args),
+        "daily_summary" => crate::read_tasks::daily_summary(bridge, args),
+        "list_dependencies" => crate::read_deps::list_dependencies(bridge, args),
+        "critical_path" => crate::read_deps::critical_path(bridge, args),
+        "graph_query" => crate::read_graph::graph_query(bridge, args),
+        "list_workspaces" => crate::read_workspaces::list_workspaces(bridge, args),
+        "list_folders" => crate::read_workspaces::list_folders(bridge, args),
+        "list_tags" => crate::read_workspaces::list_tags(bridge, args),
+        // Semantic tools execute inside the app (docs/design/constella-features.md
+        // #D15): vectors never enter the snapshot, so an external client gets a
+        // clear reason instead of an "unknown tool".
+        "semantic_search" | "related_notes" | "list_themes" | "find_contradictions" => fail(
+            "semantic_app_only",
+            "Semantic tools run inside StyleNotes. Use the in-app assistant, or ask the user to enable them.",
+        ),
+        other => fail(
+            "unknown_tool",
+            &format!("Unknown read tool `{other}`."),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -21,13 +21,7 @@ use tokio::net::TcpListener;
 
 use crate::mcp_host;
 use crate::remote_mcp::net::{request_is_trusted, token_matches, ExposureMode, REMOTE_MCP_PORT};
-
-/// The registry the remote endpoint advertises. Re-exported from the shim's
-/// module so the two never disagree on tool names (the drift test enforces it).
-#[path = "../mcp/protocol.rs"]
-pub mod protocol;
-#[path = "../mcp/registry.rs"]
-pub mod registry;
+use crate::{protocol, registry};
 
 /// How long the listener waits for the app to answer one forwarded call.
 const JOB_TIMEOUT_MS: u64 = 15_000;
@@ -282,10 +276,27 @@ async fn dispatch<R: tauri::Runtime>(
     }
 }
 
-/// Forwards one tool call as a job and waits for the workspace window's result.
+/// Answers a read tool from the app's snapshot, in-process (#D3).
 ///
-/// This mirrors the shim's `bridge::submit`: write `jobs/<id>.json`, poll
-/// `results/<id>.json`. Doing it here keeps a single execution path.
+/// This reuses the shim's `read::dispatch` so the two servers can never drift:
+/// a read the stdio client can run, the remote client can run identically.
+fn forward_read<R: tauri::Runtime>(state: &RemoteState<R>, tool: &str, args: &Value) -> Value {
+    let Some(root) = mcp_host::mcp_root(&state.app) else {
+        return protocol::tool_error(
+            "snapshot_unavailable",
+            "Snapshot unavailable; try again once the app settles.",
+        );
+    };
+    let bridge = crate::bridge::Bridge::at(root);
+    crate::read::dispatch(tool, &bridge, args)
+}
+
+/// Answers one tool call.
+///
+/// Reads are filtered from the snapshot in-process, exactly as the stdio shim
+/// does, so the remote endpoint never sends a read down the write pipe (#D3).
+/// Writes mirror the shim's `bridge::submit` — write `jobs/<id>.json`, poll
+/// `results/<id>.json` — so there is still only one write path (#D2).
 async fn forward<R: tauri::Runtime>(
     state: &RemoteState<R>,
     tool: &str,
@@ -295,6 +306,11 @@ async fn forward<R: tauri::Runtime>(
     let Some(descriptor) = registry::find(tool) else {
         return protocol::tool_error("unknown_tool", format!("Unknown tool `{tool}`."));
     };
+
+    if descriptor.kind == registry::ToolKind::Read {
+        return forward_read(state, tool, args);
+    }
+
     let id = format!("remote-{:x}-{}", peer.port(), now_millis());
     let workspace = args
         .get("workspace")
@@ -306,7 +322,7 @@ async fn forward<R: tauri::Runtime>(
     let grant = mcp_host::read_app_info(&state.app)
         .and_then(|info| info.grant)
         .unwrap_or_else(mcp_host::GrantInfo::read_only);
-    if descriptor.kind == registry::ToolKind::Write && !grant.allow_write(descriptor.scope) {
+    if !grant.allow_write(descriptor.scope) {
         return protocol::tool_error(
             "write_not_granted",
             format!("Write access for `{}` is off.", descriptor.scope),
