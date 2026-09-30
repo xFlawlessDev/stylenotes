@@ -64,6 +64,13 @@ export const ai = {
 		task: 'Task',
 		web: 'Web',
 		open: 'Open source',
+		openNote: 'Open note',
+		openTask: 'Open task',
+		openWeb: 'Open in browser',
+		noPreview: 'No preview available.',
+		fromNote: 'Cited note',
+		fromTask: 'Cited task',
+		fromWeb: 'Cited page',
 	},
 	context: {
 		note: 'Context — the note "{title}":',

@@ -23,6 +23,21 @@ export type CitationSource = {
 	title: string;
 	/** One-line description: an excerpt for notes, a snippet for web. */
 	description?: string;
+	/**
+	 * The text the tool actually returned for this source, when it carried any:
+	 * a note body for `get_note`, page text for `web_fetch`. List/search results
+	 * only carry an excerpt, so this stays undefined and the popover falls back
+	 * to the live record.
+	 */
+	content?: string;
+};
+
+/** The minimum shape a resolvable note/task needs, to preview a citation. */
+export type CitationEntity = {
+	id: string;
+	title: string;
+	/** The note/task text, when the caller has it. */
+	body?: string;
 };
 
 /** Reads the first string-ish field in a record, or undefined. */
@@ -106,7 +121,9 @@ function entitySource(entry: Record<string, unknown>): CitationSource | null {
 		ref,
 		id,
 		title,
-		description: pick(entry, ['excerpt', 'snippet', 'description'])
+		description: pick(entry, ['excerpt', 'snippet', 'description']),
+		// Only `get_note` ships the body; a list/search hit has just the excerpt.
+		content: pick(entry, ['body'])
 	};
 }
 
@@ -123,7 +140,9 @@ function webSource(entry: Record<string, unknown>): CitationSource | null {
 		ref: url,
 		id: url,
 		title,
-		description: pick(entry, ['snippet', 'description', 'excerpt'])
+		description: pick(entry, ['snippet', 'description', 'excerpt']),
+		// A fetched page carries its readable text; a search hit only a snippet.
+		content: pick(entry, ['text'])
 	};
 }
 
@@ -189,6 +208,28 @@ export function linkCiteMarkers(markdown: string, sources: CitationSource[]): st
 /** The source an inline marker points at, or null when it is out of range. */
 export function citationAt(sources: CitationSource[], index: number): CitationSource | null {
 	return sources.find((source) => source.index === index) ?? null;
+}
+
+/**
+ * The text a popover should show for a source.
+ *
+ * Prefers the live record, because a list/search hit only carries an excerpt
+ * while the note itself is right here — and the note may have been edited since
+ * the turn ran. Falls back to whatever the tool returned (a note body from
+ * `get_note`, page text from `web_fetch`, or the excerpt/snippet as a last
+ * resort). Returns an empty string when there is genuinely nothing to show, so
+ * the caller can hide the popover body rather than render a blank card.
+ */
+export function citationPreview(
+	source: CitationSource,
+	entities: CitationEntity[] = []
+): string {
+	if (source.kind !== 'web') {
+		const live = entities.find((entity) => entity.id === source.id);
+		const body = live?.body?.trim();
+		if (body) return body;
+	}
+	return source.content?.trim() || source.description?.trim() || '';
 }
 
 /** A compact label for a web source's hostname, e.g. `example.com`. */

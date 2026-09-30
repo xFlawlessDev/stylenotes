@@ -16,9 +16,10 @@
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
 	import { AI_TOOLS, toolDefinitions } from '$lib/content/ai-tool-schema';
 	import type { ToolTraceEntry } from '$lib/content/ai-trace';
-	import type { CitationSource } from '$lib/content/ai-citations';
+	import type { CitationEntity, CitationSource } from '$lib/content/ai-citations';
 	import { openExternalUrl } from '$lib/content/external-links';
-	import { loadToolContext } from '$lib/content/ai-context';
+	import { loadToolContext, snapshotNotice } from '$lib/content/ai-context';
+	import type { McpSnapshot } from '$lib/content/mcp-types';
 	import {
 		aiReady,
 		aiStore,
@@ -72,6 +73,14 @@
 	const turnCount = $derived(aiStore.messages.length);
 	const pool = $derived(mentionPool({ notes, tasks }, workspaceId));
 	const grant = $derived({ access: aiStore.settings.access, scopes: aiStore.settings.scopes });
+	/**
+	 * Live notes and tasks, so a citation preview shows the current text. Both
+	 * pools already carry `id`, `title` and `body`; a task's body is its notes.
+	 */
+	const citationEntities = $derived<CitationEntity[]>([
+		...notes.map((note) => ({ id: note.id, title: note.title, body: note.body })),
+		...tasks.map((task) => ({ id: task.id, title: task.title, body: task.body }))
+	]);
 
 	onMount(() => {
 		void hydrateAi();
@@ -133,7 +142,7 @@
 		const startedThinkingAt = Date.now();
 		try {
 			const context = { ...(await loadToolContext()), ask: requestUserAnswers };
-			const history = buildHistory(question);
+			const history = buildHistory(question, context.snapshot);
 			const output = await streamCompletion({
 				messages: history,
 				task: 'chat',
@@ -210,18 +219,32 @@
 	}
 
 	/**
-	 * Conversation turns sent to the provider, oldest first. The chat is global,
-	 * so there is no note-body context; every `@` mention is added instead.
+	 * Conversation turns sent to the provider, oldest first, preceded by the
+	 * context blocks. The chat is global, so there is no note-body context;
+	 * every `@` mention is added instead, alongside the notice that tells the
+	 * model when the snapshot itself was trimmed.
+	 *
+	 * The blocks sit in front because `trimHistory` keeps every system message
+	 * whatever its age. Unshifting them here made them the *first* thing a
+	 * long thread threw away — the question survived, the context attached to
+	 * it did not.
 	 */
-	function buildHistory(question: string): AiMessage[] {
-		const history: AiMessage[] = aiStore.messages.map((message) => ({
+	function buildHistory(question: string, snapshot: McpSnapshot): AiMessage[] {
+		const turns: AiMessage[] = aiStore.messages.map((message) => ({
 			role: message.role,
 			content: message.content
 		}));
+		// The question is normally already persisted by `appendMessage`; this
+		// keeps a failed write from sending a context-only request.
+		if (!turns.length) turns.push({ role: 'user', content: question });
+
+		const blocks: AiMessage[] = [];
+		const notice = snapshotNotice(snapshot);
+		if (notice) blocks.push({ role: 'system', content: notice });
 		for (const context of mentionedContext(question)) {
-			history.unshift({ role: 'system', content: context });
+			blocks.push({ role: 'system', content: context });
 		}
-		return history.length ? history : [{ role: 'user', content: question }];
+		return [...blocks, ...turns];
 	}
 
 	/** System blocks for the entities a message mentions. */
@@ -327,7 +350,12 @@
 				/>
 			{/if}
 
-			<AiMessageList messages={aiStore.messages} onwikilink={followWikiLink} onsource={openSource} />
+			<AiMessageList
+				messages={aiStore.messages}
+				entities={citationEntities}
+				onwikilink={followWikiLink}
+				onsource={openSource}
+			/>
 
 			{#if sending}
 				<div class="flex flex-col items-start gap-1">

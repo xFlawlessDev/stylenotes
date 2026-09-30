@@ -63,6 +63,13 @@ export const ai: AiMessages = {
 		task: 'Tugas',
 		web: 'Situs',
 		open: 'Buka sumber',
+		openNote: 'Buka catatan',
+		openTask: 'Buka tugas',
+		openWeb: 'Buka di peramban',
+		noPreview: 'Pratinjau tidak tersedia.',
+		fromNote: 'Catatan yang dikutip',
+		fromTask: 'Tugas yang dikutip',
+		fromWeb: 'Halaman yang dikutip',
 	},
 	context: {
 		note: 'Konteks — catatan "{title}":',

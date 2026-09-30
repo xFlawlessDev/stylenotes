@@ -4,6 +4,7 @@ import type { ToolResult } from '$lib/content/ai-tools';
 import type { ToolTraceEntry } from '$lib/content/ai-trace';
 import {
 	citationAt,
+	citationPreview,
 	collectCitations,
 	hostOf,
 	linkCiteMarkers
@@ -165,6 +166,97 @@ describe('citationAt', () => {
 		]);
 		expect(citationAt(sources, 1)?.title).toBe('Roadmap');
 		expect(citationAt(sources, 5)).toBeNull();
+	});
+});
+
+describe('collectCitations content capture', () => {
+	it('captures a note body from get_note', () => {
+		const sources = collectCitations([
+			entry('c1', 'get_note', { ok: true, data: note('n1', 'Roadmap', { body: 'Full body' }) })
+		]);
+		expect(sources[0].content).toBe('Full body');
+	});
+
+	it('captures fetched page text', () => {
+		const sources = collectCitations([
+			entry('c1', 'web_fetch', {
+				ok: true,
+				data: { url: 'https://example.com/a', text: 'Readable page text' }
+			})
+		]);
+		expect(sources[0].content).toBe('Readable page text');
+	});
+
+	it('leaves content undefined for a search hit with only a snippet', () => {
+		const sources = collectCitations([
+			entry('c1', 'web_search', {
+				ok: true,
+				data: { results: [{ title: 'Docs', url: 'https://example.com/a', snippet: 'hi' }] }
+			})
+		]);
+		expect(sources[0].content).toBeUndefined();
+	});
+});
+
+describe('citationPreview', () => {
+	it('prefers the live record body over the captured content', () => {
+		const sources = collectCitations([
+			entry('c1', 'get_note', {
+				ok: true,
+				data: note('n1', 'Roadmap', { body: 'Stale body' })
+			})
+		]);
+		const preview = citationPreview(sources[0], [
+			{ id: 'n1', title: 'Roadmap', body: 'Fresh live body' }
+		]);
+		expect(preview).toBe('Fresh live body');
+	});
+
+	it('falls back to the captured content when the record is gone', () => {
+		const sources = collectCitations([
+			entry('c1', 'get_note', { ok: true, data: note('n1', 'Roadmap', { body: 'Captured' }) })
+		]);
+		expect(citationPreview(sources[0], [])).toBe('Captured');
+	});
+
+	it('falls back to the description when nothing else is present', () => {
+		const sources = collectCitations([
+			entry('c1', 'search_notes', {
+				ok: true,
+				data: { notes: [note('n1', 'Roadmap', { excerpt: 'Only an excerpt' })] }
+			})
+		]);
+		expect(citationPreview(sources[0], [])).toBe('Only an excerpt');
+	});
+
+	it('uses the live body even without captured content', () => {
+		const sources = collectCitations([
+			entry('c1', 'search_notes', { ok: true, data: { notes: [note('n1', 'Roadmap')] } })
+		]);
+		expect(citationPreview(sources[0], [{ id: 'n1', title: 'Roadmap', body: 'Live' }])).toBe(
+			'Live'
+		);
+	});
+
+	it('never reads a live body for a web source', () => {
+		const sources = collectCitations([
+			entry('c1', 'web_fetch', {
+				ok: true,
+				data: { url: 'https://example.com/a', text: 'Page text' }
+			})
+		]);
+		// A same-id entity must not leak into a web preview.
+		const preview = citationPreview(sources[0], [
+			{ id: 'https://example.com/a', title: 'Docs', body: 'Not this' }
+		]);
+		expect(preview).toBe('Page text');
+	});
+
+	it('is empty when there is nothing to show', () => {
+		const sources = collectCitations([
+			entry('c1', 'search_notes', { ok: true, data: { notes: [note('n1', 'Roadmap')] } })
+		]);
+		expect(citationPreview(sources[0], [])).toBe('');
 	});
 });
 

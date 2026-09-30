@@ -8,18 +8,25 @@
 	 *
 	 * Ported from the Svelte AI Elements `Sources` block rather than vendored:
 	 * no shadcn `Collapsible`, just an explicit `<button>` + `$state`, matching
-	 * `AiReasoning`/`AiToolTrace`. A note or task opens in the app; a web source
-	 * opens in the user's browser. The list is derived from the turn's tool
-	 * traffic, so it stays truthful to what actually ran.
+	 * `AiReasoning`/`AiToolTrace`. Hovering a row previews it (`onhover`), and
+	 * clicking opens it (`onsource`): a note or task in the app, a web source in
+	 * the user's browser. The list is derived from the turn's tool traffic, so
+	 * it stays truthful to what actually ran.
 	 */
 	let {
 		sources,
 		/** Routes a note/task click the same way a wiki link does. */
 		onsource,
+		/** Reports a hovered row and its screen rect, for the preview card. */
+		onhover,
+		/** Reports the pointer leaving a row. */
+		onleave,
 		class: className = ''
 	}: {
 		sources: CitationSource[];
 		onsource?: (source: CitationSource) => void;
+		onhover?: (source: CitationSource, anchor: DOMRect) => void;
+		onleave?: () => void;
 		class?: string;
 	} = $props();
 
@@ -35,6 +42,12 @@
 		if (kind === 'web') return Globe;
 		if (kind === 'task') return ListChecks;
 		return FileText;
+	}
+
+	function hover(source: CitationSource, event: Event) {
+		if (event.currentTarget instanceof Element) {
+			onhover?.(source, event.currentTarget.getBoundingClientRect());
+		}
 	}
 </script>
 
@@ -61,6 +74,10 @@
 							type="button"
 							class="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-container-lowest/60"
 							onclick={() => onsource?.(source)}
+							onmouseenter={(event) => hover(source, event)}
+							onmouseleave={() => onleave?.()}
+							onfocus={(event) => hover(source, event)}
+							onblur={() => onleave?.()}
 						>
 							<span
 								class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-surface-container-lowest/80 text-label-sm font-label text-outline"
