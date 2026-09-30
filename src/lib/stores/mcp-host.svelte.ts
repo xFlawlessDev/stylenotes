@@ -22,6 +22,7 @@ import {
 	createTaskAction,
 	deleteNoteAction,
 	deleteTaskAction,
+	editNoteBodyAction,
 	linkTasksAction,
 	unlinkTasksAction,
 	updateNoteAction,
@@ -41,6 +42,7 @@ import { DEPENDENCIES_CHANGED } from '$lib/stores/dependencies.svelte';
 import { NOTES_CHANGED } from '$lib/stores/notes';
 import { TASKS_CHANGED } from '$lib/stores/tasks.svelte';
 import { hydrateMcp, mcpStore, MCP_CHANGED, startMcpSync, clearSnapshot, refreshMcpClients, refreshMcpAudit } from '$lib/stores/mcp.svelte';
+import { localToday } from '$lib/stores/settings.svelte';
 import { workspaceStore, reloadWorkspaces, WORKSPACES_CHANGED } from '$lib/stores/workspaces.svelte';
 import { isTauri } from '$lib/windows';
 import { mcpRepo } from '$lib/db/mcp';
@@ -116,6 +118,7 @@ export async function refreshMcpSnapshot(reason = 'change'): Promise<void> {
 			revision,
 			appRunning: true,
 			generatedAt,
+			today: localToday(),
 		});
 		await invoke('mcp_write_snapshot', { payload: JSON.stringify(snapshot) });
 		await invoke('mcp_write_app_info', {
@@ -269,6 +272,19 @@ async function runAction(job: McpJob): Promise<WriteOutcome> {
 				return { ok: false, error: 'busy_local_edit', message: 'That note has unsaved edits in this app.' };
 			}
 			return updateNoteAction(context, job.args);
+		}
+		case 'edit_note_body': {
+			const id = typeof job.args.id === 'string' ? job.args.id : '';
+			if (localNoteEditPending(id)) {
+				return { ok: false, error: 'busy_local_edit', message: 'That note has unsaved edits in this app.' };
+			}
+			const before = notes.find((note) => note.id === id);
+			if (before) {
+				// Same pre-change backup as update_note_body (§13a): a sweep is
+				// smaller than a rewrite, not less destructive.
+				await invoke('mcp_backup_note', { noteId: id, body: before.body, keep: MCP_NOTE_BACKUPS }).catch(() => undefined);
+			}
+			return editNoteBodyAction(context, job.args);
 		}
 		case 'delete_note': {
 			const id = typeof job.args.id === 'string' ? job.args.id : '';

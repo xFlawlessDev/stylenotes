@@ -1,6 +1,6 @@
 # Tool reference
 
-All 27 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
+All 28 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
 are executed by the running app. `workspace` is optional on every tool that
 takes it and falls back to `workspace-default`.
 
@@ -118,7 +118,7 @@ Each hit carries `score` and `neighbours { backlinks, outlinks, depth }`.
 |---|---|---|
 | `workspace`, `status`, `priority`, `folder` | string | exact match |
 | `dueBefore` | string | `YYYY-MM-DD`, strictly before |
-| `overdueOnly` | boolean | due date before the snapshot day and not `done` |
+| `overdueOnly` | boolean | due date before the user's local day and not `done` |
 | `includeDone` | boolean | default `true` |
 | `limit` | number | default 100, max 1000 |
 
@@ -154,6 +154,10 @@ Returns four fixed columns in order `todo, doing, review, done`, each with
 Returns `{ ok, openTasks, doneTasks, inProgress[], recentNotes[] }`. `inProgress`
 lists `doing` tasks by position; `recentNotes` are notes with the newest
 `updatedAt` (up to 10).
+
+This is a **status report, not a journal**: it reads tasks and recent notes and
+writes nothing. The snapshot's `today` field is the user's local day, which is
+what `overdueOnly` uses elsewhere.
 
 ### `list_dependencies`
 
@@ -234,6 +238,44 @@ re-file a note, or add the tags the recall tools rank by.
 
 ```json
 { "name": "update_note", "arguments": { "id": "abc-123/note-uuid", "patch": { "title": "Pricing model", "folder": "launch", "tags": ["spec", "pricing"] } } }
+```
+
+### `edit_note_body`
+
+Patch the body **in place**. Prefer this over `update_note_body` whenever you can
+name the text you want to change: you never have to read the note or send it
+back.
+
+| Argument | Type | Notes |
+|---|---|---|
+| `id` | string | **required** |
+| `op` | string | **required**; `replace` or `insert` |
+| `find` | string | `op: "replace"`; the exact text to find |
+| `replace` | string | `op: "replace"`; the replacement. `""` deletes |
+| `occurrence` | string | `op: "replace"`; `all` (default) or `once` |
+| `text` | string | `op: "insert"`; the text to add |
+| `position` | string | `op: "insert"`; `start` or `end` (default) |
+| `workspace` | string | |
+
+Returns `{ ok, note: { id, workspaceId, chars }, op, matched, replaced }`.
+
+**Refusals — all `bad_arguments`, and none of them write anything:**
+
+- `find` is empty. It would insert between every character.
+- `find` does not appear in the note. Check the exact text with `get_note`.
+- `occurrence: "once"` and `find` matches more than once. Add context, or pass
+  `"all"`.
+- `text` is empty for an insert; `op` or a `position` value is not in the set.
+
+`replace` is literal text, not a regex, and is case-sensitive. Matching is
+non-overlapping: `find: "aa"` in `"aaa"` matches once.
+
+Insert appends with exactly one blank line between the old body and the new
+text, whatever the body already ended with, and adds nothing to an empty body.
+
+```json
+{ "name": "edit_note_body", "arguments": { "id": "abc-123/note-uuid", "op": "replace", "find": "alnair", "replace": "stylenotes" } }
+{ "name": "edit_note_body", "arguments": { "id": "abc-123/note-uuid", "op": "insert", "text": "- reviewed the pricing model", "position": "end" } }
 ```
 
 ### `delete_note`

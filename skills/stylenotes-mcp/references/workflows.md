@@ -157,6 +157,8 @@ create calls fall back to `workspace-default` and the new workspace looks empty.
 
 ## Edit a note safely
 
+Whole-body rewrite — the expensive path. Only when you cannot name what changes.
+
 ```
 1. get_note          { id }        -> read the current body
 2. (compose the replacement body in full)
@@ -167,11 +169,44 @@ create calls fall back to `workspace-default` and the new workspace looks empty.
 `update_note_body` replaces the whole body. Preserve any existing content the
 user still wants; do not summarise it away.
 
+## Rename something everywhere in a note
+
+The token-cheap path, and the one to reach for by default.
+
+```
+1. edit_note_body { id, op: "replace", find: "alnair", replace: "stylenotes" }
+   -> { matched: 7, replaced: 7 }
+2. Report the count. Do not read the note back.
+```
+
+- Verify from `matched`/`replaced`, not with a follow-up `get_note`. That
+  re-read is exactly the cost this tool exists to avoid.
+- `find` must be literal and exact. Get it from `get_note` if you are unsure of
+  the spelling, spacing or capitalisation.
+- If `matched` is lower than you expected, your needle was too specific — or the
+  word appears with different case, which this tool does not match.
+- To change one occurrence among several, add surrounding context until `find`
+  is unique, then use `occurrence: "once"`. Do not settle for replacing the
+  wrong one.
+
+## Add to a note without reading it
+
+```
+1. list_notes / search_notes        -> find the note ref
+2. edit_note_body { id, op: "insert", text: "- new thought", position: "end" }
+```
+
+Use this for a running log, a daily entry, or any note that grows. It never
+reads the body, so it stays cheap no matter how long the note is.
+
 ## Rules of thumb
 
 - **A workspace is a vault.** StyleNotes is the user's second brain, kept local.
   Notes are thoughts, tasks are commitments, and the wiki links between notes are
   the point of the thing.
+- **Patch, don't rewrite.** `edit_note_body` for a change you can name,
+  `update_note_body` only when the whole body really must change. Rewriting a
+  long note to fix one word costs the user tokens and risks their prose.
 - **Recall beats invention.** When the user asks a question about their own
   world, answer from the vault and cite the note titles; never fill a gap from
   your own knowledge without saying so.

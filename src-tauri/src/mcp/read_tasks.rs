@@ -86,9 +86,7 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
                 .as_deref()
                 .is_none_or(|limit| task["dueAt"].as_str().is_some_and(|due| due < limit))
         })
-        .filter(|task| {
-            !overdue_only || is_overdue(task, snapshot["generatedAt"].as_str().unwrap_or(""))
-        })
+        .filter(|task| !overdue_only || is_overdue(task, &snapshot))
         .cloned()
         .collect();
 
@@ -102,25 +100,28 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
     ok(json!({ "ok": true, "total": total, "returned": items.len(), "tasks": items }))
 }
 
-/// Whether a task is overdue as of the snapshot's own generation time.
+/// Whether a task is overdue as of the snapshot's own day.
 ///
 /// `dueAt` is a plain `YYYY-MM-DD` string, so a lexicographic comparison against
-/// the `YYYY-MM-DD` prefix of the snapshot's ISO `generatedAt` is exact — no date
-/// library needed. A task is overdue when its due date is strictly before the
-/// snapshot day and it is not `done`. No due date means not overdue.
-fn is_overdue(task: &Value, generated_at: &str) -> bool {
+/// the snapshot's `today` field is exact — no date library needed. A task is
+/// overdue when its due date is strictly before that day and it is not `done`.
+/// No due date means not overdue.
+///
+/// `today` is the user's **local** day (#D19): slicing the UTC `generatedAt`
+/// made a task due today look not-yet-due for anyone east of UTC and overdue a
+/// day early for anyone west of it.
+fn is_overdue(task: &Value, snapshot: &Value) -> bool {
     if task["status"] == "done" {
         return false;
     }
     let Some(due) = task["dueAt"].as_str().filter(|due| !due.is_empty()) else {
         return false;
     };
-    let today = generated_at.get(..10).unwrap_or(generated_at);
-    if today.len() < 10 {
-        // A snapshot without a usable timestamp cannot judge overdue-ness;
-        // stay conservative rather than flag everything.
+    let Some(today) = snapshot["today"].as_str().filter(|today| today.len() >= 10) else {
+        // A snapshot without a usable day cannot judge overdue-ness; stay
+        // conservative rather than flag everything.
         return false;
-    }
+    };
     due < today
 }
 
@@ -294,24 +295,75 @@ mod tests {
         t
     }
 
+    /// A snapshot carrying only the field `is_overdue` reads.
+    fn snapshot_day(today: &str) -> Value {
+        json!({ "today": today })
+    }
+
     #[test]
     fn overdue_compares_due_against_snapshot_day() {
-        let today = "2026-09-29T10:00:00.000Z";
+        let snapshot = snapshot_day("2026-09-29");
         // Past due, still open -> overdue.
-        assert!(is_overdue(&dated("a", "todo", json!("2026-09-28")), today));
-        assert!(is_overdue(&dated("b", "doing", json!("2020-01-01")), today));
+        assert!(is_overdue(
+            &dated("a", "todo", json!("2026-09-28")),
+            &snapshot
+        ));
+        assert!(is_overdue(
+            &dated("b", "doing", json!("2020-01-01")),
+            &snapshot
+        ));
         // Due today is not overdue (strictly before).
-        assert!(!is_overdue(&dated("c", "todo", json!("2026-09-29")), today));
+        assert!(!is_overdue(
+            &dated("c", "todo", json!("2026-09-29")),
+            &snapshot
+        ));
         // Future due is not overdue — this was the bug: it used to be flagged.
-        assert!(!is_overdue(&dated("d", "todo", json!("2030-01-01")), today));
+        assert!(!is_overdue(
+            &dated("d", "todo", json!("2030-01-01")),
+            &snapshot
+        ));
         // Done tasks are never overdue.
-        assert!(!is_overdue(&dated("e", "done", json!("2026-09-01")), today));
+        assert!(!is_overdue(
+            &dated("e", "done", json!("2026-09-01")),
+            &snapshot
+        ));
         // No due date is never overdue.
-        assert!(!is_overdue(&dated("f", "todo", Value::Null), today));
+        assert!(!is_overdue(&dated("f", "todo", Value::Null), &snapshot));
     }
 
     #[test]
     fn overdue_is_conservative_without_a_usable_clock() {
-        assert!(!is_overdue(&dated("a", "todo", json!("2026-09-01")), ""));
+        assert!(!is_overdue(
+            &dated("a", "todo", json!("2026-09-01")),
+            &snapshot_day("")
+        ));
+        // A snapshot that predates the `today` field must not flag everything.
+        assert!(!is_overdue(
+            &dated("a", "todo", json!("2026-09-01")),
+            &json!({
+                "generatedAt": "2026-09-29T10:00:00.000Z"
+            })
+        ));
+    }
+
+    /// The regression #D19 exists to prevent: at 2026-09-29T18:00Z it is already
+    /// the 30th in Jakarta, so a task due on the 30th is not overdue there. Under
+    /// the old UTC-prefix rule it was compared against the 29th.
+    #[test]
+    fn overdue_uses_the_local_day_not_the_utc_day() {
+        let utc_day = snapshot_day("2026-09-29");
+        let jakarta_day = snapshot_day("2026-09-30");
+        let due_tomorrow_locally = dated("a", "todo", json!("2026-09-30"));
+
+        // Due "today" in Jakarta: not overdue there.
+        assert!(!is_overdue(&due_tomorrow_locally, &jakarta_day));
+        // The same task in UTC (where today is still the 29th) is due tomorrow.
+        assert!(!is_overdue(&due_tomorrow_locally, &utc_day));
+
+        // And a task due on Jakarta's yesterday IS overdue locally, even though
+        // UTC would still consider it due today.
+        let due_yesterday_locally = dated("b", "todo", json!("2026-09-29"));
+        assert!(is_overdue(&due_yesterday_locally, &jakarta_day));
+        assert!(!is_overdue(&due_yesterday_locally, &utc_day));
     }
 }

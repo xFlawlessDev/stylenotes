@@ -25,6 +25,7 @@ function snapshot(): McpSnapshot {
 		protocol: 1,
 		revision: 1,
 		generatedAt: '2026-01-01',
+		today: '2026-01-01',
 		truncated: false,
 		appRunning: true,
 		workspaces: [{ id: 'w1', name: 'Main' }],

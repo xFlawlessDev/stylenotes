@@ -34,7 +34,36 @@ export type SnapshotInput = {
 	revision: number;
 	appRunning: boolean;
 	generatedAt: string;
+	/**
+	 * The user's civil day as `YYYY-MM-DD` (#D19). Callers derive it from
+	 * `settings.timezone`; omitting it falls back to the UTC day so the snapshot
+	 * is never left without a usable date.
+	 */
+	today?: string;
 };
+
+/**
+ * The `YYYY-MM-DD` day a timestamp falls on in `timeZone`.
+ *
+ * An invalid or empty zone yields the UTC day rather than throwing: `timezone`
+ * is free-form user input, and a bad value must not be able to break the bridge.
+ */
+export function localDay(at: Date, timeZone?: string): string {
+	const iso = at.toISOString();
+	if (!timeZone) return iso.slice(0, 10);
+	try {
+		// `en-CA` formats as YYYY-MM-DD, which is the shape `dueAt` already uses,
+		// so a date comparison stays a plain string compare.
+		return new Intl.DateTimeFormat('en-CA', {
+			timeZone,
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).format(at);
+	} catch {
+		return iso.slice(0, 10);
+	}
+}
 
 /** Workspace id an entity belongs to, with the same fallback the DB uses. */
 function workspaceOf(record: { workspaceId?: string }): string {
@@ -72,6 +101,7 @@ export function buildMcpSnapshot(input: SnapshotInput): McpSnapshot {
 		protocol: MCP_PROTOCOL,
 		revision: input.revision,
 		generatedAt: input.generatedAt,
+		today: input.today ?? input.generatedAt.slice(0, 10),
 		truncated,
 		truncatedReason: reason ?? undefined,
 		appRunning: input.appRunning,

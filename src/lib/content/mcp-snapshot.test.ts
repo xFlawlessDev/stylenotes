@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createNote } from '$lib/content/content';
 import { createTask, isTaskBlocked, type TaskDependency } from '$lib/stores/tasks';
-import { buildMcpSnapshot } from '$lib/content/mcp-snapshot';
+import { buildMcpSnapshot, localDay } from '$lib/content/mcp-snapshot';
+import { MCP_PROTOCOL } from '$lib/content/mcp-types';
 
 const workspaces = [{ id: 'workspace-default', name: 'Personal', color: 'primary', createdAt: '' }];
 
@@ -19,7 +20,59 @@ function build(overrides: Partial<Parameters<typeof buildMcpSnapshot>[0]> = {}) 
 	});
 }
 
+describe('localDay', () => {
+	// 18:00 UTC: still the 29th in UTC, already the 30th in Jakarta.
+	const eveningUtc = new Date('2026-09-29T18:00:00.000Z');
+
+	it('follows the configured zone, not UTC', () => {
+		expect(localDay(eveningUtc, 'Asia/Jakarta')).toBe('2026-09-30');
+		expect(localDay(eveningUtc, 'UTC')).toBe('2026-09-29');
+	});
+
+	it('goes back a day for zones west of UTC', () => {
+		// 02:00 UTC on the 29th is still the 28th in Los Angeles.
+		const earlyUtc = new Date('2026-09-29T02:00:00.000Z');
+		expect(localDay(earlyUtc, 'America/Los_Angeles')).toBe('2026-09-28');
+	});
+
+	it('handles a half-hour offset zone', () => {
+		// Kolkata is +05:30, so the local day rolls over at 18:30 UTC.
+		expect(localDay(new Date('2026-09-29T18:30:00.000Z'), 'Asia/Kolkata')).toBe('2026-09-30');
+		expect(localDay(new Date('2026-09-29T18:29:00.000Z'), 'Asia/Kolkata')).toBe('2026-09-29');
+	});
+
+	it('follows DST rather than a fixed offset', () => {
+		// London is UTC in winter and +01:00 in summer.
+		expect(localDay(new Date('2026-01-15T23:30:00.000Z'), 'Europe/London')).toBe('2026-01-15');
+		expect(localDay(new Date('2026-07-15T23:30:00.000Z'), 'Europe/London')).toBe('2026-07-16');
+	});
+
+	it('falls back to the UTC day for an empty or unknown zone', () => {
+		expect(localDay(eveningUtc, '')).toBe('2026-09-29');
+		expect(localDay(eveningUtc, undefined)).toBe('2026-09-29');
+		// A user-typed value the runtime does not know must not break a read.
+		expect(localDay(eveningUtc, 'Mars/Olympus_Mons')).toBe('2026-09-29');
+	});
+
+	it('always produces the YYYY-MM-DD shape dueAt uses', () => {
+		for (const zone of ['Asia/Jakarta', 'America/Los_Angeles', 'UTC', 'Asia/Kolkata']) {
+			expect(localDay(eveningUtc, zone)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+		}
+	});
+});
+
 describe('buildMcpSnapshot', () => {
+	it('carries the day the caller passed, not the UTC day', () => {
+		const snapshot = build({ today: '2026-09-30' });
+		expect(snapshot.today).toBe('2026-09-30');
+		// `generatedAt` stays the full UTC timestamp; only `today` is the civil day.
+		expect(snapshot.generatedAt).toBe('2026-09-27T10:00:00.000Z');
+	});
+
+	it('defaults `today` to the UTC day when the caller omits it', () => {
+		expect(build().today).toBe('2026-09-27');
+	});
+
 	it('never exposes the display `updated` column', () => {
 		const note = createNote({ id: 'n1', title: 'A', updated: 'Baru saja' });
 		const snapshot = build({ notes: [note] });
@@ -77,7 +130,10 @@ describe('buildMcpSnapshot', () => {
 		const snapshot = build({ notes: [note] });
 		expect(snapshot.truncated).toBe(false);
 		expect(snapshot.notes[0].body).toBe('hello');
-		expect(snapshot.protocol).toBe(1);
+		// Asserts the constant, not a literal: a protocol bump should not need
+		// this test edited, and a snapshot that reports the wrong version is a
+		// `protocol_mismatch` at the shim.
+		expect(snapshot.protocol).toBe(MCP_PROTOCOL);
 		expect(snapshot.appRunning).toBe(true);
 	});
 });

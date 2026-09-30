@@ -10,7 +10,7 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes a **local** MCP server: 27 tools (14 read, 13 write) over stdio.
+StyleNotes exposes a **local** MCP server: 28 tools (14 read, 14 write) over stdio.
 A thin shim process talks to the running desktop app through a file bridge, so
 every write goes through the same validation the UI uses.
 
@@ -56,6 +56,9 @@ use; do not re-file, re-tag or rewrite a note that was not part of the request.
 5. **Ids are workspace-prefixed.** Every entity in a read response carries
    `ref` of the form `<workspaceId>/<entityId>`; `id` alone is the bare id.
    Both forms are accepted on input.
+6. **"Today" is the user's local day.** The snapshot's `today` field
+   (`YYYY-MM-DD`) is their civil date, not UTC — `overdueOnly` and any date you
+   reason about follow it. Do not compute a day yourself from `generatedAt`.
 
 See [references/tool-reference.md](references/tool-reference.md) for every tool's
 arguments and response shape, and
@@ -112,7 +115,25 @@ A correct write sequence for "mark the pricing task done":
 Do not skip step 2 when more than one candidate exists. `ambiguous_id` is
 returned instead of guessing when the same bare id exists in two workspaces.
 
-### Step 4 — verify a write with a fresh read
+### Step 4 — pick the cheapest body write
+
+Three tools change a note body, and picking the wrong one is the difference
+between sending 120 bytes and sending 40 KB. Choose by what you can name:
+
+| You can name | Use | Cost |
+|---|---|---|
+| The exact text to change | `edit_note_body { op: "replace", find, replace }` | Small — you never read the note back in |
+| Where to add, not what to change | `edit_note_body { op: "insert", text, position }` | Small — no read at all |
+| Nothing — the whole body must change | `update_note_body { id, body }` | Large — read it first, then send it all |
+
+Prefer `replace` even for one-word corrections. A rename like "`alnair` →
+`stylenotes`" or "version `0.1.0` → `0.2.0`" is exactly what it is for: one
+call, every occurrence, and the result tells you how many were replaced.
+
+`edit_note_body` never sends the body back to you, so verify from its `replaced`
+count instead of re-reading the note.
+
+### Step 5 — verify a write with a fresh read
 
 After any write, re-read the entity before reporting success to the user. The
 snapshot refreshes a moment after a write, so allow a short wait on a quick
@@ -132,8 +153,9 @@ These are the mistakes that make a correct server look broken:
   new edge would close a loop — read the existing edges with
   `list_dependencies` before concluding a refusal is wrong.
 - **Trusting `dueAt` strings as dates.** They are `YYYY-MM-DD`. `overdueOnly`
-  compares them against the snapshot's own day, so a task due in the future is
-  never overdue, and a `done` task never is.
+  compares them against the user's **local** day (`today` in the snapshot), so a
+  task due in the future is never overdue, a `done` task never is, and "today"
+  means today where the user is — not in UTC.
 - **Filing with a label instead of an id.** `folder` is an exact folder id in
   `list_notes` and in `update_note`; a display name silently matches nothing.
   Call `list_folders` first.
@@ -142,6 +164,12 @@ These are the mistakes that make a correct server look broken:
   `specs` as three unrelated themes.
 - **Editing a note's title or tags with `update_note_body`.** It replaces the
   body and leaves metadata alone. Metadata is `update_note`.
+- **Sweeping with `occurrence: "once"` on a repeated word.** It is refused, not
+  guessed. Either add surrounding context until `find` is unique, or mean it and
+  pass `"all"`.
+- **Reporting a body edit succeeded without checking `replaced`.** A match of 0
+  never happens — the call is refused — but `matched: 1, replaced: 1` on a word
+  you expected 7 times means your needle was too specific.
 - **Deleting without `confirm`.** `delete_note`, `delete_task` and
   `delete_workspace` return `bad_arguments` unless the call includes
   `confirm: true`. This is deliberate; confirm with the user first.
@@ -149,6 +177,9 @@ These are the mistakes that make a correct server look broken:
   `workspace-default` and the last remaining workspace with `last_workspace`.
 - **Reading a stale snapshot as truth.** Check `appRunning` in the response
   metadata; when false, the data is the last known state and writes will fail.
+- **Computing "today" from `generatedAt`.** That field is UTC. The snapshot's
+  `today` is the user's local day; for anyone outside UTC the two differ for
+  part of every day, and a date computed from `generatedAt` is off by one.
 - **Answering from the snapshot field you saw first.** A note's `body` may be
   truncated in index-only mode and a `list_notes` hit carries only an excerpt.
   Read the full note with `get_note` before quoting it back to the user.
@@ -182,6 +213,6 @@ Trace a dependency chain:
 
 ## Reference
 
-- [references/tool-reference.md](references/tool-reference.md) — all 27 tools, arguments, response fields.
+- [references/tool-reference.md](references/tool-reference.md) — all 28 tools, arguments, response fields.
 - [references/errors.md](references/errors.md) — error codes, causes, and fixes.
 - [references/workflows.md](references/workflows.md) — longer end-to-end recipes, including second-brain recall and capture.

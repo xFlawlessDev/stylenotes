@@ -125,6 +125,12 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Replace a note body (a backup copy is kept first).",
     },
     ToolDescriptor {
+        name: "edit_note_body",
+        kind: ToolKind::Write,
+        scope: "notes",
+        description: "Patch a note body in place: replace text or insert at start/end.",
+    },
+    ToolDescriptor {
         name: "update_note",
         kind: ToolKind::Write,
         scope: "notes",
@@ -248,6 +254,17 @@ fn schema_for(name: &str) -> Value {
             properties["patch"] = json!({ "type": "object" });
             required.push("id");
             required.push("patch");
+        }
+        "edit_note_body" => {
+            properties["id"] = json!({ "type": "string" });
+            properties["op"] = json!({ "type": "string" });
+            properties["find"] = json!({ "type": "string" });
+            properties["replace"] = json!({ "type": "string" });
+            properties["text"] = json!({ "type": "string" });
+            properties["occurrence"] = json!({ "type": "string" });
+            properties["position"] = json!({ "type": "string" });
+            required.push("id");
+            required.push("op");
         }
         "create_task" => {
             properties["title"] = json!({ "type": "string" });

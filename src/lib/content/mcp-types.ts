@@ -7,8 +7,14 @@
  * the TS host cannot drift on field names.
  */
 
-/** Bumped whenever the bridge or snapshot shape changes incompatibly. */
-export const MCP_PROTOCOL = 1;
+/**
+ * Bumped whenever the bridge or snapshot shape changes incompatibly.
+ *
+ * v2 (#D19): the snapshot gained `today`, the user's civil date. The shim
+ * requires it for date comparisons, so a v1 app gets `protocol_mismatch` and an
+ * "update StyleNotes" message instead of quietly comparing against the UTC day.
+ */
+export const MCP_PROTOCOL = 2;
 
 /** Error codes the shim and the host agree on. */
 export type McpErrorCode =
@@ -119,6 +125,15 @@ export type McpSnapshotMeta = {
 	protocol: number;
 	revision: number;
 	generatedAt: string;
+	/**
+	 * The user's civil date as `YYYY-MM-DD`, in the configured timezone (#D19).
+	 *
+	 * `generatedAt` is UTC; comparing a task's `dueAt` against its first ten
+	 * characters is wrong for anyone east or west of UTC, where the local day
+	 * differs from the UTC day for part of every day. Every date comparison the
+	 * shim makes MUST use this field, not `generatedAt`.
+	 */
+	today: string;
 	truncated: boolean;
 	appRunning: boolean;
 	/** Why the snapshot fell back to index-only mode, when it did. */

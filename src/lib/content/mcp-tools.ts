@@ -25,6 +25,7 @@ export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'list_tags', kind: 'read', scope: 'notes', description: 'Every tag in use, with how many notes carry it.' },
 	{ name: 'create_note', kind: 'write', scope: 'notes', description: 'Create a note from a title and body.' },
 	{ name: 'update_note_body', kind: 'write', scope: 'notes', description: 'Replace a note body (a backup copy is kept first).' },
+	{ name: 'edit_note_body', kind: 'write', scope: 'notes', description: 'Patch a note body in place: replace text or insert at start/end.' },
 	{ name: 'update_note', kind: 'write', scope: 'notes', description: 'Patch note metadata: title, folder, tags and pinned.' },
 	{ name: 'delete_note', kind: 'write', scope: 'notes', description: 'Delete a note; requires confirm: true.' },
 	{ name: 'create_task', kind: 'write', scope: 'tasks', description: 'Create a task, optionally linked to notes.' },

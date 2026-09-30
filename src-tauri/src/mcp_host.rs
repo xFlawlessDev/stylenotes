@@ -19,7 +19,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// Protocol version; must match `MCP_PROTOCOL` in `src/lib/content/mcp-types.ts`.
-pub const MCP_PROTOCOL: u32 = 1;
+///
+/// Bumped to 2 when the snapshot gained the `today` field (#D19): the shim now
+/// requires it, and a v1 app must be told to update rather than silently
+/// comparing due dates against the UTC day.
+pub const MCP_PROTOCOL: u32 = 2;
 
 const DB_FILE: &str = "stylenotes.db";
 const MCP_DIR: &str = "mcp";

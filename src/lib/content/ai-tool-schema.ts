@@ -196,6 +196,34 @@ export const AI_TOOLS: AiToolSpec[] = [
 			},
 			required: ['id', 'patch']
 		}),
+	tool('edit_note_body', 'Edit note', 'notes', 'write',
+		'Patch a note body in place, without sending the whole note back. Prefer this over update_note_body whenever you can name the text you want to change: `op: "replace"` for a rename or version bump that may appear many times, `op: "insert"` to add to the start or end. The result reports how many matches were found and replaced, so you can verify without re-reading the note.',
+		{
+			type: 'object',
+			properties: {
+				id: { type: 'string' },
+				op: {
+					type: 'string',
+					enum: ['replace', 'insert'],
+					description: 'replace: swap text. insert: add text at the start or end.'
+				},
+				find: { type: 'string', description: 'For op "replace": the exact text to find. Copy it from get_note.' },
+				replace: { type: 'string', description: 'For op "replace": the text to put in its place. Use "" to delete.' },
+				occurrence: {
+					type: 'string',
+					enum: ['all', 'once'],
+					description: 'For op "replace". Defaults to "all". "once" is refused unless find is unique.'
+				},
+				text: { type: 'string', description: 'For op "insert": the text to add.' },
+				position: {
+					type: 'string',
+					enum: ['start', 'end'],
+					description: 'For op "insert". Defaults to "end".'
+				},
+				workspace
+			},
+			required: ['id', 'op']
+		}),
 	tool('create_task', 'Create task', 'tasks', 'write',
 		'Create a task, optionally linked to notes.',
 		{

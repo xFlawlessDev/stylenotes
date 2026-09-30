@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { emit } from '@tauri-apps/api/event';
 import { settingsRepo } from '$lib/db';
 import type { DockEdge } from '$lib/dock';
+import { localDay } from '$lib/content/mcp-snapshot';
 import type { OverlaySort, TaskPriorityFilter, TaskStatus } from '$lib/stores/tasks';
 import { isTauri } from '$lib/windows';
 
@@ -161,6 +162,19 @@ export function timezonePreference(): string {
 	} catch {
 		return '';
 	}
+}
+
+/**
+ * The user's civil day (`YYYY-MM-DD`) in their chosen timezone.
+ *
+ * The single source for "today" anywhere outside the browser's own formatting.
+ * The MCP snapshot carries it so the shim can compare task due dates without
+ * owning a timezone library, and the assistant's prompt uses the same value.
+ * Falls back to the UTC day when no zone is set or the value is not a zone the
+ * runtime knows — a bad setting must never break a read.
+ */
+export function localToday(at: Date = new Date()): string {
+	return localDay(at, timezonePreference());
 }
 
 export function applySettings() {

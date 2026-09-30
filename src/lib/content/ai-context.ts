@@ -14,6 +14,7 @@ import { listAllNotes } from '$lib/stores/notes';
 import { listAllTasks } from '$lib/stores/tasks.svelte';
 import { loadWebHooks } from '$lib/stores/ai-web.svelte';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
+import { localToday } from '$lib/stores/settings.svelte';
 import { dependenciesRepo } from '$lib/db';
 
 /** Loads notes, tasks, dependencies and workspaces into a tool context. */
@@ -49,7 +50,8 @@ export async function loadToolContext(): Promise<ToolContext> {
 		workspaces: workspaceStore.items,
 		revision: Date.now(),
 		appRunning: true,
-		generatedAt: new Date().toISOString()
+		generatedAt: new Date().toISOString(),
+		today: localToday()
 	});
 
 	return { snapshot, write, web };

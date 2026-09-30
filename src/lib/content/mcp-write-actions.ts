@@ -1,5 +1,5 @@
 /**
- * Write actions for MCP tool calls (docs/design/mcp-local-free.md #D2, §13b).
+ * Task and dependency write actions for MCP tool calls (docs/design/mcp-local-free.md #D2, §13b).
  *
  * These run inside the always-alive `workspace` window, not in the shim. They
  * go through repositories with an explicit `workspaceId` — the stores are
@@ -7,10 +7,10 @@
  * call — but they validate explicitly first (`canAddDependency`,
  * `applyTaskPatch`) and then emit the same `*-changed` events the UI already
  * listens for, so every open window refreshes without a restart.
+ *
+ * Note actions live in `mcp-note-actions.ts` and are re-exported below.
  */
 
-import { buildExcerpt, countWords, createNote, type Note } from '$lib/content/content';
-import { formatRelative } from '$lib/content/version-format';
 import {
 	fail,
 	findNote,
@@ -45,180 +45,27 @@ export type { WriteContext, WriteOutcome } from '$lib/content/mcp-write-context'
 export { parseEntityRef, resolveWorkspace, unsavedInWorkspace } from '$lib/content/mcp-write-context';
 
 // --- notes ------------------------------------------------------------------
-
-export type CreateNoteArgs = {
-	title?: unknown;
-	body?: unknown;
-	folder?: unknown;
-	tags?: unknown;
-	workspace?: string;
-};
-
-export async function createNoteAction(
-	context: WriteContext,
-	args: CreateNoteArgs
-): Promise<WriteOutcome> {
-	const workspace = resolveWorkspace(context, args.workspace);
-	if (!workspace.ok) return workspace;
-	const note = createNote({
-		title: typeof args.title === 'string' ? args.title : undefined,
-		body: typeof args.body === 'string' ? args.body : undefined,
-		folder: typeof args.folder === 'string' ? args.folder : undefined,
-		tags: Array.isArray(args.tags) ? args.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
-		workspaceId: workspace.id,
-		updatedAt: Date.now(),
-	});
-	note.updated = formatRelative(note.updatedAt ?? Date.now());
-	try {
-		await notesRepo.upsert(note);
-	} catch {
-		return fail('write_failed', 'The note could not be saved.');
-	}
-	await notify(NOTES_CHANGED);
-	return { ok: true, data: { note: { id: note.id, workspaceId: note.workspaceId, title: note.title } } };
-}
-
-export type UpdateNoteBodyArgs = { id?: unknown; body?: unknown; workspace?: string };
-
-/**
- * Replaces a note body. The host writes a backup first (§13a), so this stays a
- * plain, validated mutation.
- */
-export async function updateNoteBodyAction(
-	context: WriteContext,
-	args: UpdateNoteBodyArgs
-): Promise<WriteOutcome> {
-	if (typeof args.body !== 'string') return fail('bad_arguments', '`body` is required.');
-	if (typeof args.id !== 'string') return fail('bad_arguments', '`id` is required.');
-	const found = noteOrError(context, args.id);
-	if (!('found' in found)) return found;
-	const note = found.found;
-	const gone = workspaceGone(context, note.workspaceId);
-	if (gone) return gone;
-	const updatedAt = Date.now();
-	const next = {
-		...note,
-		body: args.body,
-		excerpt: buildExcerpt(args.body),
-		words: countWords(args.body),
-		chars: args.body.length,
-		updated: formatRelative(updatedAt),
-		updatedAt,
-	};
-	try {
-		await notesRepo.upsert(next);
-	} catch {
-		return fail('write_failed', 'The note could not be saved.');
-	}
-	await notify(NOTES_CHANGED);
-	return { ok: true, data: { note: { id: next.id, workspaceId: next.workspaceId, chars: next.chars } } };
-}
-
-export type DeleteNoteArgs = { id?: unknown; workspace?: string };
-
-/**
- * Metadata-only patch for a note: title, folder, tags, pinned.
- *
- * `update_note_body` owns the prose; this owns everything around it, so an
- * agent that captured a note into the wrong folder or without tags can fix it
- * afterwards (#D17). An absent key means "leave it"; `null` is ignored too,
- * because there is no meaningful null for a title or a folder.
- */
-export type NotePatch = {
-	title?: string;
-	folder?: string;
-	tags?: string[];
-	pinned?: boolean;
-};
-
-export type UpdateNoteArgs = { id?: unknown; patch?: unknown; workspace?: string };
-
-export function sanitizeNotePatch(raw: Record<string, unknown>): NotePatch {
-	const patch: NotePatch = {};
-	if (typeof raw.title === 'string' && raw.title.trim()) patch.title = raw.title.trim();
-	if (typeof raw.folder === 'string' && raw.folder.trim()) patch.folder = raw.folder.trim();
-	if (Array.isArray(raw.tags)) {
-		patch.tags = [
-			...new Set(raw.tags.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean))
-		];
-	}
-	if (typeof raw.pinned === 'boolean') patch.pinned = raw.pinned;
-	return patch;
-}
-
-/**
- * True when the patch asks for a title that is blank.
- *
- * A blank title is rejected rather than dropped: dropping it would turn the call
- * into a silent no-op that still reports success, and a model that meant to
- * rename a note has no way to notice.
- */
-export function hasBlankTitle(raw: unknown): boolean {
-	if (!raw || typeof raw !== 'object') return false;
-	const title = (raw as Record<string, unknown>).title;
-	return typeof title === 'string' && !title.trim();
-}
-
-export async function updateNoteAction(
-	context: WriteContext,
-	args: UpdateNoteArgs
-): Promise<WriteOutcome> {
-	if (typeof args.id !== 'string') return fail('bad_arguments', '`id` is required.');
-	const found = noteOrError(context, args.id);
-	if (!('found' in found)) return found;
-	const note = found.found;
-	const gone = workspaceGone(context, note.workspaceId);
-	if (gone) return gone;
-	if (!args.patch || typeof args.patch !== 'object') {
-		return fail('bad_arguments', '`patch` is required.');
-	}
-	if (hasBlankTitle(args.patch)) {
-		return fail('bad_arguments', '`title` must not be empty.');
-	}
-	const patch = sanitizeNotePatch(args.patch as Record<string, unknown>);
-	const next = { ...note, ...patch };
-	// A note cannot be without a title, and an empty patch would otherwise
-	// report success while changing nothing.
-	if (!next.title.trim()) return fail('bad_arguments', '`title` must not be empty.');
-	try {
-		await notesRepo.upsert(next);
-	} catch {
-		return fail('write_failed', 'The note could not be saved.');
-	}
-	await notify(NOTES_CHANGED);
-	return {
-		ok: true,
-		data: {
-			note: {
-				id: next.id,
-				workspaceId: next.workspaceId,
-				title: next.title,
-				folder: next.folder,
-				tags: next.tags,
-				pinned: next.pinned
-			}
-		}
-	};
-}
-
-export async function deleteNoteAction(
-	context: WriteContext,
-	args: DeleteNoteArgs
-): Promise<WriteOutcome> {
-	if (typeof args.id !== 'string') return fail('bad_arguments', '`id` is required.');
-	const found = noteOrError(context, args.id);
-	if (!('found' in found)) return found;
-	const note = found.found;
-	const gone = workspaceGone(context, note.workspaceId);
-	if (gone) return gone;
-	try {
-		await notesRepo.remove(note.id);
-	} catch {
-		return fail('write_failed', 'The note could not be deleted.');
-	}
-	await notify(NOTES_CHANGED);
-	return { ok: true, data: { deleted: note.id, workspaceId: note.workspaceId } };
-}
+// Note actions live in `mcp-note-actions.ts` so this module stays under the
+// repo file-size cap. Re-exported here because the host dispatches every tool
+// from one place and the unit tests import the actions by these names.
+export {
+	createNoteAction,
+	deleteNoteAction,
+	editNoteBodyAction,
+	hasBlankTitle,
+	resolveBodyEdit,
+	sanitizeNotePatch,
+	updateNoteAction,
+	updateNoteBodyAction
+} from '$lib/content/mcp-note-actions';
+export type {
+	CreateNoteArgs,
+	DeleteNoteArgs,
+	EditNoteBodyArgs,
+	NotePatch,
+	UpdateNoteArgs,
+	UpdateNoteBodyArgs
+} from '$lib/content/mcp-note-actions';
 
 // --- tasks ------------------------------------------------------------------
 

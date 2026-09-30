@@ -260,6 +260,7 @@ Nama tool = verba + objek, semua di `mcp-tools.ts` (satu sumber untuk handshake 
 | Tulis | `create_note` | write | Note baru (title, body, folder, tags, `overlay`) |
 | | `update_note_body` | write | Ubah body note — **V1** (#D16). Hanya mode `write`; ditolak bila ada edit lokal yang belum ter-persist (#D4) |
 | | `update_note` | write | **#D17** — patch metadata note (`title`, `folder`, `tags`, `pinned`). Tidak menyentuh body |
+| | `edit_note_body` | write | **#D18** — edit terarah: `replace { find, replace, occurrence }` atau `insert { text, position }`. Hemat token; tidak ada regex |
 | | `delete_note` | write | Hapus note — **V1** (#D16) + butuh `confirm: true`. Hard delete, tanpa tombstone (#13a) |
 | | `create_task` | write | Task baru (title, status, priority, folder, `startAt`, `dueAt`, `noteIds`) |
 | | `update_task` | write | Patch field task |
@@ -801,6 +802,126 @@ baris ke daily note hari ini" tetap harus lewat baca penuh → `update_note_body
 karena append butuh format pemisah yang tidak boleh ditebak app. Menambah tool
 baru untuk itu = menebak struktur user.
 
+### 13e. Edit terarah: hemat token tanpa kehilangan keamanan (#D18)
+
+Kebutuhan nyatanya bukan "append", tapi dua hal yang lebih umum:
+
+1. **Biaya token.** Mengganti satu kata di note 400 baris lewat `update_note_body`
+   berarti agent membaca 400 baris lalu mengirim 400 baris kembali — ~800 baris
+   token untuk satu perubahan.
+2. **Sweep.** "Ganti `alnair` jadi `stylenotes`", "naikkan versi `0.1.0` → `0.2.0`",
+   "ganti nama orang" — satu kata, **banyak tempat**.
+
+Keduanya dijawab satu tool, `edit_note_body`, dengan operasi yang **tertutup**:
+
+| `op` | Argumen | Untuk |
+|---|---|---|
+| `replace` | `find`, `replace`, `occurrence` (`all` default / `once`) | Sweep, koreksi, hapus teks (`replace: ""`) |
+| `insert` | `text`, `position` (`start` / `end`) | Menumbuhkan note tanpa membacanya |
+
+**Kenapa `put` tidak ikut.** Ganti seluruh body sudah ada di `update_note_body`.
+Menggabungkannya berarti satu payload bisa berarti "kirim 40 KB" atau "kirim 120
+byte" tergantung field mana yang terisi — ambiguitas persis yang membuat model
+salah panggil. Tiga tool dengan tanggung jawab tunggal lebih mudah diprediksi
+daripada satu tool serbaguna: `update_note` (metadata), `edit_note_body`
+(terarah), `update_note_body` (ganti total).
+
+**Kenapa `occurrence` default `all`.** Permintaan aslinya hampir selalu
+"ganti semua". Agent yang lupa menyalakan `all` akan menghasilkan note dengan
+campuran nama lama dan baru — hasil yang terlihat benar padahal tidak, jauh
+lebih buruk daripada kelebihan mengganti.
+
+**Jaminan yang tidak bisa dilanggar**, dan alasannya transformasi ini **murni**
+(dihitung sebelum ada tulisan apa pun):
+
+- `find` kosong → `bad_arguments`. `replaceAll('')` menyisipkan di antara setiap
+  karakter; itu kehilangan data, bukan edit.
+- `find` tidak ada di note → `bad_arguments` dengan saran membaca `get_note`.
+  Ini yang membunuh bug terburuk: model melaporkan "berhasil" padahal tidak
+  mengubah apa pun.
+- `occurrence: "once"` tapi `find` ambigu → `bad_arguments`, **bukan** menebak
+  kemunculan pertama. Agent harus memberi konteks yang cukup unik; ini memaksa
+  ia berpikir dan mencegahnya menyunting tempat yang salah.
+- Refusal tidak pernah meninggalkan edit separuh, karena transform dihitung
+  lebih dulu di satu tempat (`resolveBodyEdit`).
+- `insert` memakai **satu** pemisah milik app (`\n\n`, dinormalkan agar tidak
+  menggandakan newline di akhir body). Pemisah dari model akan berbeda antar
+  panggilan dan membuat vault tidak konsisten.
+- `replace` yang teks penggantinya mengandung `find` tetap aman: implementasinya
+  `split`/`join`, bukan loop `indexOf` yang bisa berputar selamanya.
+- Backup pra-ubah (§13a) dan `busy_local_edit` (#D4) berlaku sama seperti
+  `update_note_body`.
+
+**Verifikasi tanpa membaca ulang.** Respons mengembalikan `matched` dan
+`replaced`. Justru inilah sumber penghematannya: agent mengonfirmasi sweep
+"7 kemunculan diganti" tanpa `get_note` penuh. Kalau ia tetap harus membaca
+ulang, hematnya hilang.
+
+**Struktur file.** Note actions pindah ke `mcp-note-actions.ts` (dan logika murni
+ke `mcp-body-edit.ts`) karena `mcp-write-actions.ts` menembus cap 500 baris saat
+tool ini ditambahkan. `mcp-write-actions.ts` menyisakan task + dependency dan
+me-re-export nama note supaya host dan test tidak perlu berubah.
+
+**Batas yang diakui:** ini tetap pencocokan **teks persis**, bukan regex dan
+bukan penggantian case-insensitive. Itu disengaja — regex dari model adalah
+permukaan serangan tersendiri (ReDoS, escaping), dan "case-insensitive" membuat
+`alnair` cocok dengan `Alnair` di judul yang mungkin memang sengaja dibedakan.
+Kalau nanti terbukti perlu, tambahkan `ignoreCase` sebagai flag boolean, bukan
+regex.
+
+### 13f. Hari lokal, bukan hari UTC (#D19)
+
+`is_overdue` membandingkan `dueAt` (`YYYY-MM-DD` yang dipilih user) dengan
+**prefix 10 karakter `generatedAt`**. Karena `generatedAt` adalah ISO **UTC**,
+setiap user di luar UTC mendapat jawaban salah selama sebagian hari:
+
+| Skenario (Jakarta, UTC+7) | Perilaku lama | Benar |
+|---|---|---|
+| 07:00 lokal, task due hari ini | dibanding `generatedAt` yang masih **kemarin** → **overdue** | tidak overdue |
+| 07:00 lokal, task due kemarin | dibanding kemarin → **tidak overdue** | overdue |
+
+Jadi bukan sekadar salah sehari: arah kesalahannya tergantung sisi UTC mana user
+berada, dan `overdueOnly` adalah tool yang dipakai agent untuk menjawab "apa yang
+telat". Jawaban yang salah di sini lebih buruk daripada tidak menjawab.
+
+**Perbaikan.** Snapshot membawa field baru `today` — tanggal sipil user sebagai
+`YYYY-MM-DD`:
+
+- Dihitung app dari `settings.timezone` (preferensi yang **sudah ada**), lewat
+  `localToday()` di `stores/settings.svelte.ts`, yang memakai
+  `Intl.DateTimeFormat('en-CA')` — format `YYYY-MM-DD` yang persis sama dengan
+  bentuk `dueAt`, sehingga perbandingannya tetap **string compare** dan shim
+  tidak butuh library tanggal.
+- `is_overdue` sekarang membaca `snapshot.today`, bukan `generatedAt`.
+- Zona kosong (`''` = ikuti OS) atau nilai yang tidak dikenal runtime →
+  fallback ke hari UTC. `timezone` adalah input bebas dari user; nilai buruk
+  **tidak boleh** membuat pembacaan gagal, dan test-nya ada
+  (`Mars/Olympus_Mons` → hari UTC).
+- **`generatedAt` tetap UTC** dan tidak diubah: ia menjawab "kapan snapshot ini
+  dibuat", yang memang pertanyaan berbeda.
+
+**`MCP_PROTOCOL` naik ke 2.** Snapshot v1 tidak punya `today`. Shim v2 menolak
+app v1 dengan `protocol_mismatch` + pesan "update StyleNotes", bukan diam-diam
+kembali membandingkan hari UTC. Gate protokol sudah berjalan **sebelum** dispatch
+tool, jadi snapshot lama tidak pernah sampai ke `is_overdue`. Snapshot tanpa
+`today` juga dijaga di sisi shim: `is_overdue` mengembalikan `false` alih-alih
+menandai semuanya telat (konservatif, seperti sebelumnya).
+
+**Yang ikut berubah perilakunya** (disetujui eksplisit, bukan efek samping):
+`overdueOnly` untuk user di luar UTC. Task due hari ini di Jakarta tidak lagi
+dianggap telat; task due kemarin di Jakarta akhirnya **dianggap** telat. Test
+regresinya eksplisit membandingkan hari Jakarta vs hari UTC pada timestamp yang
+sama (`overdue_uses_the_local_day_not_the_utc_day`).
+
+**Yang belum berubah:** `daily_summary` tetap menghitung "recent notes" dari
+`updatedAt >= generatedAt - 24 jam`, yang tidak bergantung zona. `list_notes
+{ order: "created" }` juga tidak. Tidak ada tool lain yang membandingkan tanggal.
+
+**Konsekuensi untuk journal.** Ini prasyarat yang dimaksud: journal perlu tahu
+note mana yang "hari ini", dan tanpa `today` satu-satunya cara adalah menghitung
+UTC di shim — kesalahan yang sama, tapi kali ini salah **file**, bukan salah
+label.
+
 ---
 
 ## 13. Keputusan tercatat
@@ -824,3 +945,5 @@ baru untuk itu = menebak struktur user.
 | D15 | Capability | Binary MCP **tidak** butuh permission di `capabilities/default.json` (bukan webview, tidak lewat IPC) | Diverifikasi empiris di M1 dengan **build bundle**, karena permission Tauri gagal secara silent. Buka config client otomatis **bukan** scope V1 (#D8) |
 | D16 | Scope tool note | V1 **menyertakan** `update_note_body` + `delete_note` (bukan hanya task) | Hanya berjalan di mode `write`; `delete_note` butuh `confirm: true`; keduanya diaudit. Mitigasi & batasnya: §13a |
 | D17 | Second brain | **Tambah 3 tool**: `list_folders`, `list_tags` (read) dan `update_note` (write, patch `title`/`folder`/`tags`/`pinned`). Plus kolom `notes.created_at` diisi sungguhan | Tanpa ini agent bisa membuat note tapi tidak pernah bisa merapikannya: tidak ada cara menemukan folder/tag, dan `update_note_body` hanya menyentuh body. Lihat §13d |
+| D18 | Edit terarah | **Tambah `edit_note_body`** dengan dua operasi tertutup: `replace { find, replace, occurrence }` dan `insert { text, position }`. Ganti total tetap di `update_note_body` | Motivasi: biaya token. Rename satu kata di note 400 baris tidak boleh butuh kirim 40 KB. Jaminan: `find` kosong / tidak ada / ambigu-dengan-`once` = `bad_arguments`, tidak ada edit separuh. Lihat §13e |
+| D19 | Hari lokal | Snapshot membawa **`today`** (`YYYY-MM-DD`) dihitung dari `settings.timezone`. `overdueOnly` membandingkan `dueAt` terhadap `today`, **bukan** prefix UTC `generatedAt`. `MCP_PROTOCOL` naik ke **2** | Perbaikan, bukan kosmetik: sebelumnya task due hari ini salah dinilai untuk semua user di luar UTC. Prasyarat journal. Lihat §13f |

@@ -18,6 +18,7 @@ import {
 	createTaskAction,
 	deleteNoteAction,
 	deleteTaskAction,
+	editNoteBodyAction,
 	updateNoteAction,
 	updateNoteBodyAction,
 	updateTaskAction,
@@ -314,6 +315,8 @@ async function runWrite(
 			return fromWrite(await createNoteAction(ctx.write, args));
 		case 'update_note_body':
 			return fromWrite(await updateNoteBodyAction(ctx.write, args));
+		case 'edit_note_body':
+			return fromWrite(await editNoteBodyAction(ctx.write, args));
 		case 'update_note':
 			return fromWrite(await updateNoteAction(ctx.write, args));
 		case 'delete_note':
@@ -418,6 +421,23 @@ export async function executeToolCall(
 	return (await runWrite(ctx, name, args)) ?? { ok: false, error: `Unknown tool \`${name}\`.` };
 }
 
+/**
+ * A readable sentence for an `edit_note_body` confirmation card.
+ *
+ * The confirmation is the user's only chance to catch a runaway sweep, so it
+ * shows the needle and the scope rather than a generic "edit a note".
+ */
+function describeBodyEdit(args: Record<string, unknown>): string {
+	if (args.op === 'insert') {
+		const where = args.position === 'start' ? 'the start' : 'the end';
+		return `Add text to ${where} of a note`;
+	}
+	const find = typeof args.find === 'string' ? args.find : '';
+	const scope = args.occurrence === 'once' ? 'the first exact match' : 'every match';
+	const shown = find.length > 60 ? `${find.slice(0, 60)}…` : find;
+	return shown ? `Replace ${scope} of “${shown}” in a note` : 'Replace text in a note';
+}
+
 /** A short, human sentence describing what a call will do, for confirmation. */
 export function describeToolCall(name: string, rawArgs: string): string {
 	let args: Record<string, unknown> = {};
@@ -436,6 +456,8 @@ export function describeToolCall(name: string, rawArgs: string): string {
 			return `Create a task${title ? ` “${title}”` : ''}`;
 		case 'update_note_body':
 			return 'Replace a note’s body';
+		case 'edit_note_body':
+			return describeBodyEdit(args);
 		case 'update_note':
 			return 'Update a note’s title, folder, tags or pin';
 		case 'update_task':
