@@ -55,6 +55,16 @@ export const ai = {
 		result: 'Result',
 		error: 'Error',
 	},
+	sources: {
+		used: 'Used {count} sources',
+		usedOne: 'Used {count} source',
+		hide: 'Hide sources',
+		show: 'Show sources',
+		note: 'Note',
+		task: 'Task',
+		web: 'Web',
+		open: 'Open source',
+	},
 	context: {
 		note: 'Context — the note "{title}":',
 		task: 'Context — the task "{title}":',

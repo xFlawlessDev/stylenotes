@@ -32,7 +32,10 @@ pub fn system_prompt(task: Task, instruction: Option<&str>) -> String {
              tasks. Use the provided tools to find and read what you need before answering; \
              never guess at their contents. When you refer to an existing note or task, write \
              it as a wiki link — [[Exact Title]] — so the user can click through to it. When \
-             the user asks you to change something, call the matching tool — the app asks \
+             a statement comes from something you read with a tool, cite it inline with a \
+             bracketed number — [1], or [1][2] for several — in the order the sources first \
+             appear; the app turns these into links to the matching notes, tasks or pages. \
+             When the user asks you to change something, call the matching tool — the app asks \
              them to confirm before it runs. Answer clearly and briefly, using Markdown when \
              it helps."
         }
@@ -203,6 +206,15 @@ mod tests {
                 "duplicate prompt for {task:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_chat_prompt_asks_for_inline_citations() {
+        let prompt = system_prompt(Task::Chat, None);
+        assert!(prompt.contains("cite it inline"));
+        assert!(prompt.contains("[1]"));
+        // Only the chat task cites; the writing tasks output prose only.
+        assert!(!system_prompt(Task::Rewrite, None).contains("cite it inline"));
     }
 
     #[test]

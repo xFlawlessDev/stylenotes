@@ -54,6 +54,16 @@ export const ai: AiMessages = {
 		result: 'Hasil',
 		error: 'Galat',
 	},
+	sources: {
+		used: 'Menggunakan {count} sumber',
+		usedOne: 'Menggunakan {count} sumber',
+		hide: 'Sembunyikan sumber',
+		show: 'Tampilkan sumber',
+		note: 'Catatan',
+		task: 'Tugas',
+		web: 'Situs',
+		open: 'Buka sumber',
+	},
 	context: {
 		note: 'Konteks — catatan "{title}":',
 		task: 'Konteks — tugas "{title}":',

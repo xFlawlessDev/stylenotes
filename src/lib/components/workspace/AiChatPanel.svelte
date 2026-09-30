@@ -1,20 +1,23 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { Bot, Check, Copy, Loader2, Plus, Sparkles, Trash2, X } from '@lucide/svelte';
+	import { Bot, Loader2, Plus, Sparkles, Trash2, X } from '@lucide/svelte';
 	import { Button, EmptyState } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
+	import AiMessageList from '$lib/components/workspace/AiMessageList.svelte';
 	import AiMessageBody from '$lib/components/note/AiMessageBody.svelte';
-	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import AiReasoning from '$lib/components/ai/AiReasoning.svelte';
 	import AiToolTrace from '$lib/components/ai/AiToolTrace.svelte';
+	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import AiQuestionCard from '$lib/components/ai/AiQuestionCard.svelte';
-	import type { AiMessage, AiMessageRecord, AiToolCall } from '$lib/content/ai-types';
+	import type { AiMessage, AiToolCall } from '$lib/content/ai-types';
 	import type { WikiSource, WikiClick } from '$lib/content/wiki-links';
 	import type { AnsweredQuestion, QuestionItem } from '$lib/content/ai-questions';
 	import { mentionPool, mentionedIds } from '$lib/content/ai-mentions';
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
 	import { AI_TOOLS, toolDefinitions } from '$lib/content/ai-tool-schema';
-	import { toolTraceFromRecord, type ToolTraceEntry } from '$lib/content/ai-trace';
+	import type { ToolTraceEntry } from '$lib/content/ai-trace';
+	import type { CitationSource } from '$lib/content/ai-citations';
+	import { openExternalUrl } from '$lib/content/external-links';
 	import { loadToolContext } from '$lib/content/ai-context';
 	import {
 		aiReady,
@@ -50,7 +53,6 @@
 	let draft = $state('');
 	let sending = $state(false);
 	let error = $state<string | null>(null);
-	let copiedId = $state<number | null>(null);
 	let scrollEl = $state<HTMLElement | null>(null);
 	/** Chain of thought for the turn in flight; never persisted on its own. */
 	let reasoning = $state('');
@@ -191,14 +193,20 @@
 		);
 	}
 
-	/** Rebuilds a saved message's trace for display. */
-	function savedTrace(message: AiMessageRecord) {
-		return {
-			entries: toolTraceFromRecord(message.toolCalls, message.toolResults),
-			reasoning: message.reasoning,
-			/** Persisted history has no measured duration, so it says "quickly". */
-			seconds: 0
-		};
+	/**
+	 * A source clicked under a reply, or an inline `[n]` marker.
+	 *
+	 * A note or task needs a wiki click so the same routing as `[[link]]`
+	 * applies; a web source opens in the user's browser. The panel then closes
+	 * so the target is visible.
+	 */
+	function openSource(source: CitationSource) {
+		if (source.kind === 'web') {
+			void openExternalUrl(source.ref);
+		} else {
+			onwikilink?.({ target: { id: source.id, kind: source.kind }, targetText: null, candidates: [], heading: null });
+		}
+		onclose();
 	}
 
 	/**
@@ -242,16 +250,6 @@
 
 	async function removeThread(id: string) {
 		await deleteThread(id);
-	}
-
-	async function copyMessage(id: number, content: string) {
-		try {
-			await navigator.clipboard.writeText(content);
-			copiedId = id;
-			setTimeout(() => (copiedId = null), 1500);
-		} catch {
-			/* clipboard denied: the text stays visible */
-		}
 	}
 </script>
 
@@ -329,56 +327,7 @@
 				/>
 			{/if}
 
-			{#each aiStore.messages as message (message.id)}
-				<div class="flex flex-col gap-1 {message.role === 'user' ? 'items-end' : 'items-start'}">
-					{#if message.role === 'assistant'}
-						{@const trace = savedTrace(message)}
-						{#if trace.reasoning}
-							<AiReasoning
-								content={trace.reasoning}
-								seconds={trace.seconds}
-								class="w-[92%]"
-							/>
-						{/if}
-						{#if trace.entries.length}
-							<AiToolTrace entries={trace.entries} class="w-[92%]" />
-						{/if}
-						<div
-							class="max-w-[92%] rounded-2xl bg-surface-container-lowest/40 px-3.5 py-2.5 text-body-sm font-body text-on-surface"
-						>
-							<AiMessageBody
-								content={message.content}
-								onwikilink={followWikiLink}
-								class="markdown-body markdown-body--compact"
-							/>
-						</div>
-						<Button
-							size="xs"
-							variant="ghost"
-							class="text-outline"
-							onclick={() => void copyMessage(message.id, message.content)}
-						>
-							{#if copiedId === message.id}<Check size={12} />{:else}<Copy size={12} />{/if}
-							{copiedId === message.id ? t('ai.copied') : t('ai.copy')}
-						</Button>
-					{:else}
-						<div
-							class="emphasis-container max-w-[92%] rounded-2xl px-3.5 py-2.5 text-body-sm font-body whitespace-pre-wrap text-on-primary-container"
-						>
-							{message.content}
-						</div>
-						<Button
-							size="xs"
-							variant="ghost"
-							class="text-outline"
-							onclick={() => void copyMessage(message.id, message.content)}
-						>
-							{#if copiedId === message.id}<Check size={12} />{:else}<Copy size={12} />{/if}
-							{copiedId === message.id ? t('ai.copied') : t('ai.copy')}
-						</Button>
-					{/if}
-				</div>
-			{/each}
+			<AiMessageList messages={aiStore.messages} onwikilink={followWikiLink} onsource={openSource} />
 
 			{#if sending}
 				<div class="flex flex-col items-start gap-1">

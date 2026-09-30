@@ -819,6 +819,34 @@ html[data-motion='reduced'] *::after {
 	text-underline-offset: 3px;
 }
 
+/* Inline `[n]` citation marker: a small pill, not a full-size link. */
+.markdown-body a.cite-marker {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.05rem;
+	height: 1.05rem;
+	margin: 0 0.1rem;
+	padding: 0 0.28rem;
+	vertical-align: text-top;
+	border-radius: 999px;
+	background-color: color-mix(in oklab, var(--color-primary) 16%, transparent);
+	color: var(--color-primary);
+	font-size: 0.68rem;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.markdown-body a.cite-marker:hover {
+	background-color: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
 .markdown-body img {
 	display: block;
 	max-width: 100%;
