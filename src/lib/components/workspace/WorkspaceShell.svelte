@@ -95,6 +95,8 @@
 		tasks={state.tasks}
 		fullPreview={state.fullPreview}
 		newNoteToken={state.newNoteToken}
+		journal={controller.journal}
+		journalNavigation={controller.journalNavigation}
 		onwikilink={controller.handleWikiClick}
 		bind:railOpen={state.railOpen}
 		bind:feedOpen={state.feedOpen}

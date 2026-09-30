@@ -224,6 +224,12 @@ export const AI_TOOLS: AiToolSpec[] = [
 			},
 			required: ['id', 'op']
 		}),
+	tool('journal_today', 'Today’s journal', 'notes', 'write',
+		'Find or start the journal entry for the user’s local today. Call it before writing anything a user would expect in today’s daily note, then add to it with edit_note_body { op: "insert", position: "end" }. Do not compute the date yourself: the app supplies the user’s own day. Returns created: true when this call started the entry.',
+		{
+			type: 'object',
+			properties: { workspace }
+		}),
 	tool('create_task', 'Create task', 'tasks', 'write',
 		'Create a task, optionally linked to notes.',
 		{

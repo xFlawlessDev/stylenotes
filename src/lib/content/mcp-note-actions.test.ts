@@ -20,7 +20,12 @@ vi.mock('$lib/stores/workspaces.svelte', () => ({
 	reloadWorkspaces: vi.fn()
 }));
 
-import { editNoteBodyAction, resolveBodyEdit, updateNoteAction } from '$lib/content/mcp-note-actions';
+import {
+	editNoteBodyAction,
+	journalTodayAction,
+	resolveBodyEdit,
+	updateNoteAction
+} from '$lib/content/mcp-note-actions';
 import type { WriteContext } from '$lib/content/mcp-write-context';
 import { createNote } from '$lib/content/content';
 
@@ -236,5 +241,14 @@ describe('resolveBodyEdit', () => {
 		expect(result.ok).toBe(true);
 		const written = invoke.mock.calls.at(-1);
 		expect(written?.[1]).toMatchObject({ title: 'Renamed', body: 'body' });
+	});
+});
+
+describe('journalTodayAction', () => {
+	it('reports an unknown workspace instead of writing into it', async () => {
+		const result = await journalTodayAction(context(), { workspace: 'ws-missing' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toBe('unknown_workspace');
+		expect(invoke).not.toHaveBeenCalled();
 	});
 });

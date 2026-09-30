@@ -23,6 +23,7 @@ export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'list_workspaces', kind: 'read', scope: 'workspace', description: 'Every workspace with its note and task counts.' },
 	{ name: 'list_folders', kind: 'read', scope: 'workspace', description: 'Folder ids, labels and note counts, so a note can be filed.' },
 	{ name: 'list_tags', kind: 'read', scope: 'notes', description: 'Every tag in use, with how many notes carry it.' },
+	{ name: 'journal_today', kind: 'write', scope: 'notes', description: 'Find or start the journal entry for the user’s local today.' },
 	{ name: 'create_note', kind: 'write', scope: 'notes', description: 'Create a note from a title and body.' },
 	{ name: 'update_note_body', kind: 'write', scope: 'notes', description: 'Replace a note body (a backup copy is kept first).' },
 	{ name: 'edit_note_body', kind: 'write', scope: 'notes', description: 'Patch a note body in place: replace text or insert at start/end.' },

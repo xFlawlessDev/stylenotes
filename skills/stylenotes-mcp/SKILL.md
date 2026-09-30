@@ -10,7 +10,7 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes a **local** MCP server: 28 tools (14 read, 14 write) over stdio.
+StyleNotes exposes a **local** MCP server: 29 tools (14 read, 15 write) over stdio.
 A thin shim process talks to the running desktop app through a file bridge, so
 every write goes through the same validation the UI uses.
 
@@ -59,6 +59,9 @@ use; do not re-file, re-tag or rewrite a note that was not part of the request.
 6. **"Today" is the user's local day.** The snapshot's `today` field
    (`YYYY-MM-DD`) is their civil date, not UTC — `overdueOnly` and any date you
    reason about follow it. Do not compute a day yourself from `generatedAt`.
+7. **The journal is per day, not per note title.** `journal_today` returns the
+   entry for the user's local today, creating it if needed. Do not search for a
+   note whose title looks like a date, and do not create one by hand.
 
 See [references/tool-reference.md](references/tool-reference.md) for every tool's
 arguments and response shape, and
@@ -91,6 +94,7 @@ Pick the narrowest tool that answers the question:
 | "Show that note" | `get_note { id }` |
 | "What links to / from this note?" | `get_note` — its `backlinks` / `outlinks` |
 | "What folders / tags do I have?" | `list_folders` / `list_tags` |
+| "Add this to today's journal" | `journal_today` → `edit_note_body { op: "insert" }` |
 | "How is the board?" | `task_board { workspace }` |
 | "What is due / in progress?" | `daily_summary { workspace }` |
 | "Why is this task stuck?" | `get_task { id }` — `blockedBy`, `blockedByTasks` |
@@ -167,6 +171,12 @@ These are the mistakes that make a correct server look broken:
 - **Sweeping with `occurrence: "once"` on a repeated word.** It is refused, not
   guessed. Either add surrounding context until `find` is unique, or mean it and
   pass `"all"`.
+- **Hunting for the journal by title.** Entries are keyed by a stored day, not by
+  a title that looks like a date, and the user can rename them freely. Always
+  reach the entry through `journal_today`.
+- **Writing to the journal without `journal_today` first.** The day may have no
+  entry yet; creating one by hand produces a second note for that day, which the
+  app will refuse to save.
 - **Reporting a body edit succeeded without checking `replaced`.** A match of 0
   never happens — the call is refused — but `matched: 1, replaced: 1` on a word
   you expected 7 times means your needle was too specific.
@@ -213,6 +223,6 @@ Trace a dependency chain:
 
 ## Reference
 
-- [references/tool-reference.md](references/tool-reference.md) — all 28 tools, arguments, response fields.
+- [references/tool-reference.md](references/tool-reference.md) — all 29 tools, arguments, response fields.
 - [references/errors.md](references/errors.md) — error codes, causes, and fixes.
 - [references/workflows.md](references/workflows.md) — longer end-to-end recipes, including second-brain recall and capture.

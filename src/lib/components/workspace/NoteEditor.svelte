@@ -64,6 +64,7 @@
 		tasks = [],
 		customFolders = [],
 		onwikilink,
+		journal,
 	}: {
 		note?: Note;
 		folders: Folder[];
@@ -80,6 +81,8 @@
 		tasks?: Task[];
 		customFolders?: { id: string; label: string }[];
 		onwikilink?: (click: WikiClick) => void;
+		/** Day navigation, shown only when the open note is a journal entry. */
+		journal?: { previous: string | null; next: string | null; onstep: (day: string) => void };
 	} = $props();
 
 	let title = $state('');
@@ -443,6 +446,7 @@
 					onupdatetitle={(value) => onupdate(note.id, { title: value })}
 					onupdatetags={(tags) => onupdate(note.id, { tags })}
 					onapplyai={applyAi}
+					{journal}
 				/>
 			{/if}
 

@@ -53,6 +53,7 @@ export {
 	deleteNoteAction,
 	editNoteBodyAction,
 	hasBlankTitle,
+	journalTodayAction,
 	resolveBodyEdit,
 	sanitizeNotePatch,
 	updateNoteAction,
@@ -62,6 +63,7 @@ export type {
 	CreateNoteArgs,
 	DeleteNoteArgs,
 	EditNoteBodyArgs,
+	JournalTodayArgs,
 	NotePatch,
 	UpdateNoteArgs,
 	UpdateNoteBodyArgs

@@ -37,6 +37,7 @@ import {
 } from '$lib/content/mcp-write-context';
 import { notesRepo } from '$lib/db';
 import { NOTES_CHANGED } from '$lib/stores/notes';
+import { localToday } from '$lib/stores/settings.svelte';
 
 // --- create -----------------------------------------------------------------
 
@@ -293,9 +294,58 @@ export async function updateNoteAction(
 	};
 }
 
-// --- delete -----------------------------------------------------------------
+// --- journal ----------------------------------------------------------------
+
+export type JournalTodayArgs = { workspace?: string };
 
 export type DeleteNoteArgs = { id?: unknown; workspace?: string };
+
+/**
+ * Finds — or starts — the journal entry for the user's **local** today (#J7).
+ *
+ * Read-or-write in one call, but registered as a write because it may create a
+ * note. With only a read grant the tool still does the useful half: it returns
+ * the existing entry. Only the create half is refused, which is a better answer
+ * than a blanket refusal that would hide the entry that is already there.
+ *
+ * The day comes from the app's own clock and timezone (#D19), never from the
+ * caller: an agent that computed "today" itself is off by one for part of every
+ * day outside UTC.
+ *
+ * The find-or-create body lives in the app store (`openJournalDay`), because it
+ * owns the unique-index race handling. This action only maps its result and
+ * checks the workspace, so there is still exactly one write path.
+ */
+export async function journalTodayAction(
+	context: WriteContext,
+	args: JournalTodayArgs
+): Promise<WriteOutcome> {
+	if (args.workspace && !context.workspaceIds.has(args.workspace)) {
+		return fail('unknown_workspace', `Unknown workspace \`${args.workspace}\`.`);
+	}
+	const { openJournalDay } = await import('$lib/stores/journal.svelte');
+	const result = await openJournalDay(localToday());
+	if (result.ok) {
+		return {
+			ok: true,
+			data: {
+				created: result.created,
+				note: {
+					id: result.note.id,
+					workspaceId: result.note.workspaceId,
+					title: result.note.title,
+					journalDay: result.note.journalDay
+				}
+			}
+		};
+	}
+	if (result.error === 'disabled') {
+		// Same shape as `write_not_granted`: a feature the user has not switched
+		// on, not a broken request. The message says exactly how to turn it on.
+		return fail('mcp_disabled', 'Journal is off. Enable it in Settings → Journal.');
+	}
+	return fail('write_failed', 'The journal entry could not be opened.');
+}
 
 export async function deleteNoteAction(
 	context: WriteContext,

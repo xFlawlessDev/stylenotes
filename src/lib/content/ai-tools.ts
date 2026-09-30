@@ -19,6 +19,7 @@ import {
 	deleteNoteAction,
 	deleteTaskAction,
 	editNoteBodyAction,
+	journalTodayAction,
 	updateNoteAction,
 	updateNoteBodyAction,
 	updateTaskAction,
@@ -317,6 +318,8 @@ async function runWrite(
 			return fromWrite(await updateNoteBodyAction(ctx.write, args));
 		case 'edit_note_body':
 			return fromWrite(await editNoteBodyAction(ctx.write, args));
+		case 'journal_today':
+			return fromWrite(await journalTodayAction(ctx.write, args));
 		case 'update_note':
 			return fromWrite(await updateNoteAction(ctx.write, args));
 		case 'delete_note':
@@ -458,6 +461,8 @@ export function describeToolCall(name: string, rawArgs: string): string {
 			return 'Replace a note’s body';
 		case 'edit_note_body':
 			return describeBodyEdit(args);
+		case 'journal_today':
+			return 'Open today’s journal entry';
 		case 'update_note':
 			return 'Update a note’s title, folder, tags or pin';
 		case 'update_task':

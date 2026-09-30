@@ -90,6 +90,17 @@ export const notes = {
 		delete: 'Delete',
 	},
 	badge: { quickNote: 'Quick note', pinned: 'Pinned', editNote: 'Edit note' },
+	journal: {
+		today: 'Today',
+		open: 'Open today',
+		start: 'Start today’s entry',
+		opened: 'Opened {date}',
+		created: 'Started {date}',
+		failed: 'Could not open today’s entry',
+		disabled: 'Turn on Journal in Settings to use daily notes',
+		previous: 'Previous day',
+		next: 'Next day',
+	},
 } as const;
 
 

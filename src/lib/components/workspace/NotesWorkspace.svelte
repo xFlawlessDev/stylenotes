@@ -31,6 +31,8 @@
 		tasks,
 		fullPreview = false,
 		newNoteToken = 0,
+		journal = undefined,
+		journalNavigation = undefined,
 		onwikilink,
 		railOpen = $bindable(false),
 		feedOpen = $bindable(false),
@@ -49,6 +51,13 @@
 		tasks: Task[];
 		fullPreview?: boolean;
 		newNoteToken?: number;
+		/** Journal toggle for the feed; `undefined` hides it entirely. */
+		journal?: { day: string; label: string; exists: boolean; onopen: () => void };
+		/**
+		 * Day navigation for the editor header, computed from the open note's
+		 * `journalDay`. Only consulted when the selected note is a journal entry.
+		 */
+		journalNavigation?: { previous: string | null; next: string | null; onstep: (day: string) => void };
 		onwikilink?: (click: WikiClick) => void;
 		railOpen?: boolean;
 		feedOpen?: boolean;
@@ -147,6 +156,7 @@
 			onexport={(id) => runById(id, actions.exportnote)}
 			oncopy={(id) => runById(id, actions.copynote)}
 			ondelete={actions.deletenote}
+			{journal}
 		/>
 	{/if}
 
@@ -166,5 +176,6 @@
 		onexport={actions.exportnote}
 		oncopy={actions.copynote}
 		onselectfolder={actions.selectfolder}
+		journal={selected?.journalDay ? journalNavigation : undefined}
 	/>
 </div>

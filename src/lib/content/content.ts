@@ -13,6 +13,11 @@ export type Note = {
   updatedAt?: number;
   /** Epoch milliseconds of the first write, read from `notes.created_at` (#D17). */
   createdAt?: number;
+  /**
+   * The civil day this note represents, as `YYYY-MM-DD`, for a journal entry.
+   * Absent on an ordinary note. NOT the same as `createdAt` (#J1).
+   */
+  journalDay?: string;
   pinned: boolean;
   overlay: boolean;
   excerpt: string;
@@ -49,6 +54,7 @@ export function createNote(seed: Partial<Note> = {}): Note {
     chars: seed.chars ?? body.length,
     updatedAt: seed.updatedAt ?? now,
     createdAt: seed.createdAt ?? now,
+    ...(seed.journalDay ? { journalDay: seed.journalDay } : {}),
   };
 }
 

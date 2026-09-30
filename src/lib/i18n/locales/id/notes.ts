@@ -92,4 +92,15 @@ export const notes: NotesMessages = {
 		delete: 'Hapus',
 	},
 	badge: { quickNote: 'Catatan cepat', pinned: 'Disematkan', editNote: 'Edit catatan' },
+	journal: {
+		today: 'Hari ini',
+		open: 'Buka hari ini',
+		start: 'Mulai catatan hari ini',
+		opened: 'Membuka {date}',
+		created: 'Memulai {date}',
+		failed: 'Tidak bisa membuka catatan hari ini',
+		disabled: 'Nyalakan Jurnal di Pengaturan untuk memakai catatan harian',
+		previous: 'Hari sebelumnya',
+		next: 'Hari berikutnya',
+	},
 };

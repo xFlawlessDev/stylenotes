@@ -16,6 +16,7 @@
 		PictureInPicture2,
 		Bot,
 		Plug,
+		CalendarDays,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
@@ -28,6 +29,7 @@
 	} from '$lib/stores/settings.svelte';
 	import { appInfo } from '$lib/app-info';
 	import AppearanceSettings from '$lib/components/workspace/AppearanceSettings.svelte';
+	import JournalSettings from '$lib/components/workspace/JournalSettings.svelte';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 	import AiSettings from '$lib/components/workspace/AiSettings.svelte';
 	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
@@ -46,7 +48,7 @@
 		notecount: number;
 	} = $props();
 
-	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'data' | 'about';
+	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'journal' | 'data' | 'about';
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
@@ -55,6 +57,7 @@
 		{ id: 'dock', label: t('settings.nav.dock'), icon: PictureInPicture2 },
 		{ id: 'ai', label: t('settings.nav.ai'), icon: Bot },
 		{ id: 'mcp', label: t('settings.nav.mcp'), icon: Plug },
+		{ id: 'journal', label: t('settings.nav.journal'), icon: CalendarDays },
 		{ id: 'data', label: t('settings.nav.data'), icon: HardDrive },
 		{ id: 'about', label: t('settings.nav.about'), icon: Sparkles },
 	];
@@ -220,6 +223,10 @@
 
 					{#if section === 'mcp'}
 						<McpSettings />
+					{/if}
+
+					{#if section === 'journal'}
+						<JournalSettings />
 					{/if}
 
 					{#if section === 'data'}

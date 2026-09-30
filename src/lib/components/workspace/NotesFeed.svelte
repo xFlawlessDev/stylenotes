@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Pin, FileText, X, Tag } from '@lucide/svelte';
+	import { Pin, FileText, X, Tag, CalendarDays, Plus } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import { t } from '$lib/i18n/index.svelte';
 	import { noteUpdatedLabel } from '$lib/i18n/format';
@@ -31,6 +31,7 @@
 		onexport,
 		oncopy,
 		ondelete,
+		journal,
 	}: {
 		notes: Note[];
 		selectedId: string;
@@ -54,6 +55,20 @@
 		onexport?: (id: string) => void;
 		oncopy?: (id: string) => void;
 		ondelete?: (id: string) => void;
+		/**
+		 * Journal affordance at the top of the feed. Omitted entirely when the
+		 * feature is off, so the feed looks exactly as before for users who have
+		 * not opted in.
+		 */
+		journal?: {
+			/** The day the entry belongs to, `YYYY-MM-DD`. */
+			day: string;
+			/** Human label for that day, already formatted for display. */
+			label: string;
+			/** Whether an entry for `day` already exists. */
+			exists: boolean;
+			onopen: () => void;
+		};
 	} = $props();
 
 	let query = $state('');
@@ -160,6 +175,33 @@
 	</div>
 
 	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
+		{#if journal}
+			{@const today = journal}
+			<Button
+				variant="ghost"
+				class="h-auto w-full shrink-0 justify-start gap-2.5 rounded-2xl bg-surface-container-lowest/40 p-3 text-left ring-1 ring-inset ring-outline-variant/40 hover:bg-surface-container/60"
+				aria-label={today.exists ? t('notes.journal.open') : t('notes.journal.start')}
+				onclick={() => today.onopen()}
+			>
+				<span
+					class="flex size-8 shrink-0 items-center justify-center rounded-xl {today.exists
+						? 'bg-primary/15 text-primary'
+						: 'text-outline'}"
+				>
+					<CalendarDays size={15} />
+				</span>
+				<span class="flex min-w-0 flex-col items-start">
+					<span class="text-label-md font-label text-on-surface">{t('notes.journal.today')}</span>
+					<span class="truncate text-code-sm font-code text-outline">{today.label}</span>
+				</span>
+				{#if !today.exists}
+					<span class="ml-auto shrink-0 text-outline">
+						<Plus size={14} />
+					</span>
+				{/if}
+			</Button>
+		{/if}
+
 		{#each filtered as note (note.id)}
 			{#snippet card()}
 				<div

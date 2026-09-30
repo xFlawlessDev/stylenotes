@@ -257,6 +257,7 @@ Nama tool = verba + objek, semua di `mcp-tools.ts` (satu sumber untuk handshake 
 | Baca organisasi | `list_workspaces` | read | Semua workspace + jumlah note/task |
 | | `list_folders` | read | **#D17** — id folder + jumlah note, supaya note bisa difilekan |
 | | `list_tags` | read | **#D17** — kosakata tag + frekuensi, sebelum menandai apa pun |
+| | `journal_today` | write | **#D20** — temukan-atau-buat note hari ini (hari lokal user, #D19) |
 | Tulis | `create_note` | write | Note baru (title, body, folder, tags, `overlay`) |
 | | `update_note_body` | write | Ubah body note — **V1** (#D16). Hanya mode `write`; ditolak bila ada edit lokal yang belum ter-persist (#D4) |
 | | `update_note` | write | **#D17** — patch metadata note (`title`, `folder`, `tags`, `pinned`). Tidak menyentuh body |
@@ -947,3 +948,4 @@ label.
 | D17 | Second brain | **Tambah 3 tool**: `list_folders`, `list_tags` (read) dan `update_note` (write, patch `title`/`folder`/`tags`/`pinned`). Plus kolom `notes.created_at` diisi sungguhan | Tanpa ini agent bisa membuat note tapi tidak pernah bisa merapikannya: tidak ada cara menemukan folder/tag, dan `update_note_body` hanya menyentuh body. Lihat §13d |
 | D18 | Edit terarah | **Tambah `edit_note_body`** dengan dua operasi tertutup: `replace { find, replace, occurrence }` dan `insert { text, position }`. Ganti total tetap di `update_note_body` | Motivasi: biaya token. Rename satu kata di note 400 baris tidak boleh butuh kirim 40 KB. Jaminan: `find` kosong / tidak ada / ambigu-dengan-`once` = `bad_arguments`, tidak ada edit separuh. Lihat §13e |
 | D19 | Hari lokal | Snapshot membawa **`today`** (`YYYY-MM-DD`) dihitung dari `settings.timezone`. `overdueOnly` membandingkan `dueAt` terhadap `today`, **bukan** prefix UTC `generatedAt`. `MCP_PROTOCOL` naik ke **2** | Perbaikan, bukan kosmetik: sebelumnya task due hari ini salah dinilai untuk semua user di luar UTC. Prasyarat journal. Lihat §13f |
+| D20 | Journal | Note per hari lewat kolom **`notes.journal_day`** (#J1) + indeks unik parsial, bukan judul atau tag. Setting journal (4 key) **device-local dulu**. Tool MCP **`journal_today`** | Judul dan tag bisa diubah agent lewat `update_note` (#D17), jadi keduanya tidak bisa menjamin satu note per hari. Kolom juga jadi kunci deteksi konflik saat sync. Desain: `docs/design/journal.md` |

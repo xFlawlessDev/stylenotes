@@ -199,6 +199,27 @@ The token-cheap path, and the one to reach for by default.
 Use this for a running log, a daily entry, or any note that grows. It never
 reads the body, so it stays cheap no matter how long the note is.
 
+## Write to the user's journal
+
+The daily note is the one note you must not find by searching. Its title is the
+user's own choice of format, and they may rename it; the day is what identifies
+it.
+
+```
+1. journal_today { workspace }                 -> the entry for their local today
+   -> { created: true,  note: { ref, journalDay, title } }   just started
+   -> { created: false, note: { ref, journalDay, title } }   already existed
+2. edit_note_body { id, op: "insert", text: "- what happened", position: "end" }
+```
+
+- Never compute the date. The app supplies the user's local day; your own idea of
+  "today" is off by one for part of every day outside UTC.
+- Never create the entry with `create_note`. One entry per day is a database
+  guarantee, and a hand-made duplicate is refused.
+- `created: true` is worth mentioning to the user: you started today's entry.
+- If the call returns `mcp_disabled`, journal is switched off. Say so and point
+  at Settings → Journal; do not fall back to an ordinary note.
+
 ## Rules of thumb
 
 - **A workspace is a vault.** StyleNotes is the user's second brain, kept local.

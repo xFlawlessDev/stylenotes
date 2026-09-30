@@ -16,6 +16,7 @@ type NoteRow = {
 	updated: string;
 	updated_at: number | null;
 	created_at: string | null;
+	journal_day: string | null;
 };
 
 type TagRow = { note_id: string; tag: string };
@@ -45,6 +46,7 @@ function toNote(row: NoteRow, tags: string[]): Note {
 	if (row.updated_at != null) note.updatedAt = Number(row.updated_at);
 	const createdAt = parseSqliteDate(row.created_at);
 	if (createdAt != null) note.createdAt = createdAt;
+	if (row.journal_day) note.journalDay = row.journal_day;
 	return note;
 }
 
@@ -120,6 +122,9 @@ export const notesRepo = {
 					// Only the first save sets the birthday; the SQL `ON CONFLICT`
 					// keeps the stored value on every later save (#D17).
 					createdAt: note.createdAt ?? updatedAt,
+					// Journal day is a plain field: it may be set later (a note can
+					// become a journal entry) and must follow the row on update.
+					journalDay: note.journalDay ?? null,
 					tags: note.tags,
 				});
 				return;
@@ -132,19 +137,20 @@ export const notesRepo = {
 		const createdAt = new Date(note.createdAt ?? updatedAt).toISOString();
 		if (!note.workspaceId) {
 			await db.execute(
-				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+				`INSERT INTO notes (id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at, journal_day)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 				 ON CONFLICT(id) DO UPDATE SET title = excluded.title, folder = excluded.folder, body = excluded.body,
 				 excerpt = excluded.excerpt, words = excluded.words, chars = excluded.chars, pinned = excluded.pinned,
-				 overlay = excluded.overlay, updated = excluded.updated, updated_at = excluded.updated_at`,
-				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated, updatedAt, createdAt]
+				 overlay = excluded.overlay, updated = excluded.updated, updated_at = excluded.updated_at,
+				 journal_day = excluded.journal_day`,
+				[note.id, note.title, note.folder, note.body, note.excerpt, note.words, note.chars, note.pinned ? 1 : 0, note.overlay ? 1 : 0, note.updated, updatedAt, createdAt, note.journalDay ?? null]
 			);
 			await writeTags(note.id, note.tags);
 			return;
 		}
 		await db.execute(
-			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at, journal_day)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			 ON CONFLICT(id) DO UPDATE SET
 				workspace_id = excluded.workspace_id,
 				title = excluded.title,
@@ -156,7 +162,8 @@ export const notesRepo = {
 				pinned = excluded.pinned,
 				overlay = excluded.overlay,
 				updated = excluded.updated,
-				updated_at = excluded.updated_at`,
+				updated_at = excluded.updated_at,
+				journal_day = excluded.journal_day`,
 			[
 				note.id,
 				note.workspaceId ?? 'workspace-default',
@@ -171,6 +178,7 @@ export const notesRepo = {
 				note.updated,
 				updatedAt,
 				createdAt,
+				note.journalDay ?? null,
 			]
 		);
 		await writeTags(note.id, note.tags);
@@ -194,8 +202,8 @@ export const notesRepo = {
 		await db.execute('DELETE FROM notes');
 		for (const note of notes) {
 			await db.execute(
-				`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at)
-					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+				`INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, journal_day)
+					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 				[
 					note.id,
 					note.workspaceId ?? 'workspace-default',
@@ -209,6 +217,7 @@ export const notesRepo = {
 					note.overlay ? 1 : 0,
 					note.updated,
 					note.updatedAt ?? Date.now(),
+					note.journalDay ?? null,
 				]
 			);
 			await writeTags(note.id, note.tags);

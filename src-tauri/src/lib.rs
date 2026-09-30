@@ -592,6 +592,30 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Journal (#J1, docs/design/journal.md). `journal_day` is the civil day a
+        // note represents, as `YYYY-MM-DD`; NULL for an ordinary note. It is NOT
+        // `created_at`: writing Wednesday's entry on Thursday is normal, and only
+        // `journal_day` answers "which day does this note stand for".
+        //
+        // The partial unique index is what makes "one note per day" a database
+        // guarantee rather than a convention: two windows (or the app and an
+        // agent) racing to create today's entry cannot both succeed. SQLite
+        // treats every NULL as distinct, so ordinary notes never collide.
+        //
+        // Cloud sync note: this column travels with the note row. Sync must treat
+        // `(workspace_id, journal_day)` as an identity and merge bodies rather
+        // than pick a winner — see docs/design/journal.md §6.
+        Migration {
+            version: 18,
+            description: "add_note_journal_day",
+            sql: "
+                ALTER TABLE notes ADD COLUMN journal_day TEXT;
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_journal_day
+                    ON notes (workspace_id, journal_day) WHERE journal_day IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_notes_journal_lookup ON notes (journal_day);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

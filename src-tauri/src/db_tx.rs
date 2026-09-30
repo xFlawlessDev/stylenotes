@@ -60,15 +60,19 @@ pub async fn note_upsert_tx(
     updated: String,
     updated_at: i64,
     created_at: Option<i64>,
+    journal_day: Option<String>,
     tags: Vec<String>,
 ) -> Result<(), String> {
     let mut tx = pool.0.begin().await.map_err(|error| error.to_string())?;
 
     // `created_at` is only written on insert: on conflict the existing value
     // must survive, or every save would reset a note's birthday (#D17).
+    // `journal_day` is a plain field and DOES update on conflict: a note can be
+    // turned into (or removed from) a journal entry after creation. Its value is
+    // `YYYY-MM-DD`, or None for an ordinary note (#J1).
     sqlx::query(
-        "INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        "INSERT INTO notes (id, workspace_id, title, folder, body, excerpt, words, chars, pinned, overlay, updated, updated_at, created_at, journal_day)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT(id) DO UPDATE SET
             workspace_id = excluded.workspace_id,
             title = excluded.title,
@@ -80,7 +84,8 @@ pub async fn note_upsert_tx(
             pinned = excluded.pinned,
             overlay = excluded.overlay,
             updated = excluded.updated,
-            updated_at = excluded.updated_at",
+            updated_at = excluded.updated_at,
+            journal_day = excluded.journal_day",
     )
     .bind(&id)
     .bind(&workspace_id)
@@ -95,6 +100,7 @@ pub async fn note_upsert_tx(
     .bind(&updated)
     .bind(updated_at)
     .bind(created_at)
+    .bind(&journal_day)
     .execute(&mut *tx)
     .await
     .map_err(|error| error.to_string())?;

@@ -10,10 +10,12 @@ Cursor, Codex, Zed, …) that can reach a local `stdio` server.
   second brain — a local-first home for personal knowledge, where a workspace is
   a vault — so an agent recalls from their notes instead of answering from its
   own memory.
-- **Which tool for which question** — a short routing table instead of 28
+- **Which tool for which question** — a short routing table instead of 29
   undifferentiated tools.
 - **Which body write to use** — patch in place, add to the end, or rewrite;
   the cheapest one that fits, so a one-word fix does not cost a full note.
+- **The journal** — one entry per local day, reached through `journal_today`
+  rather than by hunting for a note whose title looks like a date.
 - **The correct call order** — locate the workspace, then the entity, then read,
   then write, then verify.
 - **The traps** — missing `workspace` silently targeting `workspace-default`,
@@ -41,7 +43,7 @@ Cursor, Codex, Zed, …) that can reach a local `stdio` server.
 stylenotes-mcp/
 ├── SKILL.md                          # entry point: model, workflow, traps
 ├── references/
-│   ├── tool-reference.md             # all 28 tools, args, response fields
+│   ├── tool-reference.md             # all 29 tools, args, response fields
 │   ├── errors.md                     # error codes -> cause -> fix
 │   └── workflows.md                  # longer end-to-end recipes
 ├── scripts/

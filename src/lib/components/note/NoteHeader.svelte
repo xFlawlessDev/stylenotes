@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Note } from '$lib/content/content';
+	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import type { SelectOption } from '$lib/components/base';
 	import { Button, Input, Select } from '$lib/components/base';
 	import AiEditorAssist from '$lib/components/note/AiEditorAssist.svelte';
@@ -24,7 +25,8 @@
 		onselectfolder,
 		onupdatetitle,
 		onupdatetags,
-		onapplyai
+		onapplyai,
+		journal,
 	}: {
 		note: Note;
 		title?: string;
@@ -38,6 +40,11 @@
 		onupdatetitle: (title: string) => void;
 		onupdatetags: (tags: string[]) => void;
 		onapplyai: (body: string, caret: number) => void;
+		/**
+		 * Day navigation for a journal entry. Absent for ordinary notes, so the
+		 * header is unchanged for every note that is not a journal.
+		 */
+		journal?: { previous: string | null; next: string | null; onstep: (day: string) => void };
 	} = $props();
 </script>
 
@@ -61,6 +68,30 @@
 				options={folderOptions}
 				onchange={onmovefolder}
 			/>
+		{/if}
+		{#if journal}
+			<span class="ml-auto flex items-center gap-0.5">
+				<Button
+					size="icon-xs"
+					bare
+					class="text-outline hover:text-primary disabled:opacity-30"
+					disabled={!journal.previous}
+					aria-label={t('notes.journal.previous')}
+					onclick={() => journal.previous && journal.onstep(journal.previous)}
+				>
+					<ChevronLeft size={14} />
+				</Button>
+				<Button
+					size="icon-xs"
+					bare
+					class="text-outline hover:text-primary disabled:opacity-30"
+					disabled={!journal.next}
+					aria-label={t('notes.journal.next')}
+					onclick={() => journal.next && journal.onstep(journal.next)}
+				>
+					<ChevronRight size={14} />
+				</Button>
+			</span>
 		{/if}
 	</div>
 	<Input

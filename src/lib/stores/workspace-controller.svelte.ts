@@ -1,19 +1,14 @@
 import { tick } from 'svelte';
 import { t } from '$lib/i18n/index.svelte';
-import { createNote as makeNote } from '$lib/content/content';
 import { createNoteActions } from '$lib/content/note-actions';
 import type { Note } from '$lib/content/content';
 import {
 	foldersFor,
-	persistNote,
 	persistNotes,
-	removeNote,
 	clearNotes,
 	resetNotesToSeed,
 	loadFolders,
 	listNotes,
-	listAllNotes,
-	applyNotePatch,
 	type CustomFolder,
 	type Folder,
 	type NotePatch,
@@ -22,23 +17,18 @@ import {
 	settings,
 	toggleMode,
 	resetStoredSettings,
+	localToday,
 } from '$lib/stores/settings.svelte';
+import { createJournalOps } from '$lib/stores/workspace-journal-ops';
+import { createNoteOps } from '$lib/stores/workspace-note-ops';
+import { createWorkspaceOps } from '$lib/stores/workspace-ops';
 import { persistNotifications, resetNotifications, type AppNotification } from '$lib/stores/notifications';
 import type { TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 import type { WikiEntity } from '$lib/content/wiki-links';
 import { refreshTasks, clearTasks, listAllTasks } from '$lib/stores/tasks.svelte';
 import type { Task } from '$lib/stores/tasks';
-import { pendingEdits } from '$lib/stores/mcp-pending-edits';
-import { unsavedInWorkspace } from '$lib/content/mcp-write-actions';
 import { isTauri, openNoteWindow, type WorkspaceSection } from '$lib/windows';
-import {
-	createWorkspace,
-	deleteWorkspace,
-	renameWorkspace,
-	setActiveWorkspace,
-	workspaceStore,
-} from '$lib/stores/workspaces.svelte';
-import { notifyWorkspacesChanged } from '$lib/workspace-sync.svelte';
+import { workspaceStore } from '$lib/stores/workspaces.svelte';
 import { refreshDependencies } from '$lib/stores/dependencies.svelte';
 import { startWorkspaceSession } from '$lib/stores/workspace-session.svelte';
 import { createFolderOps } from '$lib/stores/workspace-folder-ops';
@@ -119,7 +109,6 @@ export function createWorkspaceController() {
 		feedOpen: false,
 		assistantOpen: false,
 	});
-	let workspaceLoading = false;
 	let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const folders = $derived(foldersFor(state.items, state.customFolders));
@@ -174,119 +163,53 @@ export function createWorkspaceController() {
 		state.taskFocusToken += 1;
 	}
 
-	async function changeWorkspace(id: string) {
-		if (workspaceLoading) return;
-		workspaceLoading = true;
-		if (await setActiveWorkspace(id)) {
-			await reloadWorkspaceRecords(id);
-			// The dock, Kanban and detail windows follow the selection.
-			notifyWorkspacesChanged();
-		} else {
-			showToast(t('editor.actions.workspaceSaveFailed'));
-		}
-		workspaceLoading = false;
-	}
+	const workspaceOps = createWorkspaceOps({
+		reload: (workspaceId) => reloadWorkspaceRecords(workspaceId),
+		notify: showToast,
+	});
 
-	/** Workspace CRUD for the switcher dialog; every failure becomes a toast. */
-	async function createWorkspaceByName(name: string) {
-		const workspace = await createWorkspace(name);
-		if (!workspace) {
-			showToast(t('editor.actions.workspaceCreateFailed'));
-			return false;
-		}
-		await changeWorkspace(workspace.id);
-		return true;
-	}
+	const changeWorkspace = workspaceOps.change;
+	const createWorkspaceByName = workspaceOps.createByName;
+	const renameWorkspaceById = workspaceOps.renameById;
+	const deleteWorkspaceById = workspaceOps.deleteById;
+	const unsavedWorkspaceRecords = workspaceOps.unsavedRecords;
 
-	async function renameWorkspaceById(id: string, name: string) {
-		if (!(await renameWorkspace(id, name))) {
-			showToast(t('editor.actions.workspaceRenameFailed'));
-			return false;
-		}
-		notifyWorkspacesChanged();
-		showToast(t('editor.actions.workspaceRenamed'));
-		return true;
-	}
-
-	async function deleteWorkspaceById(id: string) {
-		// Guard against a second delete (or a switch) started while this one is
-		// still awaiting the transaction: two overlapping `changeWorkspace`
-		// calls would each reload records and could leave the UI showing the
-		// lists of a workspace that was just removed.
-		if (workspaceLoading) return false;
-		workspaceLoading = true;
-		try {
-			const wasActive = id === workspaceStore.activeId;
-			if (!(await deleteWorkspace(id))) {
-				showToast(t('editor.actions.workspaceDeleteFailed'));
-				return false;
-			}
-			if (wasActive) {
-				// `changeWorkspace` re-reads the notes, tasks and dependencies of
-				// the workspace that took over, so the deleted records cannot
-				// linger in the view. It also re-asserts the selection, which can
-				// fail; surface that instead of claiming everything is saved.
-				if (!(await setActiveWorkspace(workspaceStore.activeId))) {
-					notifyWorkspacesChanged();
-					showToast(t('editor.actions.workspaceDeleteFailed'));
-					return false;
-				}
-				await reloadWorkspaceRecords(workspaceStore.activeId);
-				notifyWorkspacesChanged();
-			} else {
-				// The remaining lists did not change, but a board or the dock may
-				// have been showing the removed workspace.
-				notifyWorkspacesChanged();
-			}
-			showToast(t('editor.actions.workspaceDeleted'));
-			return true;
-		} finally {
-			workspaceLoading = false;
-		}
+	function createNote() {
+		noteOps.openCreate();
 	}
 
 	/**
-	 * Dirty notes and tasks of `workspaceId`, for the delete confirmation.
-	 *
-	 * Reads across workspaces on purpose: the records being removed are not
-	 * necessarily the ones this window is showing, and the pending sets are
-	 * cross-window truth (`mcp-pending-edits` is written by every detail
-	 * window's save queue). The loaded lists are only a fallback for the case
-	 * where the database cannot be read.
+	 * Opens (or starts) the journal entry for a day, and selects it. The ops
+	 * module owns the behaviour; this keeps the call site readable.
 	 */
-	async function unsavedWorkspaceRecords(
-		workspaceId: string
-	): Promise<{ notes: string[]; tasks: string[] }> {
-		const pending = pendingEdits();
-		if (!pending.note.size && !pending.task.size) return { notes: [], tasks: [] };
-		const [notes, tasks] = await Promise.all([listAllNotes(), listAllTasks()]);
-		return unsavedInWorkspace(workspaceId, notes, tasks, pending);
-	}
-
-	function createNote() {
-		state.createOpen = true;
-	}
-
-	async function persistNoteOrToast(note: Note) {
-		const ok = await persistNote(note);
-		if (!ok) showToast(t('editor.actions.noteSaveFailed'));
-	}
+	const openJournalDayFor = (day: string) => journalOps.openDay(day);
 
 	async function commitNewNote(data: { title: string; folder: string; body: string }) {
-		const note = makeNote({
-			...data,
-			workspaceId: workspaceStore.activeId,
-			title: data.title.trim() || 'Untitled note',
-		});
-		state.items = [note, ...state.items];
-		state.selectedId = note.id;
-		state.activeFolder = data.folder;
-		state.activeTag = null;
-		state.newNoteToken += 1;
-		state.section = 'notes';
-		showToast(t('editor.actions.noteCreated'));
-		await persistNoteOrToast(note);
+		await noteOps.commitNew(data);
 	}
+
+	const noteOps = createNoteOps({
+		get items() { return state.items; },
+		set items(value: Note[]) { state.items = value; },
+		get selectedId() { return state.selectedId; },
+		set selectedId(value: string) { state.selectedId = value; },
+		get newNoteToken() { return state.newNoteToken; },
+		set newNoteToken(value: number) { state.newNoteToken = value; },
+		get activeFolder() { return state.activeFolder; },
+		set activeFolder(value: string) { state.activeFolder = value; },
+		get activeTag() { return state.activeTag; },
+		set activeTag(value: string | null) { state.activeTag = value; },
+		set section(value: WorkspaceSection) { state.section = value; },
+		get pendingDelete() { return state.pendingDelete; },
+		set pendingDelete(value: Note | null) { state.pendingDelete = value; },
+		get deleteOpen() { return state.deleteOpen; },
+		set deleteOpen(value: boolean) { state.deleteOpen = value; },
+		get createOpen() { return state.createOpen; },
+		set createOpen(value: boolean) { state.createOpen = value; },
+		get confirmDelete() { return settings.confirmDelete; },
+		workspaceId: () => workspaceStore.activeId,
+		notify: showToast,
+	});
 
 	const folderOps = createFolderOps({
 		get items() { return state.items; },
@@ -300,6 +223,21 @@ export function createWorkspaceController() {
 		get folderDeleteOpen() { return state.folderDeleteOpen; },
 		set folderDeleteOpen(value: boolean) { state.folderDeleteOpen = value; },
 		get folders() { return folders; },
+		notify: showToast,
+	});
+
+	const journalOps = createJournalOps({
+		items: () => state.items,
+		addItem: (note) => {
+			if (!state.items.some((item) => item.id === note.id)) {
+				state.items = [note, ...state.items];
+			}
+		},
+		reveal: () => {
+			state.activeFolder = 'all';
+			state.activeTag = null;
+			state.section = 'notes';
+		},
 		notify: showToast,
 	});
 
@@ -343,37 +281,11 @@ export function createWorkspaceController() {
 	const performDeleteFolder = folderOps.performDelete;
 	const reorderFolder = folderOps.reorder;
 
-	function updateNote(id: string, patch: NotePatch) {
-		let updated: Note | undefined;
-		state.items = state.items.map((note) => {
-			if (note.id !== id) return note;
-			updated = applyNotePatch(note, patch);
-			return updated;
-		});
+	const updateNote = noteOps.update;
 
-		if (!updated) return;
-		const toSave = updated;
-		if (persistTimer) clearTimeout(persistTimer);
-		persistTimer = setTimeout(() => {
-			void persistNoteOrToast(toSave);
-		}, 250);
-	}
+	const deleteNote = noteOps.remove;
 
-	function deleteNote(id: string) {
-		if (!settings.confirmDelete) {
-			performDelete(id);
-			return;
-		}
-		state.pendingDelete = state.items.find((note) => note.id === id) ?? null;
-		state.deleteOpen = state.pendingDelete !== null;
-	}
-
-	function performDelete(id: string) {
-		state.items = state.items.filter((note) => note.id !== id);
-		if (state.selectedId === id) state.selectedId = state.items[0]?.id ?? '';
-		void removeNote(id);
-		showToast(t('editor.actions.noteDeleted'));
-	}
+	const performDelete = (id: string) => noteOps.performRemove(id);
 
 	function selectFolder(id: string) {
 		state.activeFolder = id;
@@ -520,6 +432,21 @@ export function createWorkspaceController() {
 		},
 		get selected() {
 			return selected;
+		},
+		/**
+		 * Journal affordance for the feed, or `undefined` when the feature is off
+		 * so the feed renders exactly as before.
+		 */
+		get journal() {
+			return journalOps.feedAffordance();
+		},
+		openTodayJournal: journalOps.openToday,
+		/**
+		 * Day navigation for the editor header when the selected note is a
+		 * journal entry, else `undefined`.
+		 */
+		get journalNavigation() {
+			return journalOps.navigationFor(selected);
 		},
 		noteActions,
 		showToast,

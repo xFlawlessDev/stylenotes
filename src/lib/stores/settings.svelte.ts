@@ -48,6 +48,15 @@ export type Settings = {
 	 * (`Asia/Jakarta`), or an empty string to follow the OS zone.
 	 */
 	timezone: string;
+	/**
+	 * Journal (docs/design/journal.md). Opt-in: it writes notes, so it needs an
+	 * explicit yes. These four keys are **device-local for now** and must move to
+	 * `settings_cloud` when cloud sync Phase 0 lands (#J8, §5.2).
+	 */
+	journalEnabled: boolean;
+	journalFolder: string;
+	journalFormat: string;
+	journalTemplate: string;
 };
 
 export const accents: { id: Accent; label: string; swatchClass: string }[] = [
@@ -80,6 +89,10 @@ const defaults: Settings = {
 	detailAlwaysOnTop: true,
 	versioningEnabled: true,
 	timezone: '',
+	journalEnabled: false,
+	journalFolder: 'journal',
+	journalFormat: 'YYYY-MM-DD',
+	journalTemplate: '',
 };
 
 export function defaultSettings(): Settings {

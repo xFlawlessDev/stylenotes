@@ -1,6 +1,6 @@
 # Tool reference
 
-All 28 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
+All 29 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
 are executed by the running app. `workspace` is optional on every tool that
 takes it and falls back to `workspace-default`.
 
@@ -276,6 +276,32 @@ text, whatever the body already ended with, and adds nothing to an empty body.
 ```json
 { "name": "edit_note_body", "arguments": { "id": "abc-123/note-uuid", "op": "replace", "find": "alnair", "replace": "stylenotes" } }
 { "name": "edit_note_body", "arguments": { "id": "abc-123/note-uuid", "op": "insert", "text": "- reviewed the pricing model", "position": "end" } }
+```
+
+### `journal_today`
+
+| Argument | Type |
+|---|---|
+| `workspace` | string |
+
+Finds — or starts — the journal entry for the user's **local today**. Returns
+`{ ok, created, note: { id, workspaceId, title, journalDay } }`.
+
+Registered as a write because it may create a note, but it does the useful half
+under a read grant too: it returns the existing entry and only the create is
+refused. Journal must be switched on in **Settings → Journal**; when it is off
+the call returns `mcp_disabled` with that instruction.
+
+The day comes from the app's clock and timezone, never from the caller. Do not
+pass a date, and do not create the entry with `create_note` — the vault allows one
+entry per day, and a hand-made duplicate is refused by the database.
+
+`created: true` means this call started the entry. Add to it with
+`edit_note_body`; `journalDay` is the day it represents, which is not the same as
+when it was written.
+
+```json
+{ "name": "journal_today", "arguments": { "workspace": "abc-123" } }
 ```
 
 ### `delete_note`

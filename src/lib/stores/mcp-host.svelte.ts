@@ -23,6 +23,7 @@ import {
 	deleteNoteAction,
 	deleteTaskAction,
 	editNoteBodyAction,
+	journalTodayAction,
 	linkTasksAction,
 	unlinkTasksAction,
 	updateNoteAction,
@@ -294,6 +295,8 @@ async function runAction(job: McpJob): Promise<WriteOutcome> {
 			}
 			return deleteNoteAction(context, job.args);
 		}
+		case 'journal_today':
+			return journalTodayAction(context, job.args);
 		case 'create_task':
 			return createTaskAction(context, job.args);
 		case 'update_task': {

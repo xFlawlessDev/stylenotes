@@ -113,6 +113,12 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Every tag in use, with how many notes carry it.",
     },
     ToolDescriptor {
+        name: "journal_today",
+        kind: ToolKind::Write,
+        scope: "notes",
+        description: "Find or start the journal entry for the user’s local today.",
+    },
+    ToolDescriptor {
         name: "create_note",
         kind: ToolKind::Write,
         scope: "notes",
@@ -265,6 +271,10 @@ fn schema_for(name: &str) -> Value {
             properties["position"] = json!({ "type": "string" });
             required.push("id");
             required.push("op");
+        }
+        "journal_today" => {
+            // Only `workspace`; the day is the user's local today, never the
+            // caller's idea of it (#D19).
         }
         "create_task" => {
             properties["title"] = json!({ "type": "string" });
