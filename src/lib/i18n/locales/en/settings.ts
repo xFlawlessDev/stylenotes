@@ -158,6 +158,11 @@ export const settings = {
 			'Offline baseline: this build has no embedding model, so matches follow wording, not meaning. Add a provider key or a local model for real semantic recall.',
 		status: '{indexed} indexed · {pending} to index',
 		buildIndex: 'Build index',
+		reindex: 'Re-index',
+		reindexConfirm:
+			'This deletes every stored vector and embeds your whole vault again. Your notes are not touched. Use it after switching models or if the index looks wrong.',
+		reindexConfirmButton: 'Delete and rebuild',
+		cancel: 'Cancel',
 		rebuildThemes: 'Recompute themes',
 		findContradictions: 'Find contradictions',
 		indexing: 'Indexing…',

@@ -40,7 +40,7 @@ import { clustersRepo, type ClusterRecord } from '$lib/db/clusters';
 import { clusterVectors, type ClusterItem } from '$lib/content/clusters';
 import { candidatePairs, contradictionReason, verificationPrompt, verifiedContradictions, type ContradictionItem } from '$lib/content/contradictions';
 import { buildWorkspaceGraph, type GraphSuggestion } from '$lib/content/workspace-graph';
-import { embeddingsRepo } from '$lib/db/embeddings';
+import { embeddingsRepo, type EmbeddingRecord } from '$lib/db/embeddings';
 import { metaRepo } from '$lib/db/meta';
 import { listAllNotes } from '$lib/stores/notes';
 import { listAllTasks } from '$lib/stores/tasks.svelte';
@@ -375,8 +375,13 @@ export function stopIndexing(): void {
  * Batch of `MEMORY_EMBED_BATCH`, cancellable, and a no-op if a cycle is already
  * running. Only notes whose `content_hash` changed are re-embedded, so a second
  * run after a small edit touches a handful of rows, not the whole vault.
+ *
+ * With `force`, every stored vector is dropped first and the whole vault is
+ * embedded again. That is the "re-index" repair path for a suspect index —
+ * a changed model, a corrupt row, or a manual rebuild — and it is safe because
+ * the index is a derivative that can always be rebuilt from the notes (#D6).
  */
-export async function buildIndex(): Promise<boolean> {
+export async function buildIndex(options: { force?: boolean } = {}): Promise<boolean> {
 	if (!browser || running) return false;
 	if (currentWindowRole() !== 'workspace' && isTauri) return false;
 	if (!memoryReady()) {
@@ -393,14 +398,23 @@ export async function buildIndex(): Promise<boolean> {
 	let ok = true;
 	try {
 		const id = embedderId()!;
+		// A forced rebuild starts from nothing so no row is trusted.
+		if (options.force && !(await embeddingsRepo.clear())) {
+			throw new Error('Could not clear the old index');
+		}
 		const sources = await loadSources();
-		const stored = new Map(
-			(await embeddingsRepo.listByModel(id)).map((row) => [`${row.entityKind}:${row.entityId}`, row])
-		);
+		const stored = options.force
+			? new Map<string, EmbeddingRecord>()
+			: new Map(
+					(await embeddingsRepo.listByModel(id)).map((row) => [
+						`${row.entityKind}:${row.entityId}`,
+						row
+					])
+				);
 
 		const stale = sources.filter((source) => {
 			const row = stored.get(`${source.kind}:${source.id}`);
-			return !row || row.contentHash !== contentHash(embedText(source));
+			return options.force || !row || row.contentHash !== contentHash(embedText(source));
 		});
 
 		for (let offset = 0; offset < stale.length; offset += MEMORY_EMBED_BATCH) {

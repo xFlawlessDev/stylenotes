@@ -157,6 +157,11 @@ export const settings: SettingsMessages = {
 			'Baseline offline: build ini tidak punya model embedding, jadi hasil mengikuti kata, bukan makna. Tambahkan kunci provider atau model lokal untuk pencarian makna sungguhan.',
 		status: '{indexed} terindeks · {pending} menunggu diindeks',
 		buildIndex: 'Bangun indeks',
+		reindex: 'Indeks ulang',
+		reindexConfirm:
+			'Ini menghapus semua vektor tersimpan dan meng-embed seluruh vault lagi. Catatanmu tidak disentuh. Pakai ini setelah ganti model atau bila indeks tampak salah.',
+		reindexConfirmButton: 'Hapus dan bangun ulang',
+		cancel: 'Batal',
 		rebuildThemes: 'Hitung ulang tema',
 		findContradictions: 'Cari pertentangan',
 		indexing: 'Mengindeks…',

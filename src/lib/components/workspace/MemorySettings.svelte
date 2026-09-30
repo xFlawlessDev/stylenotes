@@ -26,6 +26,7 @@
 	 * expectation and cost the feature its trust.
 	 */
 	let busy = $state(false);
+	let reindexConfirmOpen = $state(false);
 
 	const embedderOptions = $derived<SelectOption[]>(
 		memoryStore.embedders.map((embedder) => ({
@@ -50,6 +51,15 @@
 		busy = true;
 		await buildIndex();
 		busy = false;
+	}
+
+	/** Drops every vector and embeds the whole vault again (#D6 repair path). */
+	async function reindex() {
+		if (busy || memoryStore.indexing) return;
+		busy = true;
+		await buildIndex({ force: true });
+		busy = false;
+		reindexConfirmOpen = false;
 	}
 
 	async function recomputeThemes() {
@@ -206,7 +216,31 @@
 			<Button variant="secondary" size="md" disabled={busy} onclick={scanContradictions}>
 				{t('settings.memory.findContradictions')}
 			</Button>
+			<Button
+				variant="outline"
+				size="md"
+				disabled={busy || memoryStore.indexing || needsModel || (isOnnx && !memoryStore.modelRuntimeFound)}
+				onclick={() => (reindexConfirmOpen = true)}
+			>
+				{t('settings.memory.reindex')}
+			</Button>
 		</div>
+
+		{#if reindexConfirmOpen}
+			<div class="flex flex-col gap-2 rounded-2xl bg-error-container/20 p-3">
+				<span class="text-label-sm font-label text-error">
+					{t('settings.memory.reindexConfirm')}
+				</span>
+				<div class="flex gap-2">
+					<Button variant="danger" size="sm" onclick={reindex}>
+						{t('settings.memory.reindexConfirmButton')}
+					</Button>
+					<Button variant="ghost" size="sm" onclick={() => (reindexConfirmOpen = false)}>
+						{t('settings.memory.cancel')}
+					</Button>
+				</div>
+			</div>
+		{/if}
 
 		<Field label={t('settings.memory.threshold')} class="gap-2.5">
 			<Slider
