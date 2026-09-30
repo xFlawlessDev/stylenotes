@@ -28,6 +28,8 @@ export type GraphEngine = {
 	setSelected(id: string | null): void;
 	/** Fly the camera to a node and pin it (used by search results). */
 	focusNode(id: string): void;
+	/** Return the orbit target to the middle of the layout (selection cleared). */
+	resetView(): void;
 	/** Fly the camera to frame an edge's full span. */
 	focusEdge(id: string): void;
 	/** Slow idle rotation, off for `prefers-reduced-motion`. */
@@ -330,6 +332,19 @@ export async function createGraphEngine({ host, onselect, onopen, onfocus }: Gra
 	}
 
 	/**
+	 * Bring the orbit target back to the middle of the layout.
+	 *
+	 * Used when the selection is cleared: the camera keeps its current viewing
+	 * direction but pivots around the origin again, framed at the home distance by
+	 * the same path as "fit view". Guarded so it is a no-op when the target is
+	 * already centred, which avoids an unnecessary flight on the initial state.
+	 */
+	function resetView(): void {
+		if (!scene || controls.target.lengthSq() === 0) return;
+		rig.fit();
+	}
+
+	/**
 	 * Frame an edge's full span, centred between its endpoints and pulled back far
 	 * enough that the whole link, plus the nodes it joins, is in view.
 	 */
@@ -447,6 +462,7 @@ export async function createGraphEngine({ host, onselect, onopen, onfocus }: Gra
 		},
 		focusNode,
 		focusEdge,
+		resetView,
 		setAutoRotate(enabled) {
 			rig.setAutoRotate(enabled);
 		},

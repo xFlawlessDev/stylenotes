@@ -93,11 +93,39 @@
 		engine?.setSelected(selectedId);
 	});
 
-	// A new `focusId` flies the camera; `undefined` is inert so clearing the
-	// search does not move the view. `focusToken` makes a repeated pick re-frame.
+	// A new `focusId` flies the camera. Reading `focusToken` first means a pick
+	// that arrives *while the engine is still loading* is honoured once it is
+	// ready, instead of being lost: the effect re-runs when `engine` flips. The
+	// "last frame was the requested token" latch below then re-picking the same
+	// node (a new token) re-frames, while an unrelated re-run (a rebuild, a theme
+	// change) is inert and cannot yank the camera back to a stale node.
+	let framed: { nodeId: string; token: number } | null = null;
 	$effect(() => {
-		void focusToken;
-		if (focusId) engine?.focusNode(focusId);
+		const token = focusToken;
+		const nodeId = focusId;
+		const current = engine;
+		if (!current || !nodeId) return;
+		if (framed?.nodeId === nodeId && framed.token === token) return;
+		framed = { nodeId, token };
+		current.focusNode(nodeId);
+	});
+
+	// When the node is selected but *not* framed — a connection picked from the
+	// drawer — keeping the camera here does not help. Fly to it instead, with a
+	// fresh `token` marker so the loop above does not frame it a second time.
+	$effect(() => {
+		const nodeId = selectedId;
+		if (!nodeId) return;
+		if (framed?.nodeId === nodeId && framed.token === focusToken) return;
+		framed = { nodeId, token: focusToken };
+		engine?.focusNode(nodeId);
+	});
+
+	// Losing the selection returns the orbit target to the middle of the layout,
+	// so the camera does not stay pinned to a node the user has dismissed.
+	$effect(() => {
+		if (selectedId) return;
+		engine?.resetView();
 	});
 
 	// Framing an edge is a separate intent from selecting a node: it takes in the
