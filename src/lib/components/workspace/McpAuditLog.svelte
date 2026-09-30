@@ -61,6 +61,11 @@
 					{#if row.workspace}
 						<span class="shrink-0 text-label-sm font-label text-outline">{row.workspace}</span>
 					{/if}
+					{#if row.remoteAddr}
+						<span class="shrink-0 truncate text-label-sm font-label text-outline"
+							>{row.remoteAddr}</span
+						>
+					{/if}
 					<span
 						class="shrink-0 rounded-full px-1.5 py-px text-label-sm font-label {row.scope === 'write'
 							? 'bg-tertiary-container text-on-tertiary-container'

@@ -26,6 +26,9 @@ export const GRAPH_TOKENS = {
 		wiki: '--graph-edge-wiki',
 		link: '--graph-edge-link',
 		dependency: '--graph-edge-dependency',
+		semantic: '--graph-edge-semantic',
+		related: '--graph-edge-related',
+		contradicts: '--graph-edge-contradicts',
 	} as Record<GraphEdgeKind, string>,
 } as const;
 
@@ -43,12 +46,18 @@ const FALLBACK: Record<string, number> = {
 	'--graph-edge-wiki': 0x7f8ea3,
 	'--graph-edge-link': 0x4a9ff5,
 	'--graph-edge-dependency': 0xe5698f,
+	'--graph-edge-semantic': 0xb39ddb,
+	'--graph-edge-related': 0x90caf9,
+	'--graph-edge-contradicts': 0xff8a65,
 };
 
 export const GRAPH_EDGE_LABELS: Record<GraphEdgeKind, string> = {
 	wiki: 'Wiki link',
 	link: 'Linked note',
 	dependency: 'Dependency',
+	semantic: 'Similar',
+	related: 'Related',
+	contradicts: 'Contradicts',
 };
 
 let cached: Map<string, number> | null = null;
@@ -112,6 +121,42 @@ export function graphNodeColor(node: Pick<GraphNode, 'kind' | 'status'>): number
 	return node.kind === 'note'
 		? graphTokenColor(GRAPH_TOKENS.note)
 		: graphTokenColor(GRAPH_TOKENS.task[node.status ?? 'todo']);
+}
+
+/**
+ * A stable colour for a theme cluster, returned as a packed `0xrrggbb`.
+ *
+ * One definition shared by the legend and the canvas override, so the swatch a
+ * user clicks is exactly the colour the nodes take. Hue steps by the golden
+ * angle so adjacent clusters never land on near-identical hues.
+ */
+export function themeClusterColor(index: number): number {
+	const hue = (index * 137.508) % 360;
+	// HSL(62% saturation, 60% lightness) converted to sRGB keeps the clusters
+	// legible on both the dark and light graph background.
+	const hsl = hueToRgb(hue, 0.62, 0.6);
+	return (Math.round(hsl[0] * 255) << 16) | (Math.round(hsl[1] * 255) << 8) | Math.round(hsl[2] * 255);
+}
+
+/** The same theme colour as a CSS string, for inline styles in Svelte. */
+export function themeClusterCss(index: number): string {
+	return graphColorHex(themeClusterColor(index));
+}
+
+/** Standard HSL-to-RGB, all inputs in 0..1 except hue in degrees. */
+function hueToRgb(hue: number, saturation: number, lightness: number): [number, number, number] {
+	const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
+	const h = hue / 60;
+	const x = c * (1 - Math.abs((h % 2) - 1));
+	let rgb: [number, number, number];
+	if (h < 1) rgb = [c, x, 0];
+	else if (h < 2) rgb = [x, c, 0];
+	else if (h < 3) rgb = [0, c, x];
+	else if (h < 4) rgb = [0, x, c];
+	else if (h < 5) rgb = [x, 0, c];
+	else rgb = [c, 0, x];
+	const m = lightness - c / 2;
+	return [rgb[0] + m, rgb[1] + m, rgb[2] + m];
 }
 
 export function graphEdgeColor(kind: GraphEdgeKind): number {

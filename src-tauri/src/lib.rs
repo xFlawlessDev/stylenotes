@@ -6,9 +6,12 @@ mod tray;
 
 mod ai;
 mod db_tx;
+mod embed;
+mod import;
 mod mcp_host;
 mod mcp_watch;
 mod quit;
+mod remote_mcp;
 
 const DB_URL: &str = "sqlite:stylenotes.db";
 const WORKSPACE_LABEL: &str = "workspace";
@@ -616,6 +619,116 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Semantic memory index (docs/design/constella-features.md #D4, #D5).
+        //
+        // One row per entity, vector stored as little-endian `f32` BLOB. This
+        // table is a *derivative* (#D6): it may be dropped and rebuilt from
+        // `notes.body` at any time, so nothing here is a source of truth and no
+        // migration ever moves note data into it.
+        //
+        // `model` + `dim` travel with each vector so switching embedder never
+        // silently compares vectors from two different models: a mismatch is
+        // treated as "not indexed" and re-embedded. `content_hash` is the
+        // efficiency key - a note that did not change is never re-embedded.
+        Migration {
+            version: 19,
+            description: "create_embeddings",
+            sql: "
+                CREATE TABLE IF NOT EXISTS embeddings (
+                    entity_kind TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    dim INTEGER NOT NULL,
+                    vec BLOB NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (entity_kind, entity_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings (model);
+            ",
+            kind: MigrationKind::Up,
+        },
+        // Auto-link suggestions (#D7). Auto-linking *proposes*; it never writes
+        // the real graph. A row here is a pending/accepted/rejected proposal,
+        // and only an accepted one becomes an edge. Rejected rows are kept so
+        // the same pair is never suggested twice (#D8).
+        //
+        // `reason` is persisted, so it stays English (AGENTS.md: persisted text
+        // is never translated); the UI localises a stable shape around it.
+        Migration {
+            version: 20,
+            description: "create_graph_suggestions",
+            sql: "
+                CREATE TABLE IF NOT EXISTS graph_suggestions (
+                    id TEXT PRIMARY KEY,
+                    source_kind TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    target_kind TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    edge_kind TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 0,
+                    reason TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at INTEGER NOT NULL,
+                    decided_at INTEGER
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_graph_suggestions_status
+                    ON graph_suggestions (status);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_graph_suggestions_pair
+                    ON graph_suggestions (source_kind, source_id, target_kind, target_id, edge_kind);
+            ",
+            kind: MigrationKind::Up,
+        },
+        // Cluster assignments (#D9). `run_id` groups one clustering pass so a new
+        // pass can be swapped in atomically: build under a fresh id, then delete
+        // every other id. The label is persisted (English) and localised for
+        // display.
+        Migration {
+            version: 21,
+            description: "create_clusters",
+            sql: "
+                CREATE TABLE IF NOT EXISTS clusters (
+                    run_id TEXT NOT NULL,
+                    cluster_id INTEGER NOT NULL,
+                    label TEXT NOT NULL DEFAULT '',
+                    entity_kind TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 0,
+                    PRIMARY KEY (run_id, entity_kind, entity_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_clusters_run ON clusters (run_id);
+            ",
+            kind: MigrationKind::Up,
+        },
+        // Remote MCP (docs/design/constella-features.md #D12, paid tier). The
+        // token is stored as a hash with a short hint, so a leaked DB file does
+        // not leak the token itself; `mode` travels with the token because
+        // changing exposure mode must rotate it. Device-local: this must never
+        // reach the synced `settings` row.
+        //
+        // `mcp_audit.remote_addr` records where a remote call came from, so the
+        // LAN mode's audit trail can show the origin machine.
+        Migration {
+            version: 22,
+            description: "create_remote_mcp",
+            sql: "
+                CREATE TABLE IF NOT EXISTS remote_mcp (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    mode TEXT NOT NULL DEFAULT 'local',
+                    token_hash TEXT NOT NULL DEFAULT '',
+                    token_hint TEXT NOT NULL DEFAULT '',
+                    created_at INTEGER,
+                    rotated_at INTEGER
+                );
+
+                ALTER TABLE mcp_audit ADD COLUMN remote_addr TEXT NOT NULL DEFAULT '';
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -653,7 +766,17 @@ pub fn run() {
             ai::commands::ai_test_connection,
             ai::web_commands::ai_web_search,
             ai::web_commands::ai_web_fetch,
-            ai::web_commands::ai_search_providers
+            ai::web_commands::ai_search_providers,
+            embed::commands::memory_embedders,
+            embed::commands::ai_embed,
+            embed::commands::memory_cosine,
+            embed::commands::memory_model_status,
+            embed::commands::memory_download_model,
+            import::import_read_markdown,
+            remote_mcp::commands::remote_mcp_start,
+            remote_mcp::commands::remote_mcp_stop,
+            remote_mcp::commands::remote_mcp_status,
+            remote_mcp::commands::remote_mcp_rotate
         ])
         .setup(|app| {
             // Lays down `mcp/`, clears stale jobs, and writes the first
@@ -669,6 +792,10 @@ pub fn run() {
             });
             // Tracks which detail windows still owe a pre-quit flush.
             app.manage(quit::QuitState::default());
+            // Keeps a loaded local embedder warm between i_embed batches.
+            app.manage(embed::commands::LocalModelState::default());
+            // Owns the optional remote MCP listener; off until started (#D12).
+            app.manage(remote_mcp::commands::RemoteState::default());
             // The atomic note-write pool must exist before any window can call
             // `note_upsert_tx`. A failed open is not fatal: the frontend falls
             // back to the non-transactional path (see `db/index.ts`).

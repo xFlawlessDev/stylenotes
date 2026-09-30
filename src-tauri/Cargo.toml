@@ -27,6 +27,19 @@ path = "src/mcp/main.rs"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# Local ONNX embedder (docs/design/constella-features.md #D3).
+#
+# On by default so an ordinary desktop build ships the offline model path, as
+# the design intends. `--no-default-features` drops ONNX Runtime and the
+# tokenizer entirely for a fast CI check that never needs a model.
+#
+# The dylib is loaded at runtime (`load-dynamic`), so even when this is on, a
+# build without `onnxruntime.dll` still starts and simply reports the model as
+# unavailable rather than failing to launch.
+default = ["local-embed"]
+local-embed = ["dep:ort", "dep:tokenizers"]
+
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-opener = "2"
@@ -51,6 +64,17 @@ thiserror = "2"
 # Filesystem watcher: pushes new MCP job files to the parked `mcp_wait_job`
 # call instead of letting the frontend poll `mcp/jobs/` (src/mcp_watch.rs).
 notify = "8"
+# Remote MCP HTTP listener (#D12). Minimal hyper server on the tokio runtime Tauri
+# already provides; no full web framework is needed for one JSON-RPC POST route.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+tokio = { version = "1", features = ["net", "time", "rt", "macros", "sync"] }
+# Vendored ONNX Runtime bindings + tokenizer, gated by `local-embed`. Pinned
+# because `ort` 2.0 is still a release candidate; a floating requirement could
+# pull an incompatible API. `load-dynamic` keeps the dylib out of the link line.
+ort = { version = "=2.0.0-rc.12", features = ["ndarray", "load-dynamic"], optional = true }
+tokenizers = { version = "0.21", default-features = false, features = ["onig"], optional = true }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

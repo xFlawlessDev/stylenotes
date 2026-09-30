@@ -47,6 +47,7 @@ type McpAuditRow = {
 	ok: number;
 	workspace: string;
 	detail: string;
+	remote_addr: string | null;
 };
 
 /**
@@ -100,6 +101,7 @@ function toAudit(row: McpAuditRow): McpAuditRecord {
 		ok: Boolean(row.ok),
 		workspace: row.workspace,
 		detail: row.detail,
+		remoteAddr: row.remote_addr ?? '',
 	};
 }
 
@@ -211,6 +213,7 @@ export const mcpRepo = {
 		ok: boolean;
 		workspace?: string;
 		detail?: string;
+		remoteAddr?: string;
 	}): Promise<boolean> {
 		try {
 			const db = await getDb();
@@ -224,6 +227,7 @@ export const mcpRepo = {
 					record.ok ? 1 : 0,
 					record.workspace ?? '',
 					record.detail ?? '',
+					record.remoteAddr ?? '',
 				]
 			);
 			return true;

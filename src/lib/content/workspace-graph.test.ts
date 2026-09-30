@@ -20,7 +20,7 @@ describe('buildWorkspaceGraph', () => {
 			['wiki', graphNodeId('note', 'note-a'), graphNodeId('task', 'task-b')],
 			['wiki', graphNodeId('task', 'task-b'), graphNodeId('note', 'note-a')],
 		]);
-		expect(graph.counts).toEqual({ wiki: 3, dependency: 0, link: 0 });
+		expect(graph.counts).toEqual({ wiki: 3, dependency: 0, link: 0, semantic: 0, related: 0, contradicts: 0 });
 	});
 
 	it('deduplicates repeated references and skips self-links', () => {
@@ -55,7 +55,7 @@ describe('buildWorkspaceGraph', () => {
 			['link', graphNodeId('task', 'task-one'), graphNodeId('note', 'note')],
 			['dependency', graphNodeId('task', 'task-two'), graphNodeId('task', 'task-one')],
 		]);
-		expect(graph.counts).toEqual({ wiki: 0, dependency: 1, link: 1 });
+		expect(graph.counts).toEqual({ wiki: 0, dependency: 1, link: 1, semantic: 0, related: 0, contradicts: 0 });
 	});
 
 	it('ignores dependencies pointing at unknown tasks', () => {
@@ -64,5 +64,117 @@ describe('buildWorkspaceGraph', () => {
 			dependencies: [{ taskId: 'task', dependsOnTaskId: 'missing' }],
 		});
 		expect(graph.edges).toEqual([]);
+	});
+});
+
+describe('graph suggestions (#D7)', () => {
+	const noteA = createNote({ id: 'a', title: 'A', workspaceId: 'one' });
+	const noteB = createNote({ id: 'b', title: 'B', workspaceId: 'one' });
+
+	it('renders a pending suggestion separately and does not change degree', () => {
+		const graph = buildWorkspaceGraph([noteA, noteB], [], {
+			suggestions: [
+				{
+					id: 's1',
+					sourceKind: 'note',
+					sourceId: 'a',
+					targetKind: 'note',
+					targetId: 'b',
+					kind: 'related',
+					score: 0.9,
+					reason: 'Similar',
+					status: 'pending',
+				},
+			],
+		});
+		expect(graph.edges).toEqual([]);
+		expect(graph.suggestions).toHaveLength(1);
+		expect(graph.suggestions[0].kind).toBe('related');
+		expect(graph.nodes.every((node) => node.degree === 0 && node.orphan)).toBe(true);
+	});
+
+	it('turns an accepted suggestion into a real edge and counts it', () => {
+		const graph = buildWorkspaceGraph([noteA, noteB], [], {
+			suggestions: [
+				{
+					id: 's1',
+					sourceKind: 'note',
+					sourceId: 'a',
+					targetKind: 'note',
+					targetId: 'b',
+					kind: 'related',
+					score: 0.9,
+					reason: 'Similar',
+					status: 'accepted',
+				},
+			],
+		});
+		expect(graph.suggestions).toEqual([]);
+		expect(graph.edges.map((edge) => edge.kind)).toEqual(['related']);
+		expect(graph.counts.related).toBe(1);
+		expect(graph.nodes.every((node) => node.degree === 1 && !node.orphan)).toBe(true);
+	});
+
+	it('drops a rejected suggestion entirely', () => {
+		const graph = buildWorkspaceGraph([noteA, noteB], [], {
+			suggestions: [
+				{
+					id: 's1',
+					sourceKind: 'note',
+					sourceId: 'a',
+					targetKind: 'note',
+					targetId: 'b',
+					kind: 'semantic',
+					score: 0.9,
+					reason: 'Similar',
+					status: 'rejected',
+				},
+			],
+		});
+		expect(graph.edges).toEqual([]);
+		expect(graph.suggestions).toEqual([]);
+	});
+
+	it('ignores a suggestion whose endpoints are unknown', () => {
+		const graph = buildWorkspaceGraph([noteA], [], {
+			suggestions: [
+				{
+					id: 's1',
+					sourceKind: 'note',
+					sourceId: 'a',
+					targetKind: 'note',
+					targetId: 'missing',
+					kind: 'related',
+					score: 0.9,
+					reason: 'Similar',
+					status: 'pending',
+				},
+			],
+		});
+		expect(graph.suggestions).toEqual([]);
+	});
+
+	it('collapses a pending suggestion that duplicates a real edge', () => {
+		const linked = createNote({ id: 'a', title: 'A', workspaceId: 'one', body: '[[B]]' });
+		const other = createNote({ id: 'b', title: 'B', workspaceId: 'one' });
+		const graph = buildWorkspaceGraph([linked, other], [], {
+			suggestions: [
+				{
+					id: 's1',
+					sourceKind: 'note',
+					sourceId: 'a',
+					targetKind: 'note',
+					targetId: 'b',
+					kind: 'related',
+					score: 0.9,
+					reason: 'Similar',
+					status: 'accepted',
+				},
+			],
+		});
+		// The wiki edge and the accepted related edge are distinct kinds, so both
+		// exist; what matters is that no duplicate of the same kind is drawn.
+		expect(graph.edges.filter((edge) => edge.kind === 'wiki')).toHaveLength(1);
+		expect(graph.edges.filter((edge) => edge.kind === 'related')).toHaveLength(1);
 	});
 });

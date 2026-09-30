@@ -68,6 +68,20 @@ pub struct GrantInfo {
     pub access: String,
     pub scopes: Vec<String>,
 }
+impl GrantInfo {
+    /// The safe default: read-only, no scopes.
+    pub fn read_only() -> Self {
+        Self {
+            access: "read".to_string(),
+            scopes: Vec::new(),
+        }
+    }
+
+    /// Whether a write tool for `scope` is currently allowed (#D6).
+    pub fn allow_write(&self, scope: &str) -> bool {
+        self.access == "write" && self.scopes.iter().any(|item| item == scope)
+    }
+}
 
 /// Absolute path of the SQLite database.
 ///
@@ -77,7 +91,7 @@ pub fn database_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|dir| dir.join(DB_FILE))
 }
 
-fn mcp_root<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+pub fn mcp_root<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|dir| dir.join(MCP_DIR))
 }
 

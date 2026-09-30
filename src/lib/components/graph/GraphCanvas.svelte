@@ -18,6 +18,7 @@
 		fitToken = 0,
 		spinning = true,
 		guides = false,
+		themeColors = null,
 		onselect,
 		onopen,
 		onfocus,
@@ -38,6 +39,8 @@
 		spinning?: boolean;
 		/** Show the decorative orbital rings. Off by default: they are not data. */
 		guides?: boolean;
+		/** Per-node colour override for a selected theme, or null for the palette. */
+		themeColors?: Map<string, number> | null;
 		onselect: (node: GraphNode | null) => void;
 		/** Double-clicking a node opens it. */
 		onopen?: (node: GraphNode) => void;
@@ -140,6 +143,11 @@
 
 	$effect(() => {
 		engine?.setGuidesVisible(guides);
+	});
+
+	// A selected theme recolours its members; `null` restores the normal palette.
+	$effect(() => {
+		engine?.setThemeColors(themeColors);
 	});
 
 	$effect(() => {

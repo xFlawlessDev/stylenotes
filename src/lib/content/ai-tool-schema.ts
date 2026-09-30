@@ -84,6 +84,46 @@ export const AI_TOOLS: AiToolSpec[] = [
 			},
 			required: ['query']
 		}),
+	tool('semantic_search', 'Search by meaning', 'notes', 'read',
+		'Meaning-based search over notes and tasks. Use it when the user asks for notes about an idea, not a specific word or id; use search_notes for exact terms and codes. May be unavailable until the memory index is built.',
+		{
+			type: 'object',
+			properties: {
+				query: { type: 'string', description: 'The idea to search for.' },
+				workspace,
+				limit: { type: 'integer', description: 'Max results to return (default 10).' }
+			},
+			required: ['query']
+		}),
+	tool('related_notes', 'Related notes', 'notes', 'read',
+		'Notes and tasks most similar in meaning to one entity. Use it to surface connections the user may not have linked. Pass an id from list_notes, search_notes or semantic_search.',
+		{
+			type: 'object',
+			properties: {
+				id: { type: 'string', description: 'Exact note or task id.' },
+				kind: { type: 'string', enum: ['note', 'task'], description: 'Defaults to note.' },
+				limit: { type: 'integer', description: 'Max results to return (default 8).' }
+			},
+			required: ['id']
+		}),
+	tool('list_themes', 'List themes', 'notes', 'read',
+		'The current topic clusters over the notes and tasks, each with a label and member ids. Use it to answer "what am I writing about" or to group a broad question before drilling in.',
+		{
+			type: 'object',
+			properties: {
+				workspace,
+				limit: { type: 'integer', description: 'Max themes to return (default 8).' }
+			}
+		}),
+	tool('find_contradictions', 'Find contradictions', 'notes', 'read',
+		'Pairs of notes whose claims conflict, verified by a model over the most similar pairs. Use it when the user asks whether their notes disagree. Needs the assistant configured; returns nothing when it is not.',
+		{
+			type: 'object',
+			properties: {
+				workspace,
+				limit: { type: 'integer', description: 'Max pairs to verify (default 10).' }
+			}
+		}),
 	tool('get_note', 'Read note', 'notes', 'read',
 		'One note with its full body plus wiki backlinks and outlinks. Use an id from list_notes or search_notes; this does not accept a title.',
 		{

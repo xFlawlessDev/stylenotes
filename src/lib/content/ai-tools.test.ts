@@ -358,3 +358,139 @@ describe('toolLabel', () => {
 		expect(toolLabel('get_note')).toBe('Read note');
 	});
 });
+
+describe('semantic tools', () => {
+	it('reports "not ready" for semantic_search without a memory hook', async () => {
+		const result = await executeToolCall(context(), 'semantic_search', '{"query":"roadmap"}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toContain('search_notes');
+	});
+
+	it('ranks hits and references them when memory is available', async () => {
+		const withMemory: ToolContext = {
+			...context(),
+			memory: {
+				ready: () => true,
+				search: async () => [{ entityKind: 'note', entityId: 'n1', score: 0.91234 }],
+				related: async () => [
+					{ entityKind: 'task', entityId: 't1', score: 0.8 },
+					{ entityKind: 'note', entityId: 'n1', score: 0.5 }
+				],
+				themes: async () => [],
+				contradictions: async () => []
+			}
+		};
+		const search = await executeToolCall(withMemory, 'semantic_search', '{"query":"road"},', {
+			confirmed: false
+		});
+		// Malformed JSON is rejected before the hook runs.
+		expect(search.ok).toBe(false);
+
+		const good = await executeToolCall(withMemory, 'semantic_search', '{"query":"roadmap"}', {
+			confirmed: false
+		});
+		expect(good.ok).toBe(true);
+		if (good.ok) {
+			const results = (good.data as { results: { ref: string; score: number }[] }).results;
+			expect(results[0].ref).toBe('w1/n1');
+			expect(results[0].score).toBeCloseTo(0.9123, 3);
+		}
+	});
+
+	it('related_notes resolves the entity id and returns its neighbours', async () => {
+		const withMemory: ToolContext = {
+			...context(),
+			memory: {
+				ready: () => true,
+				search: async () => [],
+				related: async () => [{ entityKind: 'task', entityId: 't1', score: 0.7 }],
+				themes: async () => [{ label: 'Roadmaps', members: [{ entityKind: 'note', entityId: 'n1', score: 0.9 }] }],
+				contradictions: async () => []
+			}
+		};
+		const result = await executeToolCall(withMemory, 'related_notes', '{"id":"n1"}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const results = (result.data as { results: { kind: string; ref: string }[] }).results;
+			expect(results[0].kind).toBe('task');
+			expect(results[0].ref).toBe('w1/t1');
+		}
+	});
+
+	it('related_notes reports "not ready" without memory', async () => {
+		const result = await executeToolCall(context(), 'related_notes', '{"id":"n1"}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(false);
+	});
+
+	it('list_themes names clusters and their members', async () => {
+		const withMemory: ToolContext = {
+			...context(),
+			memory: {
+				ready: () => true,
+				search: async () => [],
+				related: async () => [],
+				themes: async () => [
+					{ label: 'Vector retrieval', members: [{ entityKind: 'note', entityId: 'n1', score: 0.9 }] }
+				],
+				contradictions: async () => []
+			}
+		};
+		const result = await executeToolCall(withMemory, 'list_themes', '{}', { confirmed: false });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const themes = (result.data as { themes: { label: string; members: { ref: string }[] }[] })
+				.themes;
+			expect(themes[0].label).toBe('Vector retrieval');
+			expect(themes[0].members[0].ref).toBe('w1/n1');
+		}
+	});
+
+	it('list_themes reports "not ready" without memory', async () => {
+		const result = await executeToolCall(context(), 'list_themes', '{}', { confirmed: false });
+		expect(result.ok).toBe(false);
+	});
+
+	it('find_contradictions reports verified pairs', async () => {
+		const withMemory: ToolContext = {
+			...context(),
+			memory: {
+				ready: () => true,
+				search: async () => [],
+				related: async () => [],
+				themes: async () => [],
+				contradictions: async () => [
+					{
+						label: 'One says up, the other down',
+						members: [
+							{ entityKind: 'note', entityId: 'n1', score: 0.8 },
+							{ entityKind: 'task', entityId: 't1', score: 0.8 }
+						]
+					}
+				]
+			}
+		};
+		const result = await executeToolCall(withMemory, 'find_contradictions', '{}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const pairs = (result.data as { pairs: { reason: string; members: { ref: string }[] }[] })
+				.pairs;
+			expect(pairs[0].reason).toContain('up');
+			expect(pairs[0].members.map((member) => member.ref)).toEqual(['w1/n1', 'w1/t1']);
+		}
+	});
+
+	it('find_contradictions reports "not ready" without memory', async () => {
+		const result = await executeToolCall(context(), 'find_contradictions', '{}', {
+			confirmed: false
+		});
+		expect(result.ok).toBe(false);
+	});
+});

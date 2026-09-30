@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { Network, Pause, Play, ScanSearch, Search } from '@lucide/svelte';
+	import { Network, Pause, Play, ScanSearch, Search, Sparkles } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
 	import { type Task, type TaskDependency, type TaskStatus } from '$lib/stores/tasks';
-	import { buildWorkspaceGraph, type GraphEdgeKind, type GraphNode } from '$lib/content/workspace-graph';
+	import { buildWorkspaceGraph, defaultEdgeKinds, type GraphEdgeKind, type GraphNode, type GraphSuggestion } from '$lib/content/workspace-graph';
 	import {
 		GRAPH_TOKENS,
 		graphColorHex,
 		graphNodeColor,
 		graphTokenColor,
 		graphTokenHex,
+		themeClusterColor,
 	} from '$lib/components/graph/graph-palette';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -18,19 +19,39 @@
 	import GraphDrawer from '$lib/components/graph/GraphDrawer.svelte';
 	import GraphHoverCard from '$lib/components/graph/GraphHoverCard.svelte';
 	import GraphSearchPanel from '$lib/components/graph/GraphSearchPanel.svelte';
+	import GraphSuggestionsPopover from '$lib/components/graph/GraphSuggestionsPopover.svelte';
+	import GraphThemeLegend from '$lib/components/graph/GraphThemeLegend.svelte';
 
 	let {
 		notes,
 		tasks,
 		folders,
 		dependencies = [],
+		suggestions = [],
+		pendingSuggestions = [],
+		themes = [],
+		onbuildthemes,
+		onsemantic,
+		semanticReady = false,
 		onopen,
+		onacceptsuggestion,
+		onrejectsuggestion,
 	}: {
 		notes: Note[];
 		tasks: Task[];
 		folders: CustomFolder[];
 		dependencies?: TaskDependency[];
+		/** Accepted + pending suggestions, so the graph can draw both (#D7). */
+		suggestions?: GraphSuggestion[];
+		pendingSuggestions?: GraphSuggestion[];
+		themes?: import('$lib/db/clusters').ClusterRecord[];
+		onbuildthemes?: () => void;
+		/** Meaning search for the panel, injected from the memory store (#D11). */
+		onsemantic?: (query: string) => Promise<{ entityKind: 'note' | 'task'; entityId: string; score: number }[]>;
+		semanticReady?: boolean;
 		onopen: (node: GraphNode) => void;
+		onacceptsuggestion?: (id: string) => void;
+		onrejectsuggestion?: (id: string) => void;
 	} = $props();
 
 	let fitToken = $state(0);
@@ -43,7 +64,9 @@
 	/** Decorative orbit rings: off by default, since they are not data. */
 	let guides = $state(false);
 	let searchOpen = $state(false);
-	let kinds = $state<Record<GraphEdgeKind, boolean>>({ wiki: true, dependency: true, link: true });
+	let suggestionsOpen = $state(false);
+	let selectedTheme = $state<number | null>(null);
+	let kinds = $state<Record<GraphEdgeKind, boolean>>(defaultEdgeKinds());
 
 	/**
 	 * Keyboard hint for the search trigger. Not translated: a keybinding is not
@@ -52,8 +75,39 @@
 	const SEARCH_SHORTCUT =
 		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K';
 
-	const graph = $derived(buildWorkspaceGraph(notes, tasks, { folders, dependencies }));
+	const graph = $derived(buildWorkspaceGraph(notes, tasks, { folders, dependencies, suggestions }));
+	/** Node id → title, so a suggestion can name both ends without a lookup. */
+	const titleById = $derived.by(() => {
+		const map = new Map<string, string>();
+		for (const node of graph.nodes) map.set(node.id, node.title);
+		return map;
+	});
+
+	function suggestionTitle(suggestion: GraphSuggestion, end: 'source' | 'target'): string {
+		const kind = end === 'source' ? suggestion.sourceKind : suggestion.targetKind;
+		const id = end === 'source' ? suggestion.sourceId : suggestion.targetId;
+		return titleById.get(`${kind}:${id}`) ?? id;
+	}
 	const highlight = $derived(selected ? new Set([selected.id]) : null);
+
+	/**
+	 * The colour override for the selected theme, or null when none is chosen.
+	 *
+	 * Every member node of the cluster gets the same colour, computed from the
+	 * cluster's index so it matches the legend swatch exactly. This is the only
+	 * thing a theme click does — it never moves a node.
+	 */
+	const themeColors = $derived.by(() => {
+		if (selectedTheme === null) return null;
+		const index = themes.findIndex((theme) => theme.clusterId === selectedTheme);
+		if (index < 0) return null;
+		const color = themeClusterColor(index);
+		const map = new Map<string, number>();
+		for (const member of themes[index].members) {
+			map.set(`${member.entityKind}:${member.entityId}`, color);
+		}
+		return map;
+	});
 
 	const active = $derived(hovered ?? selected);
 	const themeToken = $derived(`${settings.mode}:${settings.accent}`);
@@ -91,6 +145,7 @@
 		{ id: 'wiki', label: t('graph.edge.wiki'), token: GRAPH_TOKENS.edges.wiki },
 		{ id: 'link', label: t('graph.edge.link'), token: GRAPH_TOKENS.edges.link },
 		{ id: 'dependency', label: t('graph.edge.dependency'), token: GRAPH_TOKENS.edges.dependency },
+		{ id: 'related', label: t('graph.edge.related'), token: GRAPH_TOKENS.edges.related },
 	];
 
 	/** Resolve a theme token to a hex colour, re-evaluated on theme changes. */
@@ -152,7 +207,7 @@
 	{:else}
 		<GraphCanvas
 			nodes={graph.nodes}
-			edges={graph.edges}
+			edges={[...graph.edges, ...graph.suggestions]}
 			{kinds}
 			{highlight}
 			selectedId={selected?.id ?? null}
@@ -161,6 +216,7 @@
 			{fitToken}
 			{spinning}
 			{guides}
+			{themeColors}
 			onselect={selectNode}
 			onopen={onopen}
 			onfocus={onHover}
@@ -198,10 +254,53 @@
 					{SEARCH_SHORTCUT}
 				</kbd>
 			</Button>
+			{#if pendingSuggestions.length && onacceptsuggestion && onrejectsuggestion}
+				<Button
+					variant="secondary"
+					size="sm"
+					class="h-8 gap-2 rounded-full px-3"
+					aria-expanded={suggestionsOpen}
+					onclick={() => (suggestionsOpen = !suggestionsOpen)}
+				>
+					<Sparkles size={13} class="text-tertiary" />
+					<span>{t('graph.suggestion.badge', { count: pendingSuggestions.length })}</span>
+				</Button>
+			{/if}
 		</div>
 
 		{#if searchOpen}
-			<GraphSearchPanel nodes={graph.nodes} onpick={pickNode} onclose={() => (searchOpen = false)} />
+			<GraphSearchPanel
+				nodes={graph.nodes}
+				onpick={pickNode}
+				onclose={() => (searchOpen = false)}
+				{onsemantic}
+				{semanticReady}
+			/>
+		{/if}
+		<!-- Theme legend (#D9): colours by cluster, never rearranges the layout. -->
+		{#if onbuildthemes}
+			<div class="absolute top-3 left-3 z-10 max-[720px]:hidden" style="transform: translateY(3rem)">
+				<GraphThemeLegend
+					{themes}
+					selected={selectedTheme}
+					onselect={(id) => (selectedTheme = id)}
+					onbuild={onbuildthemes}
+				/>
+			</div>
+		{/if}
+
+		<!-- Pending auto-link suggestions behind a badge, so they never cover the
+			 graph they are about (#D7). -->
+		{#if pendingSuggestions.length && onacceptsuggestion && onrejectsuggestion}
+			<GraphSuggestionsPopover
+				open={suggestionsOpen}
+				suggestions={pendingSuggestions}
+				sourceTitle={(item) => suggestionTitle(item, 'source')}
+				targetTitle={(item) => suggestionTitle(item, 'target')}
+				onaccept={(id) => onacceptsuggestion?.(id)}
+				onreject={(id) => onrejectsuggestion?.(id)}
+				onclose={() => (suggestionsOpen = false)}
+			/>
 		{/if}
 
 		<!-- Status pill, bottom-left. -->
@@ -261,6 +360,17 @@
 					</Button>
 				{/each}
 			</div>
+
+			<!--
+				"Related" counts accepted edges only, which is why it reads 0 until a
+				suggestion is accepted. The pending count is shown separately so the
+				zero is not mistaken for "the feature found nothing".
+			-->
+			{#if pendingSuggestions.length}
+				<p class="mt-2 text-label-sm text-outline">
+					{t('graph.suggestion.count', { count: pendingSuggestions.length })}
+				</p>
+			{/if}
 
 			<div class="mt-3 grid grid-cols-2 gap-2">
 				<Button

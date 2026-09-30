@@ -66,6 +66,9 @@ pub fn tool_error(code: &str, message: impl Into<String>) -> Value {
 }
 
 /// Like {@link tool_error}, but attaches structured `data` (candidate lists).
+// Compiled into both the shim and the remote listener; the listener does not
+// call it, which is not dead code.
+#[allow(dead_code)]
 pub fn tool_error_with_data(code: &str, message: impl Into<String>, data: Value) -> Value {
     let mut value = tool_error(code, message);
     value["structuredContent"]["data"] = data;

@@ -23,6 +23,7 @@ import {
 	type WorkspacesChangedPayload,
 } from '$lib/workspace-sync.svelte';
 import { DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
+import { hydrateMemory, reindexEntity, startMemorySync } from '$lib/stores/memory.svelte';
 
 /** The slice of workspace state the session hydration and listeners write to. */
 export type WorkspaceSessionState = {
@@ -51,6 +52,7 @@ export function startWorkspaceSession(
 		void (async () => {
 			await hydrateWorkspaces();
 			await hydrateSettings();
+			await hydrateMemory().catch(() => undefined);
 			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),
 				loadFolders(),
@@ -66,6 +68,7 @@ export function startWorkspaceSession(
 		})();
 
 		void startWorkspaceSync();
+		void startMemorySync().catch(() => undefined);
 
 		let unlisten: (() => void) | undefined;
 		let unlistenNotes: (() => void) | undefined;
@@ -109,6 +112,12 @@ export function startWorkspaceSession(
 					state.items = next;
 					if (!next.some((note) => note.id === state.selectedId)) {
 						state.selectedId = next[0]?.id ?? '';
+					}
+					// Keep the semantic index fresh for notes this window did not
+					// write (#D16). A no-op when nothing changed, thanks to the
+					// content hash, and silently skipped when memory is off.
+					for (const noteId of event.payload?.changedIds ?? []) {
+						void reindexEntity('note', noteId).catch(() => undefined);
 					}
 				});
 			}).then((fn) => {

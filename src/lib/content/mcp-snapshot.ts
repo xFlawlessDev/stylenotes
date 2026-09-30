@@ -224,11 +224,17 @@ function toSnapshotGraph(input: SnapshotInput) {
 			degree: node.degree,
 			status: node.status,
 		})),
-		edges: graph.edges.map((edge) => ({
-			id: edge.id,
-			source: edge.source,
-			target: edge.target,
-			kind: edge.kind,
-		})),
+		// Only the three real kinds ever reach the snapshot: suggestions are
+		// dashed proposals the shim never sees (#D15), so the type stays narrow.
+		edges: graph.edges
+			.filter((edge): edge is typeof edge & { kind: 'wiki' | 'dependency' | 'link' } =>
+				edge.kind === 'wiki' || edge.kind === 'dependency' || edge.kind === 'link'
+			)
+			.map((edge) => ({
+				id: edge.id,
+				source: edge.source,
+				target: edge.target,
+				kind: edge.kind,
+			})),
 	};
 }

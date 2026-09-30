@@ -209,6 +209,14 @@ fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
         "list_workspaces" => read_workspaces::list_workspaces(bridge, args),
         "list_folders" => read_workspaces::list_folders(bridge, args),
         "list_tags" => read_workspaces::list_tags(bridge, args),
+        // Semantic tools execute inside the app (docs/design/constella-features.md
+        // #D15): vectors never enter the snapshot, so the shim has nothing to
+        // filter. The in-app assistant uses them through its own memory hook;
+        // an external client gets a clear reason instead of "unknown tool".
+        "semantic_search" | "related_notes" | "list_themes" | "find_contradictions" => protocol::tool_error(
+            "semantic_app_only",
+            "Semantic tools run inside StyleNotes. Use the in-app assistant, or ask the user to enable them.",
+        ),
         other => protocol::tool_error("unknown_tool", format!("Unknown read tool `{other}`.")),
     }
 }

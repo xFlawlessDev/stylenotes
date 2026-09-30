@@ -457,6 +457,8 @@ export function createWorkspaceController() {
 		unsavedWorkspaceRecords,
 		createNote,
 		commitNewNote,
+		importNotes: (notes: { title: string; folder: string; tags: string[]; body: string }[]) =>
+			noteOps.importMany(notes),
 		handleWikiClick,
 		handleChatWikiClick,
 		selectWikiTarget,

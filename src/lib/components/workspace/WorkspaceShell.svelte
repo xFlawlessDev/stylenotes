@@ -10,6 +10,8 @@
 	import { toggleMode, type ThemeMode } from '$lib/stores/settings.svelte';
 	import type { TaskDependency } from '$lib/stores/tasks';
 	import type { WorkspaceController } from '$lib/stores/workspace-controller.svelte';
+	import { acceptedSuggestions as loadAcceptedSuggestions, acceptSuggestion, buildClusters, memoryReady, memoryStore, refreshThemes, rejectSuggestion, semanticSearch } from '$lib/stores/memory.svelte';
+	import type { GraphSuggestion } from '$lib/content/workspace-graph';
 
 	let {
 		controller,
@@ -23,7 +25,30 @@
 		notifications: Snippet;
 	} = $props();
 
-	const state = $derived(controller.state);
+	const ws = $derived(controller.state);
+
+	/** Accepted suggestions feed the real graph; pending ones show as cards. */
+	let acceptedSuggestions = $state<GraphSuggestion[]>([]);
+	const pendingSuggestionList = $derived(memoryStore.suggestions);
+
+	async function reloadSuggestions() {
+		acceptedSuggestions = await loadAcceptedSuggestions();
+		await refreshThemes();
+	}
+
+	async function buildThemes() {
+		await buildClusters();
+	}
+
+	// Reload whenever the graph is shown, so a decision or a fresh index shows up.
+	$effect(() => {
+		if (ws.section === 'graph') void reloadSuggestions();
+	});
+
+	async function decideSuggestion(id: string, accept: boolean) {
+		const ok = accept ? await acceptSuggestion(id) : await rejectSuggestion(id);
+		if (ok) await reloadSuggestions();
+	}
 </script>
 
 <TitleBar
@@ -37,69 +62,77 @@
 	onpalette={controller.openPalette}
 	onsettings={controller.openSettings}
 	{mode}
-	section={state.section}
-	showpanelbuttons={!state.fullPreview}
+	section={ws.section}
+	showpanelbuttons={!ws.fullPreview}
 	onsection={(next: WorkspaceSection) => {
-		state.section = next;
-		state.fullPreview = false;
+		ws.section = next;
+		ws.fullPreview = false;
 	}}
 	onopenfolders={() => {
-		state.railOpen = true;
-		state.feedOpen = false;
+		ws.railOpen = true;
+		ws.feedOpen = false;
 	}}
 	onopennotes={() => {
-		state.feedOpen = true;
-		state.railOpen = false;
+		ws.feedOpen = true;
+		ws.railOpen = false;
 	}}
 	ontogglemode={toggleMode}
 	ontoggledock={toggleOverlay}
-	onassistant={() => (state.assistantOpen = !state.assistantOpen)}
+	onassistant={() => (ws.assistantOpen = !ws.assistantOpen)}
 	{notifications}
 />
 
-{#if state.section === 'graph'}
+{#if ws.section === 'graph'}
 	<div class="ws-grid relative flex min-h-0 flex-1">
 		<GraphPage
-			notes={state.items}
-			tasks={state.tasks}
-			folders={state.customFolders}
+			notes={ws.items}
+			tasks={ws.tasks}
+			folders={ws.customFolders}
 			{dependencies}
+			suggestions={[...acceptedSuggestions, ...pendingSuggestionList]}
+			pendingSuggestions={pendingSuggestionList}
 			onopen={controller.openGraphNode}
+			themes={memoryStore.themes}
+			onbuildthemes={() => void buildThemes()}
+			onsemantic={(query) => semanticSearch(query, { limit: 30 })}
+			semanticReady={memoryReady()}
+			onacceptsuggestion={(id) => void decideSuggestion(id, true)}
+			onrejectsuggestion={(id) => void decideSuggestion(id, false)}
 		/>
 	</div>
-{:else if state.section === 'tasks'}
+{:else if ws.section === 'tasks'}
 	<div class="ws-grid relative flex min-h-0 flex-1">
 		<TaskBoard
-			bind:tasks={state.tasks}
-			bind:selectedId={state.selectedTaskId}
-			bind:view={state.taskView}
-			focusToken={state.taskFocusToken}
+			bind:tasks={ws.tasks}
+			bind:selectedId={ws.selectedTaskId}
+			bind:view={ws.taskView}
+			focusToken={ws.taskFocusToken}
 			workspaceId={workspaceStore.activeId}
 			folders={controller.folders}
-			notes={state.items}
+			notes={ws.items}
 			onnotify={controller.showToast}
 		/>
 	</div>
 {:else}
 	<NotesWorkspace
-		items={state.items}
+		items={ws.items}
 		visible={controller.visible}
 		folders={controller.folders}
-		customFolders={state.customFolders}
+		customFolders={ws.customFolders}
 		folderLabelMap={controller.folderLabelMap}
 		tags={controller.tags}
 		selected={controller.selected}
-		bind:selectedId={state.selectedId}
-		activeFolder={state.activeFolder}
-		activeTag={state.activeTag}
-		tasks={state.tasks}
-		fullPreview={state.fullPreview}
-		newNoteToken={state.newNoteToken}
+		bind:selectedId={ws.selectedId}
+		activeFolder={ws.activeFolder}
+		activeTag={ws.activeTag}
+		tasks={ws.tasks}
+		fullPreview={ws.fullPreview}
+		newNoteToken={ws.newNoteToken}
 		journal={controller.journal}
 		journalNavigation={controller.journalNavigation}
 		onwikilink={controller.handleWikiClick}
-		bind:railOpen={state.railOpen}
-		bind:feedOpen={state.feedOpen}
+		bind:railOpen={ws.railOpen}
+		bind:feedOpen={ws.feedOpen}
 		actions={{
 			selectfolder: controller.selectFolder,
 			selecttag: controller.selectTag,
@@ -110,16 +143,16 @@
 			deletefolder: controller.deleteFolder,
 			reorderfolder: controller.reorderFolder,
 			selectnote: (id: string) => {
-				state.selectedId = id;
+				ws.selectedId = id;
 			},
 			pin: (id: string) =>
 				controller.updateNote(id, {
-					pinned: !state.items.find((n) => n.id === id)?.pinned,
+					pinned: !ws.items.find((n) => n.id === id)?.pinned,
 				}),
 			openwindow: controller.openNoteInWindow,
 			toggledock: (id: string) =>
 				controller.updateNote(id, {
-					overlay: !state.items.find((n) => n.id === id)?.overlay,
+					overlay: !ws.items.find((n) => n.id === id)?.overlay,
 				}),
 			togglearchive: controller.toggleArchive,
 			printnote: (note) => void controller.noteActions.print(note),
@@ -127,7 +160,7 @@
 			copynote: (note) => void controller.noteActions.copy(note),
 			deletenote: controller.deleteNote,
 			updatenote: controller.updateNote,
-			togglefullpreview: () => (state.fullPreview = !state.fullPreview),
+			togglefullpreview: () => (ws.fullPreview = !ws.fullPreview),
 		}}
 	/>
 {/if}
@@ -135,9 +168,9 @@
 <!-- Hosted at the shell so the assistant overlays notes, tasks and the graph
      alike; `onclose` only closes it, wikilinks route through the controller. -->
 <AiChatPanel
-	open={state.assistantOpen}
-	notes={state.items}
-	tasks={state.tasks.map((task) => ({
+	open={ws.assistantOpen}
+	notes={ws.items}
+	tasks={ws.tasks.map((task) => ({
 		id: task.id,
 		title: task.title,
 		folder: task.folder,
@@ -146,5 +179,5 @@
 	}))}
 	workspaceId={controller.selected?.workspaceId}
 	onwikilink={controller.handleChatWikiClick}
-	onclose={() => (state.assistantOpen = false)}
+	onclose={() => (ws.assistantOpen = false)}
 />

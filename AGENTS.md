@@ -7,6 +7,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - `bun run dev` — Vite dev server only (frontend in browser; SQLite is stubbed, see below)
 - `bun run tauri dev` — full desktop app (required for DB, windows, plugins)
 - `bun run mcp:sidecar` — builds the `stylenotes-mcp` shim and copies it beside `src-tauri/` under the target-triple name (`beforeDevCommand`/`beforeBuildCommand` run this automatically)
+- `bun run setup:onnx` — places `onnxruntime.dll`/`.so`/`.dylib` beside `src-tauri/` for the local embedder (found from `ORT_DYLIB_PATH`, a Python `onnxruntime` install, a sibling build, or downloaded); `beforeDevCommand`/`beforeBuildCommand` run it, and a failure is non-fatal (the local model just reports unavailable)
 - `bun run build` — frontend build to `build/` (adapter-static SPA)
 - `bun run tauri build` — production bundle
 - `bun run check` — svelte-check + sync (typecheck frontend)
@@ -64,6 +65,16 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - **Web tools are BYOK and Rust-owned.** `ai_settings.search_provider` / `search_api_key` (migration 17) hold the provider and its `enc:v1:` key, like the model key; `provider = ''` means search is off. `src-tauri/src/ai/web.rs` does the network (Tavily / Brave / Exa / Serper, or `combo`), `web_html.rs` owns the SSRF guard (`is_blocked_host`/`vet_url` — blocks localhost, private ranges, cloud metadata) plus HTML→text, and `web_commands.rs` exposes `ai_web_search` / `ai_web_fetch` / `ai_search_providers`. The frontend resolves the key and passes it in, as with the model provider.
 - **Tables (migration 13/14/16/17):** `ai_settings` (adds `search_provider`, `search_api_key`, `search_fallbacks` in 17), `ai_threads`, `ai_messages` (adds `reasoning`, `tool_calls`, `tool_results` in 16). AI settings and chat history are **device-local** — keep them out of the synced `settings` row.
 - **Store layout:** `stores/ai.svelte.ts` owns the conversation and streaming, `stores/ai-settings.svelte.ts` the settings persistence (it re-exports through `ai.svelte.ts` for callers), and `stores/ai-web.svelte.ts` the web hooks and provider list.
+
+## Semantic memory (local embedder + index)
+
+- **The index is a derivative (#D6).** `embeddings` (migration 19) holds one vector per note/task as a little-endian `f32` BLOB plus `model`, `dim`, `content_hash`. It can be dropped and rebuilt from `notes.body` at any time, so nothing there is a source of truth. Cosine is brute-forced in Rust/TS: exact, and fast enough for the design's target scale.
+- **`local-embed` is on by default.** `Cargo.toml` has `default = ["local-embed"]`, so an ordinary desktop build ships the offline model path. `--no-default-features` drops `ort`/`tokenizers` for a fast CI check that never needs a model; `bun run clippy` uses `--all-features`, so both paths are checked.
+- **The dylib is dynamic, not linked.** `ort` uses `load-dynamic`, so `scripts/setup:onnx` places `onnxruntime.dll`/`.so`/`.dylib` beside `src-tauri/` (from `ORT_DYLIB_PATH`, a Python `onnxruntime` install, a sibling build, or a download). `embed/onnx/runtime.rs` discovers it next to the executable and up to three parent directories — which is why `tauri dev` finds the copy in `src-tauri/` from `src-tauri/target/debug`. On Windows the dylib is bundled via `tauri.windows.conf.json` `bundle.resources`, landing beside the exe. A missing dylib is **not** fatal: the app starts and the model reports unavailable (#D17).
+- **The model is downloaded at runtime, never bundled.** `memory_model_status` reports readiness (feature compiled, dylib found, model cached) and `memory_download_model` fetches MiniLM-L6 (~23 MB) to `<app_data_dir>/models/`. `MemorySettings.svelte` offers the Download button; `memoryReady()` treats an `onnx:` embedder as not-ready until both the runtime and the model are present.
+- **The offline baseline is not "semantic".** `hashing:trigram-v1` is a hashed bag of character trigrams that runs in pure TS. It exists so the pipeline is exercisable with zero setup and in CI, and the UI labels it as a baseline (#D2). Never present it as meaning retrieval.
+- **Provider embedding is the third path.** An OpenAI-compatible `/embeddings` call lives in `embed/provider.rs` (non-streaming, unlike the chat SSE path) and reuses the decrypted key. Anthropic has no embeddings endpoint, so provider embedding is OpenAI-compatible only.
+- **Tests pin the contract.** `embeddings.test.ts` and `semantic.test.ts` cover the codec, hash, ranking and the #D8 anti-spam rules; `embed::onnx::embedder::tests::onnx_embeds_for_real` is `#[ignore]`d and is the only end-to-end proof the model runs: `cargo test --features local-embed -- --ignored onnx_embeds_for_real`.
 
 ## Database / migrations
 

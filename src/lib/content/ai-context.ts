@@ -6,15 +6,15 @@
  * snapshot the shim reads. Independent of whether the MCP server is switched
  * on: the AI grant is separate.
  */
-
 import { buildMcpSnapshot } from '$lib/content/mcp-snapshot';
-import type { ToolContext } from '$lib/content/ai-tools';
+import type { MemoryHooks, ToolContext } from '$lib/content/ai-tools';
 import type { WriteContext } from '$lib/content/mcp-write-actions';
 import { listAllNotes } from '$lib/stores/notes';
 import { listAllTasks } from '$lib/stores/tasks.svelte';
 import { loadWebHooks } from '$lib/stores/ai-web.svelte';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
 import { localToday } from '$lib/stores/settings.svelte';
+import { contradictionsFor, memoryReady, relatedNotes, semanticSearch, themesFor } from '$lib/stores/memory.svelte';
 import { dependenciesRepo } from '$lib/db';
 
 /** Loads notes, tasks, dependencies and workspaces into a tool context. */
@@ -33,7 +33,6 @@ export async function loadToolContext(): Promise<ToolContext> {
 				)
 			).flat()
 		: [];
-
 	const write: WriteContext = {
 		notes,
 		tasks,
@@ -41,7 +40,6 @@ export async function loadToolContext(): Promise<ToolContext> {
 		workspaceIds: new Set(workspaceStore.items.map((workspace) => workspace.id)),
 		workspaces: workspaceStore.items.map((workspace) => ({ ...workspace }))
 	};
-
 	const snapshot = buildMcpSnapshot({
 		notes,
 		tasks,
@@ -53,6 +51,22 @@ export async function loadToolContext(): Promise<ToolContext> {
 		generatedAt: new Date().toISOString(),
 		today: localToday()
 	});
+	return { snapshot, write, web, memory: loadMemoryHooks() };
+}
 
-	return { snapshot, write, web };
+/**
+ * Semantic recall hooks for the chat, bound to the memory store.
+ *
+ * `ready` lets the executor report "not ready" instead of returning an empty
+ * list, so the model falls back to `search_notes` rather than assuming there
+ * are no matches (#D17).
+ */
+function loadMemoryHooks(): MemoryHooks {
+	return {
+		ready: () => memoryReady(),
+		search: (query, limit) => semanticSearch(query, { limit }),
+		related: (kind, id, limit) => relatedNotes(kind, id, limit),
+		themes: (limit) => themesFor(limit),
+		contradictions: (limit) => contradictionsFor(limit)
+	};
 }

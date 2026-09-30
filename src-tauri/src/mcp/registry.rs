@@ -52,6 +52,31 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Relevant notes for a query, with their neighbourhood in the graph.",
     },
     ToolDescriptor {
+        name: "semantic_search",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description:
+            "Meaning-based search over notes and tasks. Prefer search_notes for exact terms or ids.",
+    },
+    ToolDescriptor {
+        name: "related_notes",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description: "Notes and tasks most similar to one entity, by meaning.",
+    },
+    ToolDescriptor {
+        name: "list_themes",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description: "The current topic clusters over the notes and tasks, with member ids.",
+    },
+    ToolDescriptor {
+        name: "find_contradictions",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description: "Pairs of notes whose claims conflict, verified by the assistant.",
+    },
+    ToolDescriptor {
         name: "list_tasks",
         kind: ToolKind::Read,
         scope: "tasks",
@@ -243,6 +268,29 @@ fn schema_for(name: &str) -> Value {
         "list_notes" | "search_notes" | "list_tasks" | "task_board" | "list_dependencies"
         | "critical_path" | "graph_query" | "context" | "daily_summary" | "list_folders"
         | "list_tags" => {}
+        "semantic_search" => {
+            properties["query"] =
+                json!({ "type": "string", "description": "Text to search by meaning." });
+            properties["limit"] =
+                json!({ "type": "integer", "description": "Max results (default 20)." });
+            required.push("query");
+        }
+        "related_notes" => {
+            properties["id"] =
+                json!({ "type": "string", "description": "Entity id from list_notes/list_tasks." });
+            properties["kind"] =
+                json!({ "type": "string", "description": "note or task; defaults to note." });
+            properties["limit"] =
+                json!({ "type": "integer", "description": "Max results (default 8)." });
+            required.push("id");
+        }
+        "list_themes" => {
+            // Only `workspace`; clusters are global to the index.
+        }
+        "find_contradictions" => {
+            properties["limit"] =
+                json!({ "type": "integer", "description": "Max pairs to verify (default 10)." });
+        }
         "create_note" => {
             properties["title"] = json!({ "type": "string" });
             properties["body"] = json!({ "type": "string" });

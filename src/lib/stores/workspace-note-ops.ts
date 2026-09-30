@@ -31,6 +31,10 @@ export type NoteOps = {
 	performRemove: (id: string) => void;
 	/** Cancels any pending debounced save, e.g. before a reset. */
 	cancelPending: () => void;
+	/** Creates many notes at once, from a markdown import (#D14). */
+	importMany: (
+		notes: { title: string; folder: string; tags: string[]; body: string }[]
+	) => Promise<boolean>;
 };
 
 export function createNoteOps(deps: {
@@ -115,6 +119,30 @@ export function createNoteOps(deps: {
 			if (deps.selectedId === id) deps.selectedId = deps.items[0]?.id ?? '';
 			void removeNote(id);
 			deps.notify(t('editor.actions.noteDeleted'));
+		},
+
+		async importMany(notes) {
+			if (notes.length === 0) return true;
+			// Build every note first, then persist in one pass. A partial write is
+			// reported but the notes that did land are kept: import is additive,
+			// so a retry would only add the missing ones.
+			const created = notes.map((entry) =>
+				makeNote({
+					workspaceId: deps.workspaceId(),
+					title: entry.title.trim() || 'Untitled note',
+					folder: entry.folder,
+					tags: entry.tags,
+					body: entry.body,
+				})
+			);
+			deps.items = [...created, ...deps.items];
+			let ok = true;
+			for (const note of created) {
+				const saved = await persistNote(note);
+				if (!saved) ok = false;
+			}
+			if (!ok) deps.notify(t('import.error.write'));
+			return ok;
 		},
 
 		cancelPending() {

@@ -62,6 +62,8 @@
 			onexport={() => controller.noteActions.exportAll(state.items, controller.folders)}
 			onresetdata={() => (state.resetOpen = true)}
 			notecount={state.items.length}
+			existingTitles={new Set(state.items.map((note) => note.title.toLowerCase()))}
+			onimportnotes={controller.importNotes}
 			onnewnote={controller.createNote}
 			onnewfolder={controller.openAddFolder}
 			ontogglemode={toggleMode}

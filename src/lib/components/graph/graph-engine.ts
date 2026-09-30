@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
+import { defaultEdgeKinds, type GraphEdge, type GraphEdgeKind, type GraphNode } from '$lib/content/workspace-graph';
 import { refreshGraphPalette } from '$lib/components/graph/graph-palette';
 import { activeNodeId, buildAdjacency, nodeSize, type GraphFocus } from '$lib/components/graph/graph-appearance';
 import { createGraphAppearance } from '$lib/components/graph/graph-appearance-transition';
@@ -36,6 +36,11 @@ export type GraphEngine = {
 	setAutoRotate(enabled: boolean): void;
 	/** Re-tint nodes, links and guides after a light/dark or accent change. */
 	refreshTheme(): void;
+	/**
+	 * Highlight one theme cluster by recolouring its members, or clear the
+	 * override with `null`. Never moves a node.
+	 */
+	setThemeColors(colors: Map<string, number> | null): void;
 	/** Show or hide the decorative orbital rings. */
 	setGuidesVisible(visible: boolean): void;
 	fit(): void;
@@ -68,7 +73,9 @@ export async function createGraphEngine({ host, onselect, onopen, onfocus }: Gra
 	let scene: GraphScene | null = null;
 
 	const focus: GraphFocus = { hoveredId: null, selectedId: null, highlight: null };
-	let visibleKinds: Record<GraphEdgeKind, boolean> = { wiki: true, dependency: true, link: true };
+	let visibleKinds: Record<GraphEdgeKind, boolean> = defaultEdgeKinds();
+	/** Theme-cluster colour override, or null for the normal palette. */
+	let themeColors: Map<string, number> | null = null;
 	let adjacency = buildAdjacency([], []);
 	let appearance = createGraphAppearance(adjacency);
 	let appearanceDirty = true;
@@ -275,6 +282,9 @@ export async function createGraphEngine({ host, onselect, onopen, onfocus }: Gra
 		// Snap to the settled values so a rebuild never animates in from nothing.
 		appearance.settle(scene, nodes, links);
 		appearanceDirty = false;
+		// A rebuild must keep the theme override, or selecting a theme and then
+		// editing a note would silently drop the colouring.
+		if (themeColors) retintGraphScene(scene, nodes, links, themeColors);
 
 		// Only the initial build positions the camera; a later rebuild (a new note,
 		// a renamed title) must leave the user's viewpoint alone.
@@ -466,11 +476,15 @@ export async function createGraphEngine({ host, onselect, onopen, onfocus }: Gra
 		setAutoRotate(enabled) {
 			rig.setAutoRotate(enabled);
 		},
+		setThemeColors(colors) {
+			themeColors = colors;
+			if (scene) retintGraphScene(scene, nodes, links, themeColors);
+		},
 		refreshTheme() {
 			// The palette caches against the DOM theme key, so it must be dropped
 			// before any token is resolved again.
 			refreshGraphPalette();
-			if (scene) retintGraphScene(scene, nodes, links);
+			if (scene) retintGraphScene(scene, nodes, links, themeColors);
 		},
 		setGuidesVisible(visible) {
 			if (scene) scene.guides.visible = visible;

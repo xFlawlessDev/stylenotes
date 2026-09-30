@@ -13,6 +13,7 @@ export const settings = {
 		dock: 'Overlay',
 		ai: 'AI',
 		mcp: 'MCP',
+		memory: 'Memory',
 		journal: 'Journal',
 		data: 'Data',
 		about: 'About',
@@ -141,7 +142,30 @@ export const settings = {
 			anthropic: 'Uses the Messages API with your Anthropic API key.',
 		},
 	},
-	mcp: {
+	memory: {
+		title: 'Memory',
+		embedder: 'Embedder',
+		embedderOff: 'Off',
+		embedderHint:
+			'How notes and tasks are turned into vectors. A local model or your own provider key keeps everything on this device.',
+		runtimeMissing: 'The ONNX Runtime library was not found next to the app; the local model cannot run. Reinstall StyleNotes, or use the offline baseline.',
+		modelMissing: 'Download the embedding model to use the local model. It runs fully offline once downloaded.',
+		downloadModel: 'Download model',
+		downloading: 'Downloading…',
+		downloadPercent: '{percent}% · {done} of {total}',
+		downloadBytes: 'Downloaded {done}',
+		baselineNotice:
+			'Offline baseline: this build has no embedding model, so matches follow wording, not meaning. Add a provider key or a local model for real semantic recall.',
+		status: '{indexed} indexed · {pending} to index',
+		buildIndex: 'Build index',
+		rebuildThemes: 'Recompute themes',
+		findContradictions: 'Find contradictions',
+		indexing: 'Indexing…',
+		stop: 'Stop',
+		threshold: 'Suggestion threshold',
+		thresholdHint:
+			'Similarity above {value} proposes a link (default {default}). Higher is stricter.',
+	},	mcp: {
 		title: 'Local MCP',
 		on: 'MCP is on',
 		off: 'MCP is off',
@@ -202,12 +226,36 @@ export const settings = {
 			saveSettings: 'Could not save the MCP settings',
 			clearLog: 'Could not clear the MCP log',
 		},
+		remote: {
+			title: 'Remote access',
+			hint: 'Reach this app from another machine over HTTP. Off by default; loopback unless you choose otherwise.',
+			exposure: 'Exposure',
+			mode: { local: 'This device', lan: 'Local network', tunnel: 'Tunnel' },
+			lanWarning:
+				'Anyone on your local network who has the token can read and change your notes. Use this only on a network you trust.',
+			lanTitle: 'Expose on the local network?',
+			lanConfirm:
+				'This binds the endpoint to your machine local network address and rotates the token. Anyone on that network who has the token can read and change your notes. Prefer This device, or a tunnel, when you can.',
+			lanConfirmButton: 'Expose on LAN',
+			tunnelHint:
+				'Keeps the endpoint on this device. Point a Cloudflare Tunnel or Tailscale at it yourself.',
+			address: 'Endpoint',
+			token: 'Token',
+			tokenHint: 'Current token ends {hint}',
+			tokenOnce: 'Copy it now - it is shown once and never stored in full.',
+			copy: 'Copy',
+			hide: 'Hide',
+			rotate: 'Rotate token',
+			kill: 'Turn off remote',
+			cancel: 'Cancel',
+		},
 	},
 	data: {
 		localStorage: 'Local storage',
 		notesStored: '{count} notes stored',
 		keptLocally: 'Kept on this device, no account required',
 		exportFolder: 'Export to folder',
+		importMarkdown: 'Import Markdown',
 		reset: 'Reset',
 		resetPreferences: 'Reset preferences',
 		resetPreferencesHint: 'Return appearance and editor options to defaults',
@@ -266,5 +314,3 @@ export const settings = {
 		},
 	},
 } as const;
-
-

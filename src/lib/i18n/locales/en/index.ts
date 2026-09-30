@@ -7,6 +7,7 @@ import { common } from './common';
 import { dialogs } from './dialogs';
 import { editor } from './editor';
 import { graph } from './graph';
+import { importMarkdown } from './import';
 import { notes } from './notes';
 import { over } from './overlay';
 import { palette } from './palette';
@@ -34,6 +35,7 @@ export const en = {
 	tasks,
 	over,
 	graph,
+	importMarkdown,
 	palette,
 	dialogs,
 	editor,

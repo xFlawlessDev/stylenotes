@@ -132,6 +132,9 @@
 	--graph-edge-wiki: #7f8ea3;
 	--graph-edge-link: #4a9ff5;
 	--graph-edge-dependency: #e5698f;
+	--graph-edge-semantic: #b39ddb;
+	--graph-edge-related: #90caf9;
+	--graph-edge-contradicts: #ff8a65;
 }
 
 /* ------------------------------------------------------------------ *
@@ -218,6 +221,9 @@ html.light {
 	--graph-edge-wiki: #7c8798;
 	--graph-edge-link: #2563c9;
 	--graph-edge-dependency: #b83a63;
+	--graph-edge-semantic: #7e57c2;
+	--graph-edge-related: #1e6fd9;
+	--graph-edge-contradicts: #d4552b;
 }
 
 /* Light mode: containers are already pale, so keep the lit stop subtle and
@@ -485,6 +491,9 @@ html[data-motion='reduced'] *::after {
 	--color-graph-edge-wiki: var(--graph-edge-wiki);
 	--color-graph-edge-link: var(--graph-edge-link);
 	--color-graph-edge-dependency: var(--graph-edge-dependency);
+	--color-graph-edge-semantic: var(--graph-edge-semantic);
+	--color-graph-edge-related: var(--graph-edge-related);
+	--color-graph-edge-contradicts: var(--graph-edge-contradicts);
 
 	/* Typography scale */
 	--font-headline: 'Inter Variable', 'Inter', sans-serif;

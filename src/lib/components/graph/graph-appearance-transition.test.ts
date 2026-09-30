@@ -37,7 +37,7 @@ function stubScene(linkCount: number): GraphScene {
 	} as unknown as GraphScene;
 }
 
-const KINDS = { wiki: true, dependency: true, link: true };
+const KINDS = { wiki: true, dependency: true, link: true, semantic: true, related: true, contradicts: true };
 
 function fixture(linkCount: number, nodeCount = 6) {
 	const nodes = Array.from({ length: nodeCount }, (_, index) => node(`n${index}`));

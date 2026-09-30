@@ -10,3 +10,11 @@
 # needs it as a resource at bundle time, never committed.
 /stylenotes-mcp-*
 !/stylenotes-mcp-*/.keep
+
+# ONNX Runtime is placed here by scripts/setup-onnx.cjs (a local Python install
+# or a downloaded release). It is a ~17 MB binary and must never be committed.
+/onnxruntime.dll
+/libonnxruntime.so
+/libonnxruntime.dylib
+/ort-extract/
+/*.zip.tmp

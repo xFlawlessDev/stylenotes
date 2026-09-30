@@ -115,8 +115,8 @@ describe('translation completeness', () => {
 		const allowed = new Set([
 			'Edit', 'Folder', 'StyleNotes', 'Edit folder', 'Tag', '+ Tag', 'Status',
 			'Kanban', 'Gantt', 'Manual', 'Editor', 'Overlay', 'AI', 'MCP', 'Data',
-			'Sage', 'Rose', 'Model', 'Edit {name}', 'System UI', 'Serif', 'Monospace',
-			'Diagram',
+			'Sage', 'Rose', 'Model', 'Embedder', 'Edit {name}', 'System UI', 'Serif', 'Monospace',
+			'Diagram', 'Tunnel', 'Endpoint', 'Token',
 		]);
 		const identical = leafPaths(en).filter((path) => lookup(en, path) === lookup(id, path));
 		const unexpected = identical

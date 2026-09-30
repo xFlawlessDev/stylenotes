@@ -17,6 +17,8 @@
 		Bot,
 		Plug,
 		CalendarDays,
+		Brain,
+		FileInput,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
@@ -33,6 +35,8 @@
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 	import AiSettings from '$lib/components/workspace/AiSettings.svelte';
 	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
+	import MemorySettings from '$lib/components/workspace/MemorySettings.svelte';
+	import ImportMarkdownDialog from '$lib/components/workspace/ImportMarkdownDialog.svelte';
 
 	let {
 		open = false,
@@ -40,15 +44,24 @@
 		onexport,
 		onresetdata,
 		notecount,
+		existingTitles = new Set<string>(),
+		onimportnotes,
 	}: {
 		open?: boolean;
 		onclose: () => void;
 		onexport: () => void;
 		onresetdata: () => void;
 		notecount: number;
+		/** Titles already present, so the import dialog can flag conflicts (#D14). */
+		existingTitles?: Set<string>;
+		onimportnotes?: (
+			notes: { title: string; folder: string; tags: string[]; body: string }[]
+		) => Promise<boolean>;
 	} = $props();
 
-	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'journal' | 'data' | 'about';
+	let importOpen = $state(false);
+
+	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'memory' | 'journal' | 'data' | 'about';
 	let section = $state<Section>('appearance');
 
 	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
@@ -57,6 +70,7 @@
 		{ id: 'dock', label: t('settings.nav.dock'), icon: PictureInPicture2 },
 		{ id: 'ai', label: t('settings.nav.ai'), icon: Bot },
 		{ id: 'mcp', label: t('settings.nav.mcp'), icon: Plug },
+		{ id: 'memory', label: t('settings.nav.memory'), icon: Brain },
 		{ id: 'journal', label: t('settings.nav.journal'), icon: CalendarDays },
 		{ id: 'data', label: t('settings.nav.data'), icon: HardDrive },
 		{ id: 'about', label: t('settings.nav.about'), icon: Sparkles },
@@ -225,6 +239,10 @@
 						<McpSettings />
 					{/if}
 
+					{#if section === 'memory'}
+						<MemorySettings />
+					{/if}
+
 					{#if section === 'journal'}
 						<JournalSettings />
 					{/if}
@@ -260,6 +278,18 @@
 								>
 									<Download size={15} /> {t('settings.data.exportFolder')}
 								</Button>
+								{#if onimportnotes}
+									<Button
+										variant="secondary"
+										size="lg"
+										shape="tile"
+										block
+										class="justify-center text-label-md"
+										onclick={() => (importOpen = true)}
+									>
+										<FileInput size={15} /> {t('settings.data.importMarkdown')}
+									</Button>
+								{/if}
 							</div>
 						</div>
 
@@ -335,4 +365,12 @@
 		</div>
 		</aside>
 	</div>
+{/if}
+
+{#if onimportnotes}
+	<ImportMarkdownDialog
+		bind:open={importOpen}
+		{existingTitles}
+		onimport={onimportnotes}
+	/>
 {/if}

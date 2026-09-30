@@ -58,6 +58,14 @@ describe('MCP tool registry', () => {
 		expect(toolAllowed(write, { access: 'write', scopes: ['tasks'] })).toBe(true);
 	});
 
+	it('registers the semantic read tools with the same kind and scope', () => {
+		for (const name of ['semantic_search', 'related_notes', 'list_themes', 'find_contradictions']) {
+			const tool = findTool(name);
+			expect(tool, `${name} is missing from the registry`).toBeDefined();
+			expect(tool?.kind, name).toBe('read');
+			expect(tool?.scope, name).toBe('notes');
+		}
+	});
 	it('requires confirmations on destructive tools', () => {
 		for (const name of ['delete_note', 'delete_task']) {
 			expect(findTool(name)?.description.toLowerCase()).toContain('confirm');

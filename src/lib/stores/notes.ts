@@ -16,14 +16,23 @@ import { workspaceStore } from '$lib/stores/workspaces.svelte';
 
 export const NOTES_CHANGED = 'notes:changed';
 
-/** Identifies which window wrote, so listeners can ignore their own saves. */
-export type NotesChangedPayload = { source: string };
+/**
+ * Identifies which window wrote, so listeners can ignore their own saves.
+ *
+ * `changedIds` names the notes that changed, when the caller knows them, so a
+ * listener can re-embed just those instead of the whole vault (#D16). It is
+ * optional: a caller that cannot name them omits it and listeners fall back to
+ * doing nothing, which is correct when memory is off.
+ */
+export type NotesChangedPayload = { source: string; changedIds?: string[] };
 
 /** Notifies other windows (dock, note windows, workspace) that notes changed. */
-function notifyNotesChanged() {
+function notifyNotesChanged(changedIds?: string[]) {
 	if (!browser || !isTauri) return;
 	const source = getCurrentWindow().label;
-	void emit(NOTES_CHANGED, { source } satisfies NotesChangedPayload).catch(() => undefined);
+	void emit(NOTES_CHANGED, { source, changedIds } satisfies NotesChangedPayload).catch(
+		() => undefined
+	);
 }
 
 export const TONES = ['primary', 'secondary', 'tertiary', 'sky', 'violet', 'outline'] as const;
@@ -196,7 +205,7 @@ export async function persistNote(note: Note): Promise<boolean> {
 	if (!browser) return false;
 	try {
 		await notesRepo.upsert({ ...note, workspaceId: note.workspaceId || workspaceStore.activeId });
-		notifyNotesChanged();
+		notifyNotesChanged([note.id]);
 		return true;
 	} catch {
 		return false;
@@ -220,7 +229,7 @@ export async function removeNote(id: string): Promise<boolean> {
 		await notesRepo.remove(id);
 		// Version history is not foreign-keyed, so drop it explicitly.
 		await versionsRepo.removeAll('note', id).catch(() => false);
-		notifyNotesChanged();
+		notifyNotesChanged([id]);
 		return true;
 	} catch {
 		return false;

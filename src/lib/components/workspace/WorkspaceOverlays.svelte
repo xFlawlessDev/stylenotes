@@ -56,6 +56,8 @@
 		oncancelfolderdelete,
 		resetOpen = $bindable(false),
 		onreset,
+		existingTitles = new Set<string>(),
+		onimportnotes,
 	}: {
 		toast?: string;
 		items: Note[];
@@ -92,6 +94,10 @@
 		oncancelfolderdelete: () => void;
 		resetOpen?: boolean;
 		onreset: () => void;
+		existingTitles?: Set<string>;
+		onimportnotes?: (
+			notes: { title: string; folder: string; tags: string[]; body: string }[]
+		) => Promise<boolean>;
 	} = $props();
 
 	const actions = $derived([
@@ -150,6 +156,8 @@
 	onexport={onexport}
 	onresetdata={onresetdata}
 	{notecount}
+	{existingTitles}
+	{onimportnotes}
 />
 
 <CreateNoteDialog bind:open={createOpen} {folders} onsubmit={oncreatenote} />

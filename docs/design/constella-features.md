@@ -716,3 +716,58 @@ yang tertunda: pemicu ANN dicatat sebagai catatan, bukan tugas.
 | D17 | Degradasi berjenjang; fitur menambah, tidak menggantikan |
 | D18 | Registry dua sisi dijaga test, termasuk tool baru |
 | D19 | Anti-overengineering: tanpa ANN, tanpa rayon, tanpa chunking di V1 — brute force cukup untuk ~99% user (< 1 ms) |
+
+
+---
+
+## 13. Catatan implementasi (2026-09-30, setelah dibangun)
+
+Bagian ini mencatat **di mana implementasi menyimpang dari rencana di atas**, dan
+keputusan yang diambil saat menulis kode. Semua keputusan arsitektur #D1–#D19 tetap
+berlaku; yang berubah hanya detail yang tidak diputuskan di dokumen.
+
+### 13.1 Lokasi modul Rust
+
+- **Remote MCP tinggal di `src-tauri/src/remote_mcp/`, bukan `src-tauri/src/mcp/`.**
+  `src-tauri/src/mcp/` adalah **bin** shim stdio, bukan modul lib. Listener HTTP
+  harus berjalan di dalam proses app agar bisa memakai jembatan job yang sama
+  (`mcp_host.rs`), jadi ia tidak bisa tinggal di shim. `protocol.rs` dan
+  `registry.rs` di-`#[path]`-include dari shim sehingga tetap satu registry.
+- **`src-tauri/src/embed/`** menyatukan embedder: `mod.rs` (trait), `hashing.rs`,
+  `provider.rs`, `vector.rs`, `commands.rs`, dan `onnx/` (vendored) di balik
+  feature `local-embed`.
+
+### 13.2 ONNX: default, vendor, dan penyediaan dylib
+
+- **`local-embed` sekarang ON secara default** (`default = ["local-embed"]`),
+  bukan off. Alasan: desain menetapkan model lokal sebagai jalur Free default,
+  dan feature yang off berarti user biasa tidak pernah mendapatkannya. CI cepat
+  memakai `--no-default-features`.
+- **`onnxruntime.dll` tidak di-commit.** `scripts/setup-onnx.cjs` menyalinnya dari
+  `ORT_DYLIB_PATH`, instalasi Python `onnxruntime`, build sibling, atau mengunduh
+  rilis resmi. Dijalankan dari `beforeDevCommand`/`beforeBuildCommand`.
+- **Model tidak pernah dibundel** (sesuai #D5): `memory_download_model` mengunduh
+  MiniLM-L6 (~23 MB) ke `<app_data_dir>/models/` saat pertama dipakai, dan
+  `memory_model_status` melaporkan kesiapan agar UI menampilkan tombol Unduh.
+- **Di Windows dylib ikut bundle** lewat `tauri.windows.conf.json`
+  (`bundle.resources`), mendarat di samping exe — tepat tempat `discover_dylib()`
+  mencarinya. Platform lain memakai `ORT_DYLIB_PATH` atau penempatan manual.
+- **Degradasi tetap berlaku (#D17):** dylib hilang bukan error fatal; aplikasi
+  tetap jalan dan model melaporkan "unavailable".
+
+### 13.3 Jalur provider
+
+- **Embedding provider hanya OpenAI-compatible.** Anthropic tidak punya endpoint
+  `/embeddings`, jadi provider embedding tidak ditawarkan untuk provider itu.
+- Panggilan `/embeddings` adalah JSON sekali-jalan (bukan SSE), jadi ia tinggal
+  di `embed/provider.rs`, terpisah dari stack streaming chat di `ai/`.
+
+### 13.4 Yang belum diverifikasi menyeluruh
+
+- **Remote MCP HTTP (Fase 3b) belum diuji end-to-end** dengan klien MCP nyata.
+  Logika keamanan murni (`net.rs`) dan listener-nya teruji/compile, tetapi
+  `claude mcp add --transport http` terhadap endpoint yang berjalan belum
+  dijalankan. Perlakukan sebagai "terimplementasi, belum terbukti".
+- **Baseline `hashing:trigram-v1` bukan semantic.** Ia lexical, dipakai supaya
+  pipeline bisa dijalankan tanpa setup dan di CI, dan UI melabelinya sebagai
+  baseline (#D2).

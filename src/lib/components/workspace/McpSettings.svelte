@@ -19,6 +19,7 @@
 	import ConfirmDialog from '$lib/components/dialogs/ConfirmDialog.svelte';
 	import McpClientList from './McpClientList.svelte';
 	import McpAuditLog from './McpAuditLog.svelte';
+	import RemoteMcpSettings from './RemoteMcpSettings.svelte';
 
 	let confirmOpen = $state(false);
 	let copied = $state<McpConfigTarget | null>(null);
@@ -232,6 +233,8 @@
 				{t('settings.mcp.connectHint', { count: toolCount })}
 			</span>
 		</div>
+
+		<RemoteMcpSettings />
 
 		<McpClientList />
 		<McpAuditLog />

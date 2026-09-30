@@ -33,6 +33,7 @@ export type McpErrorCode =
 	| 'dependency_cycle'
 	| 'last_workspace'
 	| 'write_failed'
+	| 'semantic_app_only'
 	| 'timeout';
 
 export type McpScope = 'notes' | 'tasks' | 'dependency' | 'workspace';
@@ -87,6 +88,8 @@ export type McpAuditRecord = {
 	ok: boolean;
 	workspace: string;
 	detail: string;
+	/** Origin machine for a remote call (#D12); empty for stdio. */
+	remoteAddr: string;
 };
 
 /** Grant attached to every job: what the user allowed at the time of the call. */

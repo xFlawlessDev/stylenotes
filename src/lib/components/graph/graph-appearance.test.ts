@@ -64,13 +64,13 @@ describe('graph-appearance', () => {
 	});
 
 	it('hides disabled edge kinds regardless of focus', () => {
-		const kinds = { wiki: false, dependency: true, link: true };
+		const kinds = { wiki: false, dependency: true, link: true, semantic: true, related: true, contradicts: true };
 		expect(edgeAlpha(edges[0], 'a', kinds)).toBe(0);
 		expect(edgeAlpha(edges[1], null, kinds)).toBe(IDLE_EDGE_ALPHA);
 	});
 
 	it('spotlights the focused node links only', () => {
-		const kinds = { wiki: true, dependency: true, link: true };
+		const kinds = { wiki: true, dependency: true, link: true, semantic: true, related: true, contradicts: true };
 		expect(edgeAlpha(edges[0], 'a', kinds)).toBe(FOCUSED_EDGE_ALPHA);
 		expect(edgeAlpha(edges[1], 'a', kinds)).toBe(DIMMED_EDGE_ALPHA);
 	});

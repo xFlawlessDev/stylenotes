@@ -59,6 +59,8 @@ export const VERTICES_PER_LINK = 4;
 export function edgeWidth(kind: GraphEdgeKind): number {
 	if (kind === 'dependency') return 2.4;
 	if (kind === 'link') return 2.1;
+	// The suggestion kinds read as lighter traces than the edges the user made.
+	if (kind === 'related' || kind === 'semantic' || kind === 'contradicts') return 1.3;
 	return 1.7;
 }
 
@@ -321,11 +323,34 @@ export function buildGraphScene(nodes: GraphNode[], links: GraphEdge[]): GraphSc
 	};
 }
 
-/** Re-tint a live scene in place after a theme change. */
-export function retintGraphScene(scene: GraphScene, nodes: GraphNode[], links: GraphEdge[]): void {
+/**
+ * Re-tint a live scene in place after a theme change, or when a theme cluster is
+ * selected in the legend.
+ *
+ * `themeColors` maps `note:<id>` / `task:<id>` to a packed RGB. When it is set,
+ * a node in the map takes that colour and every node outside it is desaturated
+ * toward the surface, so the chosen theme reads as the subject and the rest as
+ * context — without moving anything.
+ */
+export function retintGraphScene(
+	scene: GraphScene,
+	nodes: GraphNode[],
+	links: GraphEdge[],
+	themeColors: Map<string, number> | null = null,
+): void {
+	const surface = new THREE.Color(graphTokenColor(GRAPH_TOKENS.background));
+	const colorFor = (node: GraphNode): THREE.Color => {
+		if (!themeColors) return new THREE.Color(graphNodeColor(node));
+		const override = themeColors.get(node.id);
+		if (override !== undefined) return new THREE.Color(override);
+		// Outside the selected theme: fade toward the background so the cluster
+		// stands out without turning the rest into a black hole.
+		return new THREE.Color(graphNodeColor(node)).lerp(surface, 0.72);
+	};
+
 	const nodeColors = scene.nodes.geometry.getAttribute('aColor') as THREE.BufferAttribute;
 	nodes.forEach((node, index) => {
-		new THREE.Color(graphNodeColor(node)).toArray(nodeColors.array as Float32Array, index * 3);
+		colorFor(node).toArray(nodeColors.array as Float32Array, index * 3);
 	});
 	nodeColors.needsUpdate = true;
 
@@ -338,8 +363,8 @@ export function retintGraphScene(scene: GraphScene, nodes: GraphNode[], links: G
 		const target = indexOf.get(edge.target);
 		if (source === undefined || target === undefined) return;
 
-		const fromColor = new THREE.Color(graphNodeColor(nodes[source]));
-		const toColor = new THREE.Color(graphNodeColor(nodes[target]));
+		const fromColor = colorFor(nodes[source]);
+		const toColor = colorFor(nodes[target]);
 		const base = link * VERTICES_PER_LINK;
 		// Vertex order matches `buildGraphScene`: source, source, target, target.
 		for (const [offset, color] of [

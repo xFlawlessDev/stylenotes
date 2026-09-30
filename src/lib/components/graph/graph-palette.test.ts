@@ -7,6 +7,8 @@ import {
 	graphTokenColor,
 	parseGraphColor,
 	refreshGraphPalette,
+	themeClusterColor,
+	themeClusterCss,
 } from '$lib/components/graph/graph-palette';
 
 describe('graph palette', () => {
@@ -50,5 +52,23 @@ describe('graph palette', () => {
 		expect(graphNodeColor({ kind: 'note' })).toBe(graphTokenColor(GRAPH_TOKENS.note));
 		expect(graphEdgeColor('wiki')).toBe(graphTokenColor(GRAPH_TOKENS.edges.wiki));
 		expect(graphColorHex(0x0e1116)).toBe('#0e1116');
+	});
+});
+
+describe('theme cluster colours', () => {
+	it('is stable for the same index', () => {
+		expect(themeClusterColor(3)).toBe(themeClusterColor(3));
+	});
+
+	it('gives adjacent clusters distinct colours', () => {
+		const colors = Array.from({ length: 8 }, (_, index) => themeClusterColor(index));
+		expect(new Set(colors).size).toBe(colors.length);
+	});
+
+	it('returns a valid packed RGB and a matching CSS string', () => {
+		const value = themeClusterColor(2);
+		expect(value).toBeGreaterThanOrEqual(0);
+		expect(value).toBeLessThanOrEqual(0xffffff);
+		expect(themeClusterCss(2)).toBe(`#${value.toString(16).padStart(6, '0')}`);
 	});
 });

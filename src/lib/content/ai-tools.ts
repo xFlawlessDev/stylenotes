@@ -62,6 +62,27 @@ export type ToolContext = {
 	 * the chat panel, which renders the choice card inline.
 	 */
 	ask?: (questions: QuestionItem[], resolve: (answers: AnsweredQuestion[]) => void) => void;
+	/**
+	 * Semantic memory access, injected so this module stays free of the
+	 * embedder and the database (#D15). Absent in browser dev or when no
+	 * embedder is selected, in which case the tools report "not ready".
+	 */
+	memory?: MemoryHooks;
+};
+
+/** Ranked semantic hits, as the memory store returns them. */
+export type MemoryHit = { entityKind: 'note' | 'task'; entityId: string; score: number };
+
+/** One theme: a label and its ranked members. */
+export type MemoryTheme = { label: string; members: MemoryHit[] };
+
+/** Semantic recall, provided by `stores/memory.svelte.ts`. */
+export type MemoryHooks = {
+	ready: () => boolean;
+	search: (query: string, limit: number) => Promise<MemoryHit[]>;
+	related: (kind: 'note' | 'task', id: string, limit: number) => Promise<MemoryHit[]>;
+	themes: (limit: number) => Promise<MemoryTheme[]>;
+	contradictions: (limit: number) => Promise<MemoryTheme[]>;
 };
 
 /** The two network calls the web tools need, provided by the store. */
@@ -101,6 +122,93 @@ function searchNotes(ctx: ToolContext, args: Record<string, unknown>): ToolResul
 	return {
 		ok: true,
 		data: { total: notes.length, notes: notes.slice(0, limit).map(noteSummary) }
+	};
+}
+
+/**
+ * Meaning-based search. Falls back to a clear message when the index is off,
+ * so the model switches to `search_notes` instead of retrying (#D17).
+ */
+async function semanticSearch(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	const query = str(args, 'query');
+	if (!query) return { ok: false, error: '`query` is required.' };
+	if (!ctx.memory?.ready()) {
+		return { ok: false, error: 'Semantic search is not ready. Use search_notes, or ask the user to build the memory index.' };
+	}
+	const limit = num(args, 'limit', 10);
+	const hits = await ctx.memory.search(query, limit);
+	return { ok: true, data: { total: hits.length, results: hits.map((hit) => describeHit(ctx, hit)) } };
+}
+
+/** Notes/tasks most similar to one entity. */
+async function relatedNotes(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	const raw = str(args, 'id');
+	if (!raw) return { ok: false, error: '`id` is required.' };
+	const kind = str(args, 'kind') === 'task' ? 'task' : 'note';
+	const entity = kind === 'task' ? findTask(ctx.snapshot, raw, str(args, 'workspace')) : findNote(ctx.snapshot, raw, str(args, 'workspace'));
+	const id = entity?.id ?? bareId(raw);
+	if (!ctx.memory?.ready()) {
+		return { ok: false, error: 'Semantic recall is not ready. Ask the user to build the memory index first.' };
+	}
+	const limit = num(args, 'limit', 8);
+	const hits = await ctx.memory.related(kind, id, limit);
+	return { ok: true, data: { total: hits.length, results: hits.map((hit) => describeHit(ctx, hit)) } };
+}
+
+/** Turns a memory hit into a titled, referenced entry the model can cite. */
+function describeHit(ctx: ToolContext, hit: MemoryHit): Record<string, unknown> {
+	const nodeId = `${hit.entityKind}:${hit.entityId}`;
+	const node = ctx.snapshot.graph.nodes.find((item) => item.id === nodeId);
+	return {
+		kind: hit.entityKind,
+		id: hit.entityId,
+		ref: node ? `${node.workspaceId}/${node.entityId}` : hit.entityId,
+		title: node?.title ?? hit.entityId,
+		score: Number(hit.score.toFixed(4))
+	};
+}
+
+/** The topic clusters, when the index has produced any. */
+async function listThemes(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	if (!ctx.memory?.ready()) {
+		return { ok: false, error: 'Themes are not ready. Ask the user to build the memory index first.' };
+	}
+	const limit = num(args, 'limit', 8);
+	const themes = await ctx.memory.themes(limit);
+	return {
+		ok: true,
+		data: {
+			total: themes.length,
+			themes: themes.map((theme) => ({
+				label: theme.label,
+				members: theme.members.map((member) => describeHit(ctx, member))
+			}))
+		}
+	};
+}
+
+/** Verified contradictions among the most similar notes (#D10). */
+async function findContradictionsTool(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+	if (!ctx.memory?.ready()) {
+		return { ok: false, error: 'Contradiction search needs the memory index. Ask the user to build it first.' };
+	}
+	const limit = num(args, 'limit', 10);
+	const pairs = await ctx.memory.contradictions(limit);
+	if (pairs.length === 0) {
+		return {
+			ok: true,
+			data: { total: 0, pairs: [], note: 'No contradictions found, or the assistant is not configured.' }
+		};
+	}
+	return {
+		ok: true,
+		data: {
+			total: pairs.length,
+			pairs: pairs.map((pair) => ({
+				reason: pair.label,
+				members: pair.members.map((member) => describeHit(ctx, member))
+			}))
+		}
 	};
 }
 
@@ -416,6 +524,10 @@ export async function executeToolCall(
 	if (spec.kind === 'read') {
 		if (name === 'web_search') return webSearch(ctx, args);
 		if (name === 'web_fetch') return webFetch(ctx, args);
+		if (name === 'semantic_search') return semanticSearch(ctx, args);
+		if (name === 'related_notes') return relatedNotes(ctx, args);
+		if (name === 'list_themes') return listThemes(ctx, args);
+		if (name === 'find_contradictions') return findContradictionsTool(ctx, args);
 		return runRead(ctx, name, args) ?? { ok: false, error: `Unknown tool \`${name}\`.` };
 	}
 	if (!options.confirmed) {
