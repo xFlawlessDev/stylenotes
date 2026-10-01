@@ -67,6 +67,10 @@ thiserror = "2"
 # plaintext on disk). `keyring` v4 ships native backends: Windows Credential
 # Manager, macOS Keychain, and Secret Service on Linux.
 keyring = "4"
+# MCP Bridge for AI-driven Tauri development (debug builds only). Runs a
+# localhost WebSocket so an MCP client can screenshot, inspect the DOM, and
+# watch IPC live. Never ships in release: registered under `debug_assertions`.
+tauri-plugin-mcp-bridge = "0.13"
 # Filesystem watcher: pushes new MCP job files to the parked `mcp_wait_job`
 # call instead of letting the frontend poll `mcp/jobs/` (src/mcp_watch.rs).
 notify = "8"

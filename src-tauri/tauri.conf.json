@@ -64,7 +64,8 @@
         "enable": true,
         "scope": ["**"]
       }
-    }
+    },
+    "withGlobalTauri": true
   },
   "plugins": {
     "sql": {

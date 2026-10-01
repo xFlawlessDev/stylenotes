@@ -969,6 +969,16 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_desktop_underlay::init());
 
+    // MCP Bridge for AI-driven development (debug builds only — never in a
+    // release). Bound to localhost so the automation socket is not reachable
+    // from the LAN. Requires `withGlobalTauri` in `tauri.conf.json`.
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(
+        tauri_plugin_mcp_bridge::Builder::new()
+            .bind_address("127.0.0.1")
+            .build(),
+    );
+
     builder
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

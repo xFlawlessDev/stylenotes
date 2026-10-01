@@ -39,6 +39,7 @@
     "fs:allow-write-file",
     "fs:allow-mkdir",
     "sql:default",
-    "sql:allow-execute"
+    "sql:allow-execute",
+    "mcp-bridge:default"
   ]
 }

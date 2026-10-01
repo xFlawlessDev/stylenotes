@@ -119,6 +119,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - `tauri-plugin-prevent-default` blocks browser shortcuts, but dev builds keep DevTools + Reload (`lib.rs`).
 - The `workspace`, `overlay`, and `kanban` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
 - The `kanban` window locks to the desktop via `tauri-plugin-desktop-underlay` (`src/lib/stores/kanban.svelte.ts`, `desktop-underlay:default` permission): locked = desktop underlay, unlocked = always on top. Global shortcuts (`Ctrl+Shift+\` lock, `Ctrl+Shift+N`/`Ctrl+Shift+T` quick capture) are registered in Rust (`lib.rs`) and reported to the webviews through events; the lock state lives in `settings.kanbanLocked`.
+- `tauri-plugin-mcp-bridge` (debug builds only, `127.0.0.1:9223`) lets an MCP client drive the app: screenshots, DOM snapshots, IPC monitoring. It needs `withGlobalTauri: true` in `tauri.conf.json` and the `mcp-bridge:default` permission; both are required or it fails silently. Registered under `#[cfg(debug_assertions)]` so it never ships in a release.
 
 ## Frontend conventions
 
