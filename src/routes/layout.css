@@ -591,16 +591,24 @@ html[data-motion='reduced'] *::after {
 	 * Text selection highlight. The OS default (a flat Windows blue) reads as
 	 * foreign next to the accent system, so tint it from the active accent
 	 * instead — it tracks the theme and every accent palette for free.
-	 * Background only: forcing a `color` here would clobber the syntax colours
-	 * inside a selected code block. Firefox needs the `::-moz-selection` twin;
-	 * put it in its own rule so an unknown pseudo-element cannot drop the first.
+	 *
+	 * `color` is lifted to `--color-on-surface`: the accent tint sits under
+	 * muted body text below the 4.5:1 bar, while on-surface clears it with
+	 * margin in both modes. The syntax colours inside a selected code block
+	 * survive anyway — Shiki writes them with `!important`, which outranks a
+	 * plain `::selection` declaration.
+	 *
+	 * Firefox needs the `::-moz-selection` twin; put it in its own rule so an
+	 * unknown pseudo-element cannot drop the first.
 	 */
 	::selection {
 		background-color: color-mix(in oklab, var(--color-primary) 34%, transparent);
+		color: var(--color-on-surface);
 	}
 
 	::-moz-selection {
 		background-color: color-mix(in oklab, var(--color-primary) 34%, transparent);
+		color: var(--color-on-surface);
 	}
 
 	.glass-panel {
