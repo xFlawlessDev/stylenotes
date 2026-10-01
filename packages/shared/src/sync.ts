@@ -1,5 +1,5 @@
 /**
- * Sync protocol envelope (`docs/design/cloud-sync-ai-mcp.md` §4).
+ * Sync protocol envelope (`cloud-sync-ai-mcp.md` §4).
  *
  * This module is the single source of truth for what crosses the wire between
  * the desktop app and the cloud service. Both repositories depend on it, so the

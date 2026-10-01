@@ -1,6 +1,6 @@
 //! AI assistant gateway (BYOK, device-local).
 //!
-//! Design: `docs/design/cloud-sync-ai-mcp.md` §8 describes a future server
+//! Design: `cloud-sync-ai-mcp.md` §8 describes a future server
 //! gateway. The free tier ships the same idea *client-side*: the user brings
 //! their own OpenAI-compatible or Anthropic key, which is encrypted at rest and
 //! used directly from the app. Moving this behind the server later changes only

@@ -4,10 +4,14 @@
 > Tanggal: 2026-09-29
 > Scope: bagaimana StyleNotes mendapat **mobile app** (Android + iOS) tanpa mem-fork logika inti.
 > Dokumen terkait:
-> - `docs/design/cloud-sync-ai-mcp.md` — sync delta, auth, AI, MCP (#1–#27). Fase 6 dokumen itu ("Mobile / web — pakai `shared/` yang sama") **direvisi di sini menjadi lebih konkret** (§8).
-> - `docs/design/collaboration.md` — org/permission/CRDT (#C1–#C16). Menentukan apakah mobile ikut mode CRDT.
+> - `cloud-sync-ai-mcp.md` — sync delta, auth, AI, MCP (#1–#27). Fase 6 dokumen itu ("Mobile / web — pakai `shared/` yang sama") **direvisi di sini menjadi lebih konkret** (§8).
+> - `collaboration.md` — org/permission/CRDT (#C1–#C16). Menentukan apakah mobile ikut mode CRDT.
 > - `docs/design/archive/mcp-local-free.md` — local MCP (#D1–#D16). **Tidak ikut ke mobile** (#M7).
-> - `docs/design/business-model.md` — open core, Plus/Pro (#B1–#B13). Menentukan tier fitur mobile.
+> - `business-model.md` — open core, Plus/Pro (#B1–#B13). Menentukan tier fitur mobile.
+>
+> (`cloud-sync-ai-mcp.md`, `collaboration.md`, dan `business-model.md` adalah
+> dokumen di repo **privat** `stylenotes-cloud`; nama berkasnya dipakai sebagai
+> penanda, bukan tautan.)
 
 ---
 

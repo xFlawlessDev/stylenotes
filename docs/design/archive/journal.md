@@ -2,7 +2,7 @@
 
 > Status: **Diimplementasikan** (2026-09-30). Bagian ini awalnya draft untuk review; keputusan di §9 sudah diambil dan kodenya sudah ada.
 > Scope: fitur journal (note per hari) di app + satu tool MCP `journal_today` di atasnya.
-> Terkait: `docs/design/archive/mcp-local-free.md` (#D19 hari lokal, #D17 metadata note, #D18 `edit_note_body`, §13a backup), `docs/design/cloud-sync-ai-mcp.md` (§3.2/§3.3 split settings, #24).
+> Terkait: `docs/design/archive/mcp-local-free.md` (#D19 hari lokal, #D17 metadata note, #D18 `edit_note_body`, §13a backup), `cloud-sync-ai-mcp.md` (§3.2/§3.3 split settings, #24).
 
 Ringkasan keputusan ada di §8; yang masih terbuka ada di §9.
 
@@ -21,7 +21,7 @@ Dan `edit_note_body` (#D18) sudah menyediakan `op: "insert"`. Artinya **setelah 
 ## 2. Temuan dari kode yang membentuk desain ini
 
 1. **StyleNotes tidak punya konsep "hari ini" di data.** Tidak ada kolom tanggal di `notes`, tidak ada journal, tidak ada template. `created_at`/`updated_at` ada, tapi keduanya berarti "kapan ditulis", bukan "hari mana yang diwakili".
-2. **`settings` adalah satu row JSON device-local** (`docs/design/cloud-sync-ai-mcp.md` §3.3, #24). Aturan yang ada: preferensi yang bermakna lintas device masuk `settings_cloud`. Tapi tabel itu **belum ada** (Fase 0 sync belum dikerjakan), jadi §5.2 di bawah memutuskan lebih hati-hati daripada sekadar menuruti aturan itu.
+2. **`settings` adalah satu row JSON device-local** (`cloud-sync-ai-mcp.md` §3.3, #24). Aturan yang ada: preferensi yang bermakna lintas device masuk `settings_cloud`. Tapi tabel itu **belum ada** (Fase 0 sync belum dikerjakan), jadi §5.2 di bawah memutuskan lebih hati-hati daripada sekadar menuruti aturan itu.
 3. **`localToday()` sudah ada** (`stores/settings.svelte.ts`, #D19) dan sudah memakai `settings.timezone`. Journal tidak perlu logika zona baru.
 4. **Folder sudah punya repo** (`foldersRepo`, `workspace_id`, `position`) tapi dibaca sebagai daftar kustomisasi, bukan sebagai tempat tujuan penulisan. Journal butuh folder tujuan yang **boleh belum ada**.
 5. **Note dibuat lewat `makeNote`/`createNote`** dan disimpan lewat `notesRepo.upsert`; tidak ada jalur "temukan-atau-buat" di app hari ini. Yang paling dekat adalah `commitNewNote` di `workspace-controller.svelte.ts`, dan itu terikat UI.
@@ -81,7 +81,7 @@ Keempatnya masuk **`settings` yang device-local** sekarang.
 journal "jelas lintas device" sehingga harus masuk `settings_cloud` **sekarang**.
 Itu terlalu cepat, dan dokumen ini mencatat koreksinya alih-alih menimpanya:
 
-- `settings_cloud` **tidak ada**. `docs/design/cloud-sync-ai-mcp.md` §3.3 + #24
+- `settings_cloud` **tidak ada**. `cloud-sync-ai-mcp.md` §3.3 + #24
   memutuskan tabel itu untuk preferensi lintas device, tapi Fase 0 sync belum
   dikerjakan dan belum ada sinkronisasi apa pun di repo ini.
 - "Taruh di `settings_cloud`" hari ini berarti membangun sebagian Fase 0 di

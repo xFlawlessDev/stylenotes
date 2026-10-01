@@ -23,6 +23,10 @@ All notable changes to StyleNotes are documented in this file. Versions follow S
 - **OSS infrastructure**: `LICENSE` (AGPL-3.0), `packages/shared/LICENSE` (MIT),
   `CONTRIBUTING.md` (with CLA), `CODE_OF_CONDUCT.md`, `SECURITY.md`, GitHub
   issue/PR templates, and a CI workflow.
+- **Private cloud docs moved out**: `business-model.md`, `cloud-sync-ai-mcp.md`,
+  and `collaboration.md` now live in the private `stylenotes-cloud` repo. Public
+  docs and code comments refer to them by bare filename (a marker, not a link) —
+  see `docs/design/repo-split.md` §6.
 
 ### Changed
 

@@ -6,8 +6,8 @@
 > semantic recall (embedding), auto-link suggestion, auto-clustering, contradiction detection, remote MCP, dan import Markdown.
 > Dokumen terkait:
 > - `docs/design/archive/mcp-local-free.md` — MCP stdio lokal (#D1–#D16). Dokumen ini **memperluas** registry tool-nya (#D8) dan menambah transport HTTP (#D12).
-> - `docs/design/cloud-sync-ai-mcp.md` — gateway AI & akun. Embedding server-side (§8) adalah **fallback** untuk #D3 di sini.
-> - `docs/design/business-model.md` — remote MCP = Plus/Pro. Fitur ini **tidak boleh** membuka remote untuk tier Free (#D13).
+> - `cloud-sync-ai-mcp.md` — gateway AI & akun. Embedding server-side (§8) adalah **fallback** untuk #D3 di sini.
+> - `business-model.md` — remote MCP = Plus/Pro. Fitur ini **tidak boleh** membuka remote untuk tier Free (#D13).
 > - `AGENTS.md` — aturan file (≤300/500 LOC), i18n, migrasi, satu pintu tulis.
 
 ---

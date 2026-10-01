@@ -4,9 +4,9 @@
 > Tanggal: 2026-09-27
 > Scope: **Local MCP (stdio) untuk user Free**, plus halaman Settings yang mengaturnya.
 > Dokumen terkait:
-> - `docs/design/business-model.md` — **Local MCP = gratis (B5)**, remote MCP = Plus/Pro (§2). Dokumen bisnis adalah induk keputusan di sini.
-> - `docs/design/cloud-sync-ai-mcp.md` — §9 sudah menetapkan "remote-only dulu"; dokumen ini **membalik urutan itu untuk Free** (§1 alasan).
-> - `docs/design/collaboration.md` — tempat task/org/CRDT ke depan; memengaruhi scope write MCP (#D11).
+> - `business-model.md` — **Local MCP = gratis (B5)**, remote MCP = Plus/Pro (§2). Dokumen bisnis adalah induk keputusan di sini.
+> - `cloud-sync-ai-mcp.md` — §9 sudah menetapkan "remote-only dulu"; dokumen ini **membalik urutan itu untuk Free** (§1 alasan).
+> - `collaboration.md` — tempat task/org/CRDT ke depan; memengaruhi scope write MCP (#D11).
 
 ---
 
@@ -44,7 +44,7 @@ Dibaca dari `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src/lib/db/index.ts
 | 9 | **Belum ada proses spawn apa pun** di Rust (`std::process` belum dipakai); `capabilities/default.json` hanya memuat permission window/fs/sql/plugin yang sudah ada. | Menambah binary + spawn **butuh** perubahan `Cargo.toml`, `tauri.conf.json` (`externalBin`) dan pemikiran ulang permission (#D12). Tidak ada permission `shell`/`process` di set sekarang. |
 | 10 | Repo memakai **Vitest** (`src/**/*.test.ts`) + `bun run check`/`clippy`/`fmt:check`; logika murni ditaruh di `src/lib/content/*` atau `src/lib/stores/*.ts` dengan unit test. | Logika baru (snapshot build, filter tool, validasi registry) harus **murni + teruji**, dan file kecil (≤300 LOC target, 500 hard cap). |
 | 11 | `ui_plugins` (migrasi 7) + `ui-plugins.svelte.ts` adalah **pola persis** yang dibutuhkan: tabel → repo (`boolean`) → store `.svelte.ts` (hydrate/refresh/save/notify lintas window) → komponen Settings. | Halaman MCP di Settings **tidak perlu pola baru**; cukup meniru jalur ui_plugins, dengan tambahan komponen `McpSettings.svelte` (#D10). |
-| 12 | `docs/design/cloud-sync-ai-mcp.md` §9 menetapkan **"remote-only dulu, local stdio menyusul"**. | Dokumen ini **membalik urutan untuk Free** (§0 alasan), dan **mewajibkan** hasilnya di-fold balik ke §9 supaya dua dokumen tidak bertentangan (lihat roadmap §10). |
+| 12 | `cloud-sync-ai-mcp.md` §9 menetapkan **"remote-only dulu, local stdio menyusul"**. | Dokumen ini **membalik urutan untuk Free** (§0 alasan), dan **mewajibkan** hasilnya di-fold balik ke §9 supaya dua dokumen tidak bertentangan (lihat roadmap §10). |
 
 ---
 

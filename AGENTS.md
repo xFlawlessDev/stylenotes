@@ -10,6 +10,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - The client seam is `content/cloud-types.ts` + `content/cloud-client.ts` (the only HTTP caller) + `db/cloud.ts` + `stores/cloud.svelte.ts` + `workspace/CloudSettings.svelte`. Cloud is `disabled` until a server URL is set; entitlements default to the most restricted set.
 - Enforcement is **server-side**; the client only reads entitlements to show/hide UI.
 - `bun run check:all` also typechecks `packages/shared`; Vitest covers `packages/**`.
+- Some design docs are **private** and live in the `stylenotes-cloud` repo: `cloud-sync-ai-mcp.md`, `collaboration.md`, `business-model.md`. Public docs (and code comments) refer to them by **bare filename** — a marker, not a link. See `docs/design/repo-split.md` §6.
 
 ## Commands
 
@@ -57,7 +58,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 
 ## AI assistant (BYOK, device-local)
 
-- **Free tier is bring-your-own-key.** The user configures an OpenAI-compatible or Anthropic endpoint in `Settings → AI`; there is no server in this repo. `docs/design/cloud-sync-ai-mcp.md` §8 describes the future hosted gateway; the client provider contract is designed so it can move behind that gateway without UI changes.
+- **Free tier is bring-your-own-key.** The user configures an OpenAI-compatible or Anthropic endpoint in `Settings → AI`; there is no server in this repo. `cloud-sync-ai-mcp.md` §8 describes the future hosted gateway; the client provider contract is designed so it can move behind that gateway without UI changes.
 - **Rust owns crypto + network; the frontend owns persistence.** `src-tauri/src/ai/` holds the provider stack (ported from the `alnair-router` gateway), the AES-256-GCM cipher, and the commands. The key is encrypted at rest in `ai_settings.api_key` (`enc:v1:` marker); the cipher key lives in `app_data_dir()/ai/secrets.key` and is created on first use. The key crosses IPC as plaintext only for the duration of a request.
 - **Commands:** `ai_encrypt_key`, `ai_decrypt_key`, `ai_test_connection`, `ai_stream` (streams tokens over a Tauri `Channel`). All registered in `generate_handler!`.
 - **Frontend pieces:** store `src/lib/stores/ai.svelte.ts`, repo `src/lib/db/ai.ts`, contract `src/lib/content/ai-types.ts`, pure UI logic `src/lib/content/ai-assistant.ts`. Settings UI is `AiSettings.svelte`; the editor popover is `note/AiAssistantPopover.svelte` (via `note/AiEditorAssist.svelte`); the docked chat is `workspace/AiChatPanel.svelte`.
