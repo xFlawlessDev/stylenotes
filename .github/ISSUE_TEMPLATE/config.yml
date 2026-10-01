@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or help
+    url: https://github.com/
+    about: For usage questions, please start a discussion instead of an issue.

@@ -2,6 +2,15 @@
 
 StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust backend in `src-tauri`, frontend in `src`. Package manager is **bun** (not npm/pnpm).
 
+## Open core: two repos
+
+This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared`). The paid cloud (sync, AI gateway, remote MCP, billing) is a **separate private repo** (`stylenotes-cloud`) and must never be imported here. One desktop build is shipped; it is **cloud-ready** but offline by default — see `docs/design/repo-split.md`.
+
+- `packages/shared` (`@stylenotes/shared`) is the contract shared with the cloud: HLC, sync envelope, wire DTOs, entitlements. It is built into `src/` as a nested workspace package. **It must never import `$lib`, `$app/*`, or `@tauri-apps/*`** — it is framework-free so the cloud can use it.
+- The client seam is `content/cloud-types.ts` + `content/cloud-client.ts` (the only HTTP caller) + `db/cloud.ts` + `stores/cloud.svelte.ts` + `workspace/CloudSettings.svelte`. Cloud is `disabled` until a server URL is set; entitlements default to the most restricted set.
+- Enforcement is **server-side**; the client only reads entitlements to show/hide UI.
+- `bun run check:all` also typechecks `packages/shared`; Vitest covers `packages/**`.
+
 ## Commands
 
 - `bun run dev` — Vite dev server only (frontend in browser; SQLite is stubbed, see below)
@@ -12,7 +21,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - `bun run tauri build` — production bundle
 - `bun run check` — svelte-check + sync (typecheck frontend)
 - `bun run test` — Vitest unit tests (`src/**/*.test.ts`); `bun run test:watch` for watch mode
-- `bun run check:all` — runs `check`, `fmt:check`, then `clippy`; use before finishing work
+- `bun run check:all` — runs `check`, `check:shared`, `fmt:check`, then `clippy`; use before finishing work
 - `bun run release` — cut a release: bumps `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock` in lockstep, updates `CHANGELOG.md`, commits, and tags `vX.Y.Z` (creates a commit/tag — run only when explicitly asked)
 - `bun run release:dry` — preview the version bump and changelog without changing anything
 - `bun run fmt` / `bun run fmt:check` — cargo fmt on `src-tauri`
@@ -44,7 +53,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - **Reads are a snapshot (#D3).** `src/lib/content/mcp-snapshot.ts` builds it with the same `buildWorkspaceGraph`/`isTaskBlocked` the UI uses; the shim only filters. Default is **read-only**; write needs an explicit grant (`mcp_settings`, `meta:mcp/enabled`) and is audited (`mcp_audit`). MCP settings are **device-local** — keep them out of the synced `settings` row.
 - **Trimming is progressive (protocol v3).** `truncated` means *content was cut somewhere*; `indexOnly` means *no body shipped at all*. A body over `MCP_MAX_BODY_BYTES` is cut and flagged on its own note, and only the 32 MB budget drops bodies (largest first, `packSnapshotBodies`). A withheld body must never read as an empty one: `get_note` answers `snapshot_truncated`, and the chat prepends `snapshotNotice()` so the model says what it could not see.
 - **Settings page** is `src/lib/components/workspace/McpSettings.svelte` (nav `MCP` in `SettingsPanel.svelte`; `AI` is a separate section). `app-info.json`/`snapshot.json`/`backups/` live under `app_data_dir()/mcp/` and are **not** app data to commit.
-- Design + decisions: `docs/design/mcp-local-free.md` (#D1–#D16).
+- Design + decisions: `docs/design/archive/mcp-local-free.md` (#D1–#D16).
 
 ## AI assistant (BYOK, device-local)
 
@@ -84,7 +93,7 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 ## Attachments / artifact store (local-first, S3-ready)
 
-- **A blob's identity is its bytes.** Dragging/pasting/picking a file copies it into `<app_data_dir>/attachments/<ab>/<sha256>.<ext>` and the note holds a portable `stylenotes-attachment://<sha256>[.<ext>]` reference — never the original absolute path. Design + #A1–#A10: `docs/design/artifacts.md`.
+- **A blob's identity is its bytes.** Dragging/pasting/picking a file copies it into `<app_data_dir>/attachments/<ab>/<sha256>.<ext>` and the note holds a portable `stylenotes-attachment://<sha256>[.<ext>]` reference — never the original absolute path. Design + #A1–#A10: `docs/design/archive/artifacts.md`.
 - **Rust owns the store; the frontend owns markdown.** `src-tauri/src/attachments/mod.rs` is pure (hash, `object_rel_path`, `parse_reference`, ext normalisation); `commands.rs` does I/O and exposes `attachment_import` / `attachment_import_bytes` / `attachment_resolve` / `attachment_path` / `attachment_root` / `attachment_open`. All are in `generate_handler!`. The store writes `*.part` then renames.
 - **The `rel_path` is the S3 object key** (`attachments/<ab>/<id>.<ext>`), so cloud sync uploads exactly the referenced blobs with no translation table. `attachments` (migration 24) is a **derived index**, not truth: a bad row never fails an import (the on-disk blob is real), and a missing blob renders as `exists: false`, not a broken image.
 - **Rendering resolves references, not paths.** `content/attachment-url.ts` (no SQLite, no IPC beyond one cached `attachment_root`) turns a reference into an `asset://` URL; `content/note-actions.ts` calls it via `resolveAttachmentSources`, which also covers `video`/`audio`/`source`. A file link (`<a href="stylenotes-attachment://…">`) is **not** rewritten — it stays clickable and opens through `attachment_open` (`tauri-plugin-opener` via Rust, so no `open-path` permission in the webview). `attachmentLinkTarget` is checked **before** `handleExternalLink`.

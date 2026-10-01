@@ -1,0 +1,21 @@
+{
+  "name": "@stylenotes/shared",
+  "version": "0.1.0",
+  "description": "Shared sync contract, wire DTOs and entitlements for StyleNotes. Framework-free; consumed by the desktop app and the closed-source cloud service.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./hlc": "./src/hlc.ts",
+    "./sync": "./src/sync.ts",
+    "./domain": "./src/domain.ts",
+    "./entitlements": "./src/entitlements.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit"
+  }
+}

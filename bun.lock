@@ -9,6 +9,7 @@
         "@mdit/plugin-katex": "^1.1.1",
         "@olets/markdown-it-wrapperless-fence-rule": "^1.2.1",
         "@shikijs/markdown-it": "^4.4.3",
+        "@stylenotes/shared": "workspace:*",
         "@tauri-apps/api": "^2",
         "@tauri-apps/plugin-dialog": "^2.7.3",
         "@tauri-apps/plugin-fs": "^2.5.2",
@@ -56,6 +57,10 @@
         "vite": "^8.0.16",
         "vitest": "^5.0.1",
       },
+    },
+    "packages/shared": {
+      "name": "@stylenotes/shared",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -210,6 +215,8 @@
     "@simple-libs/stream-utils": ["@simple-libs/stream-utils@2.0.0", "", {}, "sha512-fCTuZK4QBa+39Oz9l4OGfJfz+GpwCp3AqO7Zch3to99xHPgstVsRFpeQ8LNd2o1Gv8raL2mCFwiaHh7bFSp5DQ=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
+
+    "@stylenotes/shared": ["@stylenotes/shared@workspace:packages/shared"],
 
     "@sveltejs/acorn-typescript": ["@sveltejs/acorn-typescript@1.0.13", "", { "peerDependencies": { "acorn": "^8.9.0" } }, "sha512-wgKggnhZVL9Bfx1OaKKTrYY9BFRk6C8UAkQNUcIv1+llzYrIqy+RZm5HPKzn0NpEBvTVhTqB4kQyllZywsRBRQ=="],
 

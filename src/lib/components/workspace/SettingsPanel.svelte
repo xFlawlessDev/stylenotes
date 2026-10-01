@@ -16,6 +16,7 @@
 		PictureInPicture2,
 		Bot,
 		Plug,
+		Cloud,
 		CalendarDays,
 		Brain,
 		FileInput,
@@ -36,6 +37,7 @@
 	import JournalSettings from '$lib/components/workspace/JournalSettings.svelte';
 	import DockSettings from '$lib/components/workspace/DockSettings.svelte';
 	import AiSettings from '$lib/components/workspace/AiSettings.svelte';
+	import CloudSettings from '$lib/components/workspace/CloudSettings.svelte';
 	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
 	import MemorySettings from '$lib/components/workspace/MemorySettings.svelte';
 	import AttachmentSettings from '$lib/components/workspace/AttachmentSettings.svelte';
@@ -83,6 +85,7 @@
 		{ id: 'appearance', label: t('settings.nav.appearance'), icon: Sun },
 		{ id: 'editor', label: t('settings.nav.editor'), icon: Type },
 		{ id: 'dock', label: t('settings.nav.dock'), icon: PictureInPicture2 },
+		{ id: 'cloud', label: t('settings.nav.cloud'), icon: Cloud },
 		{ id: 'ai', label: t('settings.nav.ai'), icon: Bot },
 		{ id: 'mcp', label: t('settings.nav.mcp'), icon: Plug },
 		{ id: 'memory', label: t('settings.nav.memory'), icon: Brain },
@@ -245,6 +248,10 @@
 
 					{#if section === 'dock'}
 						<DockSettings />
+					{/if}
+
+					{#if section === 'cloud'}
+						<CloudSettings />
 					{/if}
 
 					{#if section === 'ai'}

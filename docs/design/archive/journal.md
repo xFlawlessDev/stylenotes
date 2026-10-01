@@ -2,7 +2,7 @@
 
 > Status: **Diimplementasikan** (2026-09-30). Bagian ini awalnya draft untuk review; keputusan di §9 sudah diambil dan kodenya sudah ada.
 > Scope: fitur journal (note per hari) di app + satu tool MCP `journal_today` di atasnya.
-> Terkait: `docs/design/mcp-local-free.md` (#D19 hari lokal, #D17 metadata note, #D18 `edit_note_body`, §13a backup), `docs/design/cloud-sync-ai-mcp.md` (§3.2/§3.3 split settings, #24).
+> Terkait: `docs/design/archive/mcp-local-free.md` (#D19 hari lokal, #D17 metadata note, #D18 `edit_note_body`, §13a backup), `docs/design/cloud-sync-ai-mcp.md` (§3.2/§3.3 split settings, #24).
 
 Ringkasan keputusan ada di §8; yang masih terbuka ada di §9.
 

@@ -115,6 +115,7 @@ describe('translation completeness', () => {
 		const allowed = new Set([
 			'Edit', 'Folder', 'StyleNotes', 'Edit folder', 'Tag', '+ Tag', 'Status',
 			'Kanban', 'Gantt', 'Manual', 'Editor', 'Overlay', 'AI', 'MCP', 'Data',
+			'Cloud',
 			'Sage', 'Rose', 'Model', 'Embedder', 'Edit {name}', 'System UI', 'Serif', 'Monospace',
 			'Diagram', 'Tunnel', 'Endpoint', 'Token', 'Video', 'Audio', 'PDF',
 		]);

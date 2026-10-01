@@ -5,10 +5,10 @@
 > Scope: membuka **permukaan UI** yang bisa diperluas komunitas — bukan hanya warna/CSS — **tanpa** memuat JavaScript pihak ketiga ke dalam app.
 > Dokumen terkait:
 > - `docs/design/business-model.md` — temuan §1 #2 ("`ui_plugins` = tulang belakang marketplace tema"), keputusan **B4** (theme marketplace berbayar) dan **B3** (seluruh app desktop OSS). Dokumen ini **mengunci** arti "marketplace" (X3, X10, X12).
-> - `docs/design/mcp-local-free.md` — pola tabel → repo(`boolean`) → store `.svelte.ts` → komponen Settings (temuan 11) yang dipakai ulang di sini; §13a tentang backup & hard delete (dipakai X13).
-> - `docs/design/constella-features.md` — #D18 (registry dua sisi dijaga test) adalah preseden untuk "manifest ↔ tipe app dijaga test" di sini.
+> - `docs/design/archive/mcp-local-free.md` — pola tabel → repo(`boolean`) → store `.svelte.ts` → komponen Settings (temuan 11) yang dipakai ulang di sini; §13a tentang backup & hard delete (dipakai X13).
+> - `docs/design/archive/constella-features.md` — #D18 (registry dua sisi dijaga test) adalah preseden untuk "manifest ↔ tipe app dijaga test" di sini.
 > - `AGENTS.md` — aturan file (≤300/500 LOC), i18n (`t()` + locale per fitur), migrasi (tidak boleh mengedit yang sudah jalan), dan **"jangan bicara `import()` pihak ketiga"**.
-> - `docs/design/journal.md` — bentuk dokumen fitur kecil yang dilebur ke app; dokumen ini mengikuti kadens senada.
+> - `docs/design/archive/journal.md` — bentuk dokumen fitur kecil yang dilebur ke app; dokumen ini mengikuti kadens senada.
 
 ---
 

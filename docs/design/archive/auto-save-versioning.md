@@ -1,9 +1,9 @@
 # Technical Design — Auto-Save Hardening & Note/Task Versioning
 
-> Status: **Draft untuk review** (belum ada kode yang diubah).
-> Tanggal: 2026-09-28
+> Status: **Diimplementasikan & diarsipkan** (Phase A + Phase B selesai; lihat §7).
+> Tanggal: 2026-09-28 (status diperbarui 2026-10-01)
 > Scope: memperkuat jalur auto-save yang sudah ada (`save-queue.svelte.ts`) dan menambahkan riwayat versi lokal untuk note & task.
-> Terkait: `docs/design/cloud-sync-ai-mcp.md` (Fase 0 sync readiness), `docs/design/collaboration.md` (CRDT `Y.Text`, keputusan C13), `docs/design/mcp-local-free.md` (#D13 `notes.updated_at`, #13a backup body).
+> Terkait: `docs/design/cloud-sync-ai-mcp.md` (Fase 0 sync readiness), `docs/design/collaboration.md` (CRDT `Y.Text`, keputusan C13), `docs/design/archive/mcp-local-free.md` (#D13 `notes.updated_at`, #13a backup body).
 
 Dokumen ini adalah kelanjutan dari review arsitektur. Urutannya sengaja: **Phase A (prasyarat) harus selesai sebelum Phase B**, karena menulis versi di atas SQLite yang belum WAL dan masih rawan `SQLITE_BUSY` hanya memperburuk masalah.
 

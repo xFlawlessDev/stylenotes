@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+license = "AGPL-3.0-only"
 # The crate has two binaries (the app and the MCP shim), so `cargo run` — which
 # `tauri dev` invokes — must be told which one is the app. Without this it fails
 # with "could not determine which binary to run".
@@ -62,6 +63,10 @@ aes-gcm = "0.10"
 base64 = "0.22"
 rand = "0.8"
 thiserror = "2"
+# OS credential store for the cloud session token (never `localStorage`, never
+# plaintext on disk). `keyring` v4 ships native backends: Windows Credential
+# Manager, macOS Keychain, and Secret Service on Linux.
+keyring = "4"
 # Filesystem watcher: pushes new MCP job files to the parked `mcp_wait_job`
 # call instead of letting the frontend poll `mcp/jobs/` (src/mcp_watch.rs).
 notify = "8"

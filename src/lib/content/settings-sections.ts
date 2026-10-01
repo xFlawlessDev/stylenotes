@@ -10,6 +10,7 @@ export type SettingsSection =
 	| 'appearance'
 	| 'editor'
 	| 'dock'
+	| 'cloud'
 	| 'ai'
 	| 'mcp'
 	| 'memory'

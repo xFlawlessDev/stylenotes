@@ -2,6 +2,20 @@
 
 A desktop markdown note-taking app built with Tauri v2, SvelteKit (Svelte 5), and TypeScript. Notes live in a local SQLite database and the UI ships as a static SPA.
 
+StyleNotes is **open core**: this repository is the full, free desktop app. Cloud sync, AI, and remote MCP are optional features served by a separate (proprietary) cloud — the app works completely offline without it.
+
+## Open source & licensing
+
+| Part | License |
+| --- | --- |
+| The app (`src/`, `src-tauri/`) | [AGPL-3.0-only](LICENSE) |
+| The shared protocol (`packages/shared/`) | [MIT](packages/shared/LICENSE) |
+
+`packages/shared` is the sync contract (types, Hybrid Logical Clock, entitlements) shared with the cloud service. It is deliberately framework-free so third parties can build their own client or server against the same protocol. See `docs/design/repo-split.md`.
+
+Contributions are welcome under the CLA described in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+
 ## Features
 
 - Windows driven by one route:
@@ -41,7 +55,8 @@ bun run tauri dev   # full desktop app (DB, windows, plugins)
 | `bun run check` | `svelte-check` typecheck |
 | `bun run fmt` / `bun run fmt:check` | `cargo fmt` on `src-tauri` |
 | `bun run clippy` | `cargo clippy` with `-D warnings` |
-| `bun run check:all` | `check` + `fmt:check` + `clippy` |
+| `bun run check:shared` | Typecheck `packages/shared` (`tsc`) |
+| `bun run check:all` | `check` + `check:shared` + `fmt:check` + `clippy` |
 | `bun run release` | Cut a release: bump versions, update `CHANGELOG.md`, commit, tag `vX.Y.Z` |
 | `bun run release:dry` | Preview the version bump and changelog without changing anything |
 
@@ -85,6 +100,7 @@ src-tauri/               Rust backend
   src/lib.rs             Tauri setup, plugins, DB migrations
   tauri.conf.json        window + plugin config
   capabilities/          window permissions
+packages/shared/         @stylenotes/shared — sync contract (MIT), shared with the cloud
 ```
 
 See `AGENTS.md` for developer conventions and architecture notes.

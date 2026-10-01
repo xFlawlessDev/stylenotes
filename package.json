@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -18,13 +21,15 @@
     "fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
     "clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
-    "check:all": "bun run check && bun run fmt:check && bun run clippy",
+    "check:shared": "tsc -p packages/shared/tsconfig.json --noEmit",
+    "check:all": "bun run check && bun run check:shared && bun run fmt:check && bun run clippy",
     "release": "commit-and-tag-version",
     "release:dry": "commit-and-tag-version --dry-run"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
+    "@stylenotes/shared": "workspace:*",
     "@mdit/plugin-katex": "^1.1.1",
     "@olets/markdown-it-wrapperless-fence-rule": "^1.2.1",
     "@shikijs/markdown-it": "^4.4.3",

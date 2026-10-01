@@ -10,6 +10,7 @@ import {
 	type NotesChangedPayload,
 } from '$lib/stores/notes';
 import { hydrateSettings } from '$lib/stores/settings.svelte';
+import { hydrateCloud } from '$lib/stores/cloud.svelte';
 import { loadNotifications, type AppNotification } from '$lib/stores/notifications';
 import { hydrateTasks } from '$lib/stores/tasks.svelte';
 import type { Task } from '$lib/stores/tasks';
@@ -58,6 +59,7 @@ export function startWorkspaceSession(
 			void resumeRemoteMcp().catch(() => undefined);
 			await hydrateWorkspaces();
 			await hydrateSettings();
+			await hydrateCloud().catch(() => undefined);
 			await hydrateMemory().catch(() => undefined);
 			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),

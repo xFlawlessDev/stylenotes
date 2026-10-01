@@ -6,6 +6,7 @@ mod tray;
 
 mod ai;
 mod attachments;
+mod cloud;
 mod db_tx;
 mod embed;
 mod import;
@@ -841,6 +842,9 @@ pub fn run() {
             db_tx::note_remove_tx,
             db_tx::workspace_remove_tx,
             quit::app_quit_ready,
+            cloud::cloud_session_set,
+            cloud::cloud_session_get,
+            cloud::cloud_session_clear,
             ai::commands::ai_encrypt_key,
             ai::commands::ai_decrypt_key,
             ai::commands::ai_stream,
