@@ -11,7 +11,7 @@
  * is unavailable and callers simply get nothing back.
  */
 
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '$lib/windows';
 import { attachmentMarkdown, attachmentReference } from '$lib/content/attachments';
 import { attachmentStoreRoot, onAttachmentStoreReady } from '$lib/content/attachment-url';
@@ -75,6 +75,69 @@ export async function openAttachment(target: string): Promise<boolean> {
 	}
 }
 
+/** One trashed blob, as `attachment_trash_list` reports it. */
+export type TrashedAttachment = {
+	id: string;
+	ext: string;
+	deletedAt: number;
+	size: number;
+};
+
+/**
+ * Moves a blob to Trash. The note's reference is left intact: delete is a store
+ * action, so a mistake stays recoverable until the user empties the trash.
+ * Returns false when the blob was already absent.
+ */
+export async function deleteAttachment(reference: string): Promise<boolean> {
+	if (!isTauri) return false;
+	try {
+		return await invoke<boolean>('attachment_delete', { reference });
+	} catch {
+		return false;
+	}
+}
+
+/** Restores a trashed blob. Returns the restored hash, or null. */
+export async function restoreAttachment(id: string): Promise<string | null> {
+	if (!isTauri) return null;
+	try {
+		return await invoke<string | null>('attachment_restore', { id });
+	} catch {
+		return null;
+	}
+}
+
+export async function listTrashedAttachments(): Promise<TrashedAttachment[]> {
+	if (!isTauri) return [];
+	try {
+		return await invoke<TrashedAttachment[]>('attachment_trash_list');
+	} catch {
+		return [];
+	}
+}
+
+/** Permanently removes one trashed blob. */
+export async function purgeAttachment(id: string): Promise<boolean> {
+	if (!isTauri) return false;
+	try {
+		return await invoke<boolean>('attachment_purge', { id });
+	} catch {
+		return false;
+	}
+}
+
+/** Permanently removes trashed blobs older than the retention window. */
+export async function purgeExpiredTrash(retentionDays: number): Promise<number> {
+	if (!isTauri) return 0;
+	try {
+		return await invoke<number>('attachment_trash_purge_expired', {
+			retentionDays
+		});
+	} catch {
+		return 0;
+	}
+}
+
 /**
  * Native file picker that imports the chosen files and returns their markdown.
  * `kind: 'image'` narrows the filter to image types; `'file'` allows anything.
@@ -102,14 +165,4 @@ export function storedAttachmentMarkdown(record: StoredAttachment): string {
 /** Markdown for a batch, one per line, in the order they were imported. */
 export function storedAttachmentsMarkdown(records: StoredAttachment[]): string {
 	return records.map(storedAttachmentMarkdown).join('\n');
-}
-
-/** A webview-loadable URL for a stored blob path, for previews outside markdown. */
-export function attachmentPathUrl(path: string): string | null {
-	if (!isTauri) return null;
-	try {
-		return convertFileSrc(path);
-	} catch {
-		return null;
-	}
 }

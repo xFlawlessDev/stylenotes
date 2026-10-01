@@ -47,7 +47,7 @@ export const dialogs = {
 		emptyTitle: 'Versions appear here after you edit for a while.',
 		restore: 'Restore',
 		empty: 'Empty',
-		reason: { auto: 'Auto', manual: 'Manual', preMcp: 'Before AI', close: 'On close' },
+		reason: { auto: 'Auto', manual: 'Manual', preMcp: 'Before AI', close: 'On close', attachment: 'Attachment change' },
 		relative: {
 			justNow: 'just now',
 			minutes: '{count}m ago',

@@ -14,5 +14,6 @@ export type SettingsSection =
 	| 'mcp'
 	| 'memory'
 	| 'journal'
+	| 'attachments'
 	| 'data'
 	| 'about';

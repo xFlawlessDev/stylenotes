@@ -24,6 +24,14 @@ pub mod commands;
 /// Subdirectory under `app_data_dir()` that owns every blob.
 pub const ATTACHMENTS_DIR: &str = "attachments";
 
+/// Subdirectory under `attachments/` holding soft-deleted blobs.
+///
+/// Deleting an attachment moves the blob here instead of unlinking it, so a
+/// mistaken delete is recoverable until the user empties the trash. The trashed
+/// path is `trash/<stamp>-<hash>[.<ext>]`; the hash stays legible so restore can
+/// find it without a second index.
+pub const TRASH_DIR: &str = "trash";
+
 /// Scheme used inside note markdown. Deliberately not `http`/`asset`: it is a
 /// store-owned, portable identifier that must survive cloud sync unchanged.
 pub const SCHEME: &str = "stylenotes-attachment://";
@@ -118,6 +126,74 @@ pub fn parse_reference(reference: &str) -> Option<(String, String)> {
     Some((hash.to_lowercase(), ext))
 }
 
+/// Store-relative path of a trashed blob: `attachments/trash/<stamp>-<hash>[.<ext>]`.
+///
+/// The timestamp leads so a directory listing sorts oldest-first, which is what
+/// the purge walk wants; the hash stays in the name so `restore` can recover the
+/// original object path from the file name alone.
+pub fn trash_rel_path(hash: &str, ext: &str, stamp: u64) -> String {
+    let ext = normalize_ext(ext);
+    if ext.is_empty() {
+        format!("{ATTACHMENTS_DIR}/{TRASH_DIR}/{stamp}-{hash}")
+    } else {
+        format!("{ATTACHMENTS_DIR}/{TRASH_DIR}/{stamp}-{hash}.{ext}")
+    }
+}
+
+/// Splits a trashed file name into `(stamp, hash, ext)`.
+///
+/// Mirrors `trash_rel_path`; a name that does not match is `None`, so a foreign
+/// file dropped into `trash/` is ignored rather than restored as garbage.
+pub fn parse_trash_name(name: &str) -> Option<(u64, String, String)> {
+    let (stamp, rest) = name.split_once('-')?;
+    let stamp: u64 = stamp.parse().ok()?;
+    if rest.is_empty() {
+        return None;
+    }
+    let (hash, ext) = match rest.rsplit_once('.') {
+        Some((hash, ext)) if !hash.is_empty() => (hash, normalize_ext(ext)),
+        _ => (rest, String::new()),
+    };
+    if hash.is_empty() || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some((stamp, hash.to_lowercase(), ext))
+}
+
+/// Extracts the store references (`stylenotes-attachment://…`) from note body
+/// text, deduplicated. This is the one definition of "what a note references",
+/// shared by the orphan scan (frontend TS) and any future server-side GC.
+///
+/// Kept even though the current app never calls it from Rust: it is the parity
+/// reference the TS extractor is tested against, and the seam a server-side
+/// garbage collector will use.
+#[allow(dead_code)]
+pub fn extract_references(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find(SCHEME) {
+        // Skip past the scheme itself; the token that follows is hex + dots.
+        let token_start = start + SCHEME.len();
+        let after = &rest[token_start..];
+        let end = after
+            .find(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '.' || ch == '-'))
+            .unwrap_or(after.len());
+        if end > 0 {
+            let reference = format!("{SCHEME}{}", &after[..end]);
+            if parse_reference(&reference).is_some() && !out.contains(&reference) {
+                out.push(reference);
+            }
+            rest = &after[end..];
+        } else {
+            rest = after;
+        }
+        if rest.is_empty() {
+            break;
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +258,56 @@ mod tests {
         // Documents the single source of truth for the cap; the check itself
         // lives in commands.rs so this stays pure.
         assert_eq!(MAX_ATTACHMENT_BYTES, 512 * 1024 * 1024);
+    }
+
+    #[test]
+    fn trash_name_round_trips_through_parse() {
+        let rel = trash_rel_path("ab12cd", "png", 1_700_000_000_000);
+        assert_eq!(rel, "attachments/trash/1700000000000-ab12cd.png");
+        let name = rel.rsplit('/').next().unwrap();
+        assert_eq!(
+            parse_trash_name(name),
+            Some((1_700_000_000_000, "ab12cd".into(), "png".into()))
+        );
+        let bare = trash_rel_path("deadbeef", "", 42);
+        assert_eq!(
+            parse_trash_name(bare.rsplit('/').next().unwrap()),
+            Some((42, "deadbeef".into(), String::new()))
+        );
+    }
+
+    #[test]
+    fn parse_trash_name_rejects_foreign_names() {
+        assert_eq!(parse_trash_name("not-a-trash-name.png"), None);
+        // No leading stamp.
+        assert_eq!(parse_trash_name("ab12cd.png"), None);
+        // A non-numeric stamp.
+        assert_eq!(parse_trash_name("abc-deadbeef"), None);
+    }
+
+    #[test]
+    fn extract_references_dedupes_and_ignores_foreign_text() {
+        let body = concat!(
+            "See ![a](stylenotes-attachment://ab12cd.png) and ",
+            "[b](stylenotes-attachment://deadbeef.pdf). ",
+            "Again ![a](stylenotes-attachment://ab12cd.png). ",
+            "A link [x](https://x.test/a.png) and text."
+        );
+        assert_eq!(
+            extract_references(body),
+            vec![
+                "stylenotes-attachment://ab12cd.png".to_string(),
+                "stylenotes-attachment://deadbeef.pdf".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_references_stops_at_punctuation() {
+        let body = "![a](stylenotes-attachment://ab12cd.png), then";
+        assert_eq!(
+            extract_references(body),
+            vec!["stylenotes-attachment://ab12cd.png".to_string()]
+        );
     }
 }

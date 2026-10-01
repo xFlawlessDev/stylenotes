@@ -5,7 +5,7 @@ import type { Task } from '$lib/stores/tasks';
 export type VersionEntity = 'note' | 'task';
 
 /** Why a version was captured. */
-export type VersionReason = 'auto' | 'manual' | 'pre-mcp' | 'close';
+export type VersionReason = 'auto' | 'manual' | 'pre-mcp' | 'close' | 'attachment';
 
 /**
  * Fields a version stores. Derived values (`words`, `chars`, `excerpt`) are not

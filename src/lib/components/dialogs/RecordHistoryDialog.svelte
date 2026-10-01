@@ -54,6 +54,7 @@
 		manual: t('dialogs.history.reason.manual'),
 		'pre-mcp': t('dialogs.history.reason.preMcp'),
 		close: t('dialogs.history.reason.close'),
+		attachment: t('dialogs.history.reason.attachment'),
 	};
 </script>
 

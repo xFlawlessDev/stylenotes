@@ -13,7 +13,8 @@
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { toggleChecklistItem } from '$lib/stores/notes';
-	import { captureNoteVersion, notePatchFromVersion } from '$lib/content/note-versioning';
+	import { captureNoteVersion, captureAttachmentVersion, notePatchFromVersion } from '$lib/content/note-versioning';
+	import { attachmentReferencesChanged } from '$lib/content/attachment-manager';
 	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
 	import type { EntityVersion } from '$lib/content/version-types';
 	import { insertAttachment, attachmentLinkTarget } from '$lib/content/attachments';
@@ -254,9 +255,19 @@
 	}
 	function commitBody(value: string) {
 		if (!note) return;
+		const previousBody = draft;
 		draft = value;
 		// History is best-effort; the pre-image is the current note state.
-		if (settings.versioningEnabled) captureNoteVersion(note);
+		// An edit that changes which attachments are referenced always earns a
+		// version (even inside the time-gap window), so a link removed from the
+		// body can be recovered; `previousBody` is the exact pre-edit body.
+		if (settings.versioningEnabled) {
+			if (attachmentReferencesChanged(previousBody, value)) {
+				captureAttachmentVersion({ ...note, body: previousBody });
+			} else {
+				captureNoteVersion(note);
+			}
+		}
 		onupdate(note.id, { body: value });
 	}
 

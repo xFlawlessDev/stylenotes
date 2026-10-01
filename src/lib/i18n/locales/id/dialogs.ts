@@ -49,7 +49,7 @@ export const dialogs: DialogMessages = {
 		emptyTitle: 'Versi muncul di sini setelah kamu mengedit beberapa saat.',
 		restore: 'Pulihkan',
 		empty: 'Kosong',
-		reason: { auto: 'Otomatis', manual: 'Manual', preMcp: 'Sebelum AI', close: 'Saat tutup' },
+		reason: { auto: 'Otomatis', manual: 'Manual', preMcp: 'Sebelum AI', close: 'Saat tutup', attachment: 'Perubahan lampiran' },
 		relative: {
 			justNow: 'baru saja',
 			minutes: '{count} mnt lalu',

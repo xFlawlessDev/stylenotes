@@ -13,8 +13,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use super::{
-    ext_from_name, hex, object_rel_path, parse_reference, StoredAttachment, ATTACHMENTS_DIR,
-    MAX_ATTACHMENT_BYTES,
+    ext_from_name, hex, object_rel_path, parse_reference, parse_trash_name, trash_rel_path,
+    StoredAttachment, ATTACHMENTS_DIR, MAX_ATTACHMENT_BYTES, TRASH_DIR,
 };
 
 /// A reference resolved back to a concrete file on this device.
@@ -28,11 +28,23 @@ pub struct ResolvedAttachment {
     pub exists: bool,
 }
 
+/// The app-data directory. Every store path is relative to this, and the
+/// `attachments/` prefix is already part of `object_rel_path`/`trash_rel_path`,
+/// so the region, trash and shard dirs all hang off one root.
+fn data_root<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    app.path().app_data_dir().map_err(|error| error.to_string())
+}
+
+/// Creates and returns `<app_data_dir>/attachments`.
 fn attachments_root<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join(ATTACHMENTS_DIR))
-        .map_err(|error| error.to_string())
+    let root = data_root(app)?.join(ATTACHMENTS_DIR);
+    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    Ok(root)
+}
+
+/// Resolves a store-relative path against the app-data root.
+fn store_path<R: tauri::Runtime>(app: &AppHandle<R>, rel: &str) -> Result<PathBuf, String> {
+    Ok(data_root(app)?.join(rel))
 }
 
 /// Writes `bytes` under their content hash, deduplicating against an existing
@@ -101,8 +113,7 @@ pub fn attachment_import(
     app: AppHandle,
     paths: Vec<String>,
 ) -> Result<Vec<StoredAttachment>, String> {
-    let root = attachments_root(&app)?;
-    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    let root = data_root(&app)?;
     let mut stored = Vec::with_capacity(paths.len());
     for path in paths {
         match import_one(&root, Path::new(&path)) {
@@ -120,8 +131,7 @@ pub fn attachment_import_bytes(
     name: String,
     bytes: Vec<u8>,
 ) -> Result<StoredAttachment, String> {
-    let root = attachments_root(&app)?;
-    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    let root = data_root(&app)?;
     let label = if name.trim().is_empty() {
         "pasted-file"
     } else {
@@ -140,12 +150,11 @@ pub fn attachment_resolve(
     app: AppHandle,
     references: Vec<String>,
 ) -> Result<Vec<ResolvedAttachment>, String> {
-    let root = attachments_root(&app)?;
     let resolved = references
         .into_iter()
         .map(|reference| {
             let path = parse_reference(&reference)
-                .map(|(hash, ext)| root.join(object_rel_path(&hash, &ext)));
+                .and_then(|(hash, ext)| store_path(&app, &object_rel_path(&hash, &ext)).ok());
             let exists = path.as_ref().map(|path| path.exists()).unwrap_or(false);
             ResolvedAttachment {
                 reference,
@@ -165,11 +174,10 @@ pub fn attachment_resolve(
 /// stored locally. Used by the frontend to hand the file to the OS.
 #[tauri::command]
 pub fn attachment_path(app: AppHandle, reference: String) -> Result<Option<String>, String> {
-    let root = attachments_root(&app)?;
     let Some((hash, ext)) = parse_reference(&reference) else {
         return Ok(None);
     };
-    let path = root.join(object_rel_path(&hash, &ext));
+    let path = store_path(&app, &object_rel_path(&hash, &ext))?;
     Ok(path.exists().then(|| path.to_string_lossy().to_string()))
 }
 
@@ -181,7 +189,6 @@ pub fn attachment_path(app: AppHandle, reference: String) -> Result<Option<Strin
 #[tauri::command]
 pub fn attachment_root(app: AppHandle) -> Result<String, String> {
     let root = attachments_root(&app)?;
-    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
     Ok(root.to_string_lossy().to_string())
 }
 
@@ -191,16 +198,165 @@ pub fn attachment_root(app: AppHandle) -> Result<String, String> {
 /// the store stays the only thing that knows the on-disk layout.
 #[tauri::command]
 pub fn attachment_open(app: AppHandle, target: String) -> Result<(), String> {
-    let path = match parse_reference(&target) {
-        Some((hash, ext)) => attachments_root(&app)?.join(object_rel_path(&hash, &ext)),
-        None => PathBuf::from(&target),
-    };
+    let path = resolve_local_path(&app, &target)?;
     if !path.exists() {
         return Err("this file is not available on this device yet".to_string());
     }
     app.opener()
         .open_path(path.to_string_lossy().to_string(), None::<String>)
         .map_err(|error| error.to_string())
+}
+
+/// Resolves a reference — or a legacy absolute path — to a real file on disk.
+fn resolve_local_path<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    target: &str,
+) -> Result<PathBuf, String> {
+    match parse_reference(target) {
+        Some((hash, ext)) => store_path(app, &object_rel_path(&hash, &ext)),
+        None => Ok(PathBuf::from(target)),
+    }
+}
+
+/// Moves a blob to `attachments/trash/` and returns the hash moved.
+///
+/// The reference in the note is left alone: "delete" is a store action, not an
+/// edit, so the user can still undo it from Trash. Only if the blob is already
+/// gone does this report `false`.
+#[tauri::command]
+pub fn attachment_delete(app: AppHandle, reference: String) -> Result<bool, String> {
+    let Some((hash, ext)) = parse_reference(&reference) else {
+        return Ok(false);
+    };
+    let source = store_path(&app, &object_rel_path(&hash, &ext))?;
+    if !source.exists() {
+        return Ok(false);
+    }
+    let stamp = now_millis();
+    let target = store_path(&app, &trash_rel_path(&hash, &ext, stamp))?;
+    fs::create_dir_all(target.parent().unwrap_or(Path::new(".")))
+        .map_err(|error| error.to_string())?;
+    fs::rename(&source, &target).map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+/// Restores a trashed blob to its object path. Returns the hash, or `None` when
+/// no matching trashed file exists.
+#[tauri::command]
+pub fn attachment_restore(app: AppHandle, id: String) -> Result<Option<String>, String> {
+    let trash = store_path(&app, &format!("{ATTACHMENTS_DIR}/{TRASH_DIR}"))?;
+    let entries = match fs::read_dir(&trash) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(None),
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let Some((_, hash, ext)) = parse_trash_name(&name) else {
+            continue;
+        };
+        if hash != id.to_lowercase() {
+            continue;
+        }
+        let target = store_path(&app, &object_rel_path(&hash, &ext))?;
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        fs::rename(entry.path(), &target).map_err(|error| error.to_string())?;
+        return Ok(Some(hash));
+    }
+    Ok(None)
+}
+
+/// One trashed blob, as the Trash list shows it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashedAttachment {
+    pub id: String,
+    pub ext: String,
+    /// When it was deleted (epoch ms, from the file name).
+    pub deleted_at: u64,
+    pub size: u64,
+}
+
+/// Lists every trashed blob, newest first.
+#[tauri::command]
+pub fn attachment_trash_list(app: AppHandle) -> Result<Vec<TrashedAttachment>, String> {
+    let trash = store_path(&app, &format!("{ATTACHMENTS_DIR}/{TRASH_DIR}"))?;
+    let entries = match fs::read_dir(&trash) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some((stamp, hash, ext)) = parse_trash_name(&name.to_string_lossy()) else {
+            continue;
+        };
+        let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+        out.push(TrashedAttachment {
+            id: hash,
+            ext,
+            deleted_at: stamp,
+            size,
+        });
+    }
+    out.sort_by_key(|a| std::cmp::Reverse(a.deleted_at));
+    Ok(out)
+}
+
+/// Permanently removes one trashed blob.
+#[tauri::command]
+pub fn attachment_purge(app: AppHandle, id: String) -> Result<bool, String> {
+    let trash = store_path(&app, &format!("{ATTACHMENTS_DIR}/{TRASH_DIR}"))?;
+    let entries = match fs::read_dir(&trash) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(false),
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some((_, hash, _)) = parse_trash_name(&name.to_string_lossy()) else {
+            continue;
+        };
+        if hash == id.to_lowercase() {
+            fs::remove_file(entry.path()).map_err(|error| error.to_string())?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Permanently removes every trashed blob older than `retention_days`, or every
+/// one when `retention_days` is 0. Returns how many were removed.
+#[tauri::command]
+pub fn attachment_trash_purge_expired(app: AppHandle, retention_days: u64) -> Result<u64, String> {
+    let trash = store_path(&app, &format!("{ATTACHMENTS_DIR}/{TRASH_DIR}"))?;
+    let entries = match fs::read_dir(&trash) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(0),
+    };
+    let cutoff = retention_days.saturating_mul(24 * 60 * 60 * 1000);
+    let now = now_millis();
+    let mut removed = 0u64;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some((stamp, _, _)) = parse_trash_name(&name.to_string_lossy()) else {
+            continue;
+        };
+        let expired = retention_days == 0 || now.saturating_sub(stamp) >= cutoff;
+        if expired && fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+/// Epoch milliseconds. Kept small so the trash name is only digits + hash.
+fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -213,6 +369,45 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("scratch");
         dir
+    }
+
+    /// The trash helpers operate on a root directly, so they can be tested
+    /// without an `AppHandle`. `attachment_delete`/`restore`/`purge` wrap these
+    /// same paths; the store root is just `app_data_dir()/attachments`.
+    fn delete(root: &Path, reference: &str) -> bool {
+        let Some((hash, ext)) = parse_reference(reference) else {
+            return false;
+        };
+        let source = root.join(object_rel_path(&hash, &ext));
+        if !source.exists() {
+            return false;
+        }
+        let trash = root.join(ATTACHMENTS_DIR).join(TRASH_DIR);
+        fs::create_dir_all(&trash).expect("trash dir");
+        let target = root.join(trash_rel_path(&hash, &ext, 1_700_000_000_000));
+        fs::rename(&source, &target).expect("trash move");
+        true
+    }
+
+    fn restore(root: &Path, id: &str) -> bool {
+        let trash = root.join(ATTACHMENTS_DIR).join(TRASH_DIR);
+        let Ok(entries) = fs::read_dir(&trash) else {
+            return false;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some((_, hash, ext)) = parse_trash_name(&name.to_string_lossy()) else {
+                continue;
+            };
+            if hash != id {
+                continue;
+            }
+            let target = root.join(object_rel_path(&hash, &ext));
+            fs::create_dir_all(target.parent().expect("parent")).expect("parent dir");
+            fs::rename(entry.path(), &target).expect("restore move");
+            return true;
+        }
+        false
     }
 
     #[test]
@@ -246,6 +441,32 @@ mod tests {
         assert_eq!(record.origin_path, file.to_string_lossy());
         assert_eq!(record.name, "note.pdf");
         assert_eq!(record.ext, "pdf");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn delete_moves_to_trash_and_restore_brings_it_back() {
+        let root = scratch("trash");
+        let record = store_bytes(&root, "shot.png", b"image-bytes").expect("store");
+        let reference = format!("stylenotes-attachment://{}.png", record.id);
+
+        assert!(delete(&root, &reference));
+        // Gone from its object path, present under trash/.
+        assert!(!root.join(object_rel_path(&record.id, "png")).exists());
+        let trash = root.join(ATTACHMENTS_DIR).join(TRASH_DIR);
+        assert_eq!(fs::read_dir(&trash).expect("trash").count(), 1);
+
+        assert!(restore(&root, &record.id));
+        assert!(root.join(object_rel_path(&record.id, "png")).exists());
+        assert_eq!(fs::read_dir(&trash).expect("trash").count(), 0);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn delete_of_a_missing_blob_is_a_noop() {
+        let root = scratch("trash-missing");
+        assert!(!delete(&root, "stylenotes-attachment://abcdef.png"));
         let _ = fs::remove_dir_all(&root);
     }
 }

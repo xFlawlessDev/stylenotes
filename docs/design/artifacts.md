@@ -33,6 +33,19 @@
 | A9 | Path lama | Tetap didukung (render *dan* buka), tapi lampiran baru tak pernah memakainya | Note lama tidak pecah; migrasi malas, bukan paksa |
 | A10 | Export | `stylenotes-attachment://…` ditulis ulang jadi `attachments/<ab>/<id>.<ext>` | `.md` yang diekspor menunjuk file yang bisa disalin berdampingan |
 
+## 2b. Lifecycle & recall (#A11–#A16)
+
+| # | Topik | Keputusan | Implikasi |
+|---|-------|-----------|-----------|
+| A11 | Hapus = pindah ke Trash | `attachment_delete` me-`rename` blob ke `attachments/trash/<stamp>-<sha>[.<ext>]`, **bukan** unlink | Salah hapus bisa dipulihkan; retensi default **30 hari** |
+| A12 | Purge | `attachment_purge` (satu) / `attachment_trash_purge_expired` (kedaluwarsa, atau semua saat `0`) | Satu-satunya jalur yang benar-benar menghapus byte |
+| A13 | Recall lewat History | Edit yang mengubah **himpunan referensi** selalu membuat versi (`reason: 'attachment'`), mengabaikan aturan time-gap | Tempel-lalu-hapus **selalu** bisa di-undo dari Record History |
+| A14 | Orphan | Blob yang tak direferensikan note mana pun ditandai; user memindahkannya ke Trash secara eksplisit | Tidak ada GC otomatis — keputusan user, selalu via Trash |
+| A15 | Manajer | Settings → **Attachments**: total ukuran, daftar + jenis, orphan, Trash (restore/purge/empty) | Visibilitas; `stores/attachments.svelte.ts` + `AttachmentSettings.svelte` |
+| A16 | Satu definisi referensi | `extract_references` (Rust) dan `extractReferences` (TS) di-pin oleh test | Daftar orphan dan scan server kelak memakai aturan yang sama |
+
+> Catatan #A13: versioning melewati body >1 MB (`VERSION_MAX_BYTES`). Itu batas yang disengaja; recall attachment untuk body sebesar itu mengandalkan re-attach file (hash sama → referensi sama).
+
 ## 3. Tata letak & alur
 
 ```
@@ -40,7 +53,9 @@
 ├─ stylenotes.db
 └─ attachments/
    ├─ ab/ab12…ef.png      ← blob (identitas = isi)
-   └─ 9f/9f03…11.pdf
+   ├─ 9f/9f03…11.pdf
+   └─ trash/
+      └─ 1700000000000-ab12…ef.png   ← dihapus, bisa dipulihkan
 ```
 
 **Impor (drag-drop / picker / paste):** `FileDropZone` / toolbar → `importAttachments()`
@@ -54,6 +69,10 @@ via `convertFileSrc`. Root store di-cache setelah satu panggilan `attachment_roo
 
 **Buka tautan file:** klik pada `<a href="stylenotes-attachment://…pdf">` ditangkap
 `attachmentLinkTarget` (sebelum `handleExternalLink`) → command `attachment_open`.
+
+**Hapus & recall:** tombol hapus di manajer → `attachment_delete` memindahkan blob ke
+`attachments/trash/`. Referensi di note **tidak disentuh**, sehingga Note History dan Trash
+adalah dua jalur pemulihan yang saling melengkapi (lihat §2b).
 
 ## 4. Peta ke S3 (cloud sync)
 
@@ -79,8 +98,12 @@ Karena #A1–#A3, lapisan cloud tidak butuh logika khusus:
 ## 6. Yang belum (menunggu fase cloud)
 
 - Client S3 + antrean unggah/unduh (`sync_outbox` akan membawa operasi blob).
-- GC blob yatim (tabel `attachments` + referensi body) saat delete note.
+- Pemulihan otomatis saat **hapus note**: history & Trash sudah ada, tapi belum ada pintu UI ke history note yang sudah dihapus.
 - Plafon total store per device / per akun.
+
+> Lifecycle lokal **sudah** ada: Trash 30 hari, orphan scan manual, dan recall lewat History
+> (#A11–#A16). GC yang tersisa hanyalah pembersihan blob yatim secara otomatis, yang sengaja
+> tidak dilakukan tanpa keputusan user.
 
 ## 7. Berkas terkait
 

@@ -15,6 +15,16 @@ export function captureNoteVersion(note: Note): void {
 	void versioning.captureNote(note);
 }
 
+/**
+ * Saves the pre-edit note as a version *because an attachment was added or
+ * removed*. Unlike `captureNoteVersion`, an edit that changes which attachments
+ * a note references always snapshots — even inside the time-gap window — so a
+ * reference that was just deleted can be recovered from History.
+ */
+export function captureAttachmentVersion(note: Note): void {
+	void versioning.captureNote(note, 'attachment');
+}
+
 /** The editable fields a note version restores. */
 export function notePatchFromVersion(version: EntityVersion): NoteVersionPatch {
 	const payload = version.payload as Partial<Note>;

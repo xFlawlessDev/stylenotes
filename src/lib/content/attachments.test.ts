@@ -23,6 +23,12 @@ import {
 	rewriteAttachmentReferences,
 	targetExtension,
 } from '$lib/content/attachments';
+import {
+	attachmentReferencesChanged,
+	extractReferences,
+	missingReferences,
+	referencedIds,
+} from '$lib/content/attachment-manager';
 
 const HASH = 'a'.repeat(64);
 
@@ -317,5 +323,59 @@ describe('fileLinkKind and attachmentLinkTarget', () => {
 		expect(attachmentLinkTarget(el.querySelector('#web'), el)).toBeNull();
 		expect(attachmentLinkTarget(el.querySelector('#wiki'), el)).toBeNull();
 		el.remove();
+	});
+});
+
+describe('extractReferences', () => {
+	it('finds, dedupes and orders store references', () => {
+		const body = `![a](stylenotes-attachment://${HASH}.png) [b](stylenotes-attachment://deadbeef.pdf) ![a](stylenotes-attachment://${HASH}.png)`;
+		expect(extractReferences(body)).toEqual([
+			`stylenotes-attachment://${HASH}.png`,
+			'stylenotes-attachment://deadbeef.pdf'
+		]);
+	});
+
+	it('stops at punctuation and ignores foreign urls', () => {
+		expect(extractReferences(`x (stylenotes-attachment://${HASH}.png), y`)).toEqual([
+			`stylenotes-attachment://${HASH}.png`
+		]);
+		expect(extractReferences('[a](https://x.test/a.png) plain')).toEqual([]);
+	});
+
+	it('collects the referenced ids across many bodies', () => {
+		const ids = referencedIds([
+			`![a](stylenotes-attachment://${HASH}.png)`,
+			'[b](stylenotes-attachment://deadbeef.pdf)'
+		]);
+		expect(ids).toEqual(new Set([HASH, 'deadbeef']));
+	});
+
+	it('reports references whose blob is missing', () => {
+		const body = `![a](stylenotes-attachment://${HASH}.png) [b](stylenotes-attachment://deadbeef.pdf)`;
+		expect(missingReferences(body, new Set([HASH]))).toEqual(['stylenotes-attachment://deadbeef.pdf']);
+	});
+});
+
+describe('attachmentReferencesChanged', () => {
+	it('is true when a reference is added or removed', () => {
+		const withImage = `![a](stylenotes-attachment://${HASH}.png)`;
+		expect(attachmentReferencesChanged('text', withImage)).toBe(true);
+		expect(attachmentReferencesChanged(withImage, 'text')).toBe(true);
+	});
+
+	it('is true when one reference replaces another', () => {
+		expect(
+			attachmentReferencesChanged(
+				`![a](stylenotes-attachment://${HASH}.png)`,
+				'![b](stylenotes-attachment://deadbeef.jpg)'
+			)
+		).toBe(true);
+	});
+
+	it('is false for ordinary text edits and reordering', () => {
+		const body = `![a](stylenotes-attachment://${HASH}.png) and [b](stylenotes-attachment://deadbeef.pdf)`;
+		expect(attachmentReferencesChanged(body, `${body} more text`)).toBe(false);
+		const reversed = `[b](stylenotes-attachment://deadbeef.pdf) and ![a](stylenotes-attachment://${HASH}.png)`;
+		expect(attachmentReferencesChanged(body, reversed)).toBe(false);
 	});
 });

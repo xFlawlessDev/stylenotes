@@ -27,7 +27,8 @@
 	} from '$lib/stores/notes';
 	import { createSaveQueue } from '$lib/stores/save-queue.svelte';
 	import { registerQuitFlush } from '$lib/stores/quit-flush';
-	import { captureNoteVersion, notePatchFromVersion } from '$lib/content/note-versioning';
+	import { captureNoteVersion, captureAttachmentVersion, notePatchFromVersion } from '$lib/content/note-versioning';
+	import { attachmentReferencesChanged } from '$lib/content/attachment-manager';
 	import { setPendingEdit } from '$lib/stores/mcp-pending-edits';
 	import {
 		applySettingsSnapshot,
@@ -124,8 +125,15 @@
 		const next = applyNotePatch(current, patch);
 		note = next;
 		// History is best-effort and must never block or fail the actual save;
-		// the pre-image is `current` (the state before this edit).
-		if (settings.versioningEnabled) captureNoteVersion(current);
+		// the pre-image is `current` (the state before this edit). A body edit
+		// that changes the attachments referenced always earns a version.
+		if (settings.versioningEnabled) {
+			if (patch.body !== undefined && attachmentReferencesChanged(current.body, patch.body)) {
+				captureAttachmentVersion(current);
+			} else {
+				captureNoteVersion(current);
+			}
+		}
 		queue.enqueue(next);
 	}
 

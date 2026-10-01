@@ -19,6 +19,7 @@
 		CalendarDays,
 		Brain,
 		FileInput,
+		FolderOpen,
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
@@ -37,6 +38,7 @@
 	import AiSettings from '$lib/components/workspace/AiSettings.svelte';
 	import McpSettings from '$lib/components/workspace/McpSettings.svelte';
 	import MemorySettings from '$lib/components/workspace/MemorySettings.svelte';
+	import AttachmentSettings from '$lib/components/workspace/AttachmentSettings.svelte';
 	import ImportMarkdownDialog from '$lib/components/workspace/ImportMarkdownDialog.svelte';
 
 	let {
@@ -85,6 +87,7 @@
 		{ id: 'mcp', label: t('settings.nav.mcp'), icon: Plug },
 		{ id: 'memory', label: t('settings.nav.memory'), icon: Brain },
 		{ id: 'journal', label: t('settings.nav.journal'), icon: CalendarDays },
+		{ id: 'attachments', label: t('settings.nav.attachments'), icon: FolderOpen },
 		{ id: 'data', label: t('settings.nav.data'), icon: HardDrive },
 		{ id: 'about', label: t('settings.nav.about'), icon: Sparkles },
 	];
@@ -258,6 +261,10 @@
 
 					{#if section === 'journal'}
 						<JournalSettings />
+					{/if}
+
+					{#if section === 'attachments'}
+						<AttachmentSettings />
 					{/if}
 
 					{#if section === 'data'}
