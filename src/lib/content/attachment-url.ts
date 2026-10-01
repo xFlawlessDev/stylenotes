@@ -4,7 +4,12 @@
  * Kept separate from `attachment-actions.ts` on purpose: the note render path
  * (`note-actions.ts`) resolves images and media on every render, and it must not
  * drag in the SQLite catalog or the import commands. This module only needs the
- * store's root directory, which it caches after one `attachment_root` call.
+ * store's base directory, which it caches after one `attachment_root` call.
+ *
+ * `baseDir` is the **app-data root**, not the `attachments/` folder: the object
+ * path already carries the `attachments/` prefix, exactly as Rust's `store_path`
+ * joins it. Keeping one base on both sides is what stops the path from becoming
+ * `attachments/attachments/…`.
  */
 
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -17,19 +22,19 @@ import {
 
 const SEPARATOR = /\\/g;
 
-let storeRoot = '';
+let baseDir = '';
 let rootLoading: Promise<string> | null = null;
 let listeners: Array<(root: string) => void> = [];
 
-/** Whether the store root has been resolved (and references can be rendered). */
+/** Whether the base directory has been resolved (references can render). */
 export function attachmentRootReady(): boolean {
-	return storeRoot !== '';
+	return baseDir !== '';
 }
 
-/** Subscribers fire when the store root first resolves, so a view can re-render. */
+/** Subscribers fire when the base directory first resolves, so a view can re-render. */
 export function onAttachmentStoreReady(listener: (root: string) => void): () => void {
-	if (storeRoot) {
-		listener(storeRoot);
+	if (baseDir) {
+		listener(baseDir);
 		return () => undefined;
 	}
 	listeners.push(listener);
@@ -38,16 +43,16 @@ export function onAttachmentStoreReady(listener: (root: string) => void): () => 
 	};
 }
 
-/** Resolves the store root once; subsequent calls reuse it. */
+/** Resolves the app-data root once; subsequent calls reuse it. */
 export async function attachmentStoreRoot(): Promise<string> {
 	if (!isTauri) return '';
-	if (storeRoot) return storeRoot;
+	if (baseDir) return baseDir;
 	if (!rootLoading) {
 		rootLoading = invokeRoot().then((root) => {
-			storeRoot = root.replace(SEPARATOR, '/');
-			for (const listener of listeners) listener(storeRoot);
+			baseDir = root.replace(SEPARATOR, '/');
+			for (const listener of listeners) listener(baseDir);
 			listeners = [];
-			return storeRoot;
+			return baseDir;
 		});
 		rootLoading = rootLoading.catch((error) => {
 			rootLoading = null;
@@ -62,9 +67,9 @@ async function invokeRoot(): Promise<string> {
 	return invoke<string>('attachment_root');
 }
 
-/** Loads the store root without throwing; the render path calls this first. */
+/** Loads the base directory without throwing; the render path calls this first. */
 export async function primeAttachmentStore(): Promise<void> {
-	if (!isTauri || storeRoot) return;
+	if (!isTauri || baseDir) return;
 	try {
 		await attachmentStoreRoot();
 	} catch {
@@ -75,8 +80,8 @@ export async function primeAttachmentStore(): Promise<void> {
 /** The absolute path of a stored blob, or null when the reference is foreign. */
 export function storedPath(reference: string): string | null {
 	const parsed = parseAttachmentReference(reference);
-	if (!parsed || !storeRoot) return null;
-	return `${storeRoot}/${attachmentObjectPath(parsed.id, parsed.ext)}`;
+	if (!parsed || !baseDir) return null;
+	return `${baseDir}/${attachmentObjectPath(parsed.id, parsed.ext)}`;
 }
 
 function assetUrl(path: string): string | null {

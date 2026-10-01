@@ -35,13 +35,6 @@ fn data_root<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|error| error.to_string())
 }
 
-/// Creates and returns `<app_data_dir>/attachments`.
-fn attachments_root<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let root = data_root(app)?.join(ATTACHMENTS_DIR);
-    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
-    Ok(root)
-}
-
 /// Resolves a store-relative path against the app-data root.
 fn store_path<R: tauri::Runtime>(app: &AppHandle<R>, rel: &str) -> Result<PathBuf, String> {
     Ok(data_root(app)?.join(rel))
@@ -183,13 +176,16 @@ pub fn attachment_path(app: AppHandle, reference: String) -> Result<Option<Strin
 
 /// Absolute path of the attachments directory.
 ///
-/// The frontend builds blob paths from a reference and this root, so rendering
-/// does not need one IPC round-trip per image. The store owns the layout; this
-/// only exposes the root, never a way to read outside it.
+/// Absolute path of the app-data directory — the base the frontend joins a
+/// store-relative path onto.
+///
+/// It returns the **app-data root, not the `attachments/` directory**: the
+/// object path already carries the `attachments/` prefix (`object_rel_path`),
+/// and Rust's own `store_path` joins against this same base. Exposing anything
+/// else here would make the frontend build `attachments/attachments/…`.
 #[tauri::command]
 pub fn attachment_root(app: AppHandle) -> Result<String, String> {
-    let root = attachments_root(&app)?;
-    Ok(root.to_string_lossy().to_string())
+    Ok(data_root(&app)?.to_string_lossy().to_string())
 }
 
 /// Opens a stored blob (or a legacy absolute path) with the OS default app.
@@ -373,7 +369,8 @@ mod tests {
 
     /// The trash helpers operate on a root directly, so they can be tested
     /// without an `AppHandle`. `attachment_delete`/`restore`/`purge` wrap these
-    /// same paths; the store root is just `app_data_dir()/attachments`.
+    /// same paths; the root passed here is the **app-data root**, and the
+    /// `attachments/` prefix comes from `object_rel_path`/`trash_rel_path`.
     fn delete(root: &Path, reference: &str) -> bool {
         let Some((hash, ext)) = parse_reference(reference) else {
             return false;
@@ -468,5 +465,20 @@ mod tests {
         let root = scratch("trash-missing");
         assert!(!delete(&root, "stylenotes-attachment://abcdef.png"));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn object_path_is_relative_to_the_app_data_root() {
+        // The frontend joins `attachment_root()` (the app-data dir) with
+        // `object_rel_path`. If `attachment_root` returned the `attachments/`
+        // folder instead, the path would become `attachments/attachments/…`.
+        // Pin the contract the fix relies on: the relative path starts with
+        // `attachments/` and joining it once lands the blob exactly once.
+        let rel = object_rel_path("ab12cd34", "png");
+        assert_eq!(rel, "attachments/ab/ab12cd34.png");
+        let root = Path::new("/data");
+        let joined = root.join(&rel);
+        assert_eq!(joined.to_string_lossy().matches("attachments").count(), 1);
+        assert!(joined.ends_with(Path::new("attachments/ab/ab12cd34.png")));
     }
 }
