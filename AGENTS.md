@@ -119,7 +119,15 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - `tauri-plugin-prevent-default` blocks browser shortcuts, but dev builds keep DevTools + Reload (`lib.rs`).
 - The `workspace`, `overlay`, and `kanban` windows **hide instead of closing** (`hide_on_close` in `lib.rs`); the titlebar close button hides too. The system tray (`src-tauri/src/tray.rs`, requires tauri's `tray-icon` feature) keeps the app alive and its "Quit StyleNotes" item is the only way to exit.
 - The `kanban` window locks to the desktop via `tauri-plugin-desktop-underlay` (`src/lib/stores/kanban.svelte.ts`, `desktop-underlay:default` permission): locked = desktop underlay, unlocked = always on top. Global shortcuts (`Ctrl+Shift+\` lock, `Ctrl+Shift+N`/`Ctrl+Shift+T` quick capture) are registered in Rust (`lib.rs`) and reported to the webviews through events; the lock state lives in `settings.kanbanLocked`.
-- `tauri-plugin-mcp-bridge` (debug builds only, `127.0.0.1:9223`) lets an MCP client drive the app: screenshots, DOM snapshots, IPC monitoring. It needs `withGlobalTauri: true` in `tauri.conf.json` and the `mcp-bridge:default` permission; both are required or it fails silently. Registered under `#[cfg(debug_assertions)]` so it never ships in a release.
+
+### MCP bridge (dev tooling)
+
+`tauri-plugin-mcp-bridge` lets an MCP client drive the **running** app: screenshots, DOM snapshots, element finding, clicks/typing, and IPC monitoring. It is **debug-only** — registered under `#[cfg(debug_assertions)]` in `lib.rs`, so it never ships in a release.
+
+- **Setup already in place:** `tauri-plugin-mcp-bridge = "0.13"` (`Cargo.toml`, bound to `127.0.0.1`), `withGlobalTauri: true` (`tauri.conf.json`), and the `mcp-bridge:default` permission. All three are required; a missing one fails silently.
+- **The client config is per-machine, not in this repo.** OpenCode has a `tauri` entry in `~/.config/opencode/opencode.json` running `npx @hypothesi/tauri-mcp-server`. Other editors are configured with `npx -y @a1st/aix add mcp tauri --command 'npx @hypothesi/tauri-mcp-server' --user`.
+- **Use:** the app must be running (`bun run tauri dev` — the **user** starts it, never the agent). Then `driver_session` with `action: "start"` connects on `127.0.0.1:9223`, after which `webview_screenshot`, `webview_dom_snapshot`, `webview_find_element`, `webview_interact`, `ipc_get_backend_state`, etc. work. Call `driver_session` with `action: "stop"` when done.
+- **Target a window by label** with `windowId`: `workspace`, `overlay`, `kanban` (the `note-*`/`task-*` windows are created on demand).
 
 ## Frontend conventions
 
