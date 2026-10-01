@@ -22,7 +22,9 @@ import {
 import { createJournalOps } from '$lib/stores/workspace-journal-ops';
 import { createNoteOps } from '$lib/stores/workspace-note-ops';
 import { createWorkspaceOps } from '$lib/stores/workspace-ops';
-import { persistNotifications, resetNotifications, type AppNotification } from '$lib/stores/notifications';
+import type { AppNotification } from '$lib/stores/notifications';
+import { createNotificationOps } from '$lib/stores/workspace-notification-ops';
+import type { SettingsSection } from '$lib/content/settings-sections';
 import type { TaskView } from '$lib/components/tasks/TaskBoard.svelte';
 import type { WikiEntity } from '$lib/content/wiki-links';
 import { refreshTasks, clearTasks, listAllTasks } from '$lib/stores/tasks.svelte';
@@ -46,6 +48,8 @@ export type WorkspaceState = {
 	activeTag: string | null;
 	paletteOpen: boolean;
 	settingsOpen: boolean;
+	/** The section Settings should land on, or `null` for "wherever it was". */
+	settingsSection: SettingsSection | null;
 	notificationsOpen: boolean;
 	createOpen: boolean;
 	folderOpen: boolean;
@@ -85,6 +89,7 @@ export function createWorkspaceController() {
 		activeTag: null,
 		paletteOpen: false,
 		settingsOpen: false,
+		settingsSection: null,
 		notificationsOpen: false,
 		createOpen: false,
 		folderOpen: false,
@@ -273,6 +278,11 @@ export function createWorkspaceController() {
 	const handleChatWikiClick = wiki.handleChatClick;
 	const selectWikiTarget = wiki.selectTarget;
 	const openGraphNode = wiki.openGraphNode;
+	const notificationOps = createNotificationOps(state);
+	const addNotification = notificationOps.addNotification;
+	const markRead = notificationOps.markRead;
+	const markAllRead = notificationOps.markAllRead;
+	const clearNotifications = notificationOps.clearNotifications;
 	const openAddFolder = () => { state.folderOpen = true; };
 	const commitNewFolder = folderOps.commitNew;
 	const renameFolder = folderOps.rename;
@@ -327,35 +337,14 @@ export function createWorkspaceController() {
 		await clearNotes();
 		await resetStoredSettings();
 		await clearTasks();
-		const [fresh, freshNotifications] = await Promise.all([
-			resetNotesToSeed(),
-			resetNotifications(),
-		]);
+		const [fresh] = await Promise.all([resetNotesToSeed(), notificationOps.resetNotificationsList()]);
 		state.items = fresh;
 		state.customFolders = [];
 		state.selectedId = state.items[0]?.id ?? '';
-		state.notifications = freshNotifications;
 		state.tasks = [];
 		state.activeFolder = 'all';
 		state.activeTag = null;
 		showToast(t('editor.actions.dataReset'));
-	}
-
-	function markRead(id: string) {
-		state.notifications = state.notifications.map((item) =>
-			item.id === id ? { ...item, read: true } : item
-		);
-		void persistNotifications(state.notifications);
-	}
-
-	function markAllRead() {
-		state.notifications = state.notifications.map((item) => ({ ...item, read: true }));
-		void persistNotifications(state.notifications);
-	}
-
-	function clearNotifications() {
-		state.notifications = [];
-		void persistNotifications([]);
 	}
 
 	function closePanels() {
@@ -369,8 +358,15 @@ export function createWorkspaceController() {
 		state.paletteOpen = true;
 	}
 
-	function openSettings() {
+	/**
+	 * Opens Settings, optionally pointing at the section a caller is talking
+	 * about — a nudge from the chat lands the user on the setting it explains
+	 * rather than one they have to find. An ordinary open passes nothing and
+	 * keeps the section from the last visit.
+	 */
+	function openSettings(section?: SettingsSection) {
 		closePanels();
+		state.settingsSection = section ?? null;
 		state.settingsOpen = true;
 	}
 
@@ -481,6 +477,7 @@ export function createWorkspaceController() {
 		markRead,
 		markAllRead,
 		clearNotifications,
+		addNotification,
 		closePanels,
 		openPalette,
 		openSettings,

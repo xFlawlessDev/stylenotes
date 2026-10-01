@@ -11,6 +11,7 @@
 		RotateCcw,
 	} from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
+	import type { SettingsSection } from '$lib/content/settings-sections';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import type { Task } from '$lib/stores/tasks';
@@ -31,6 +32,7 @@
 		onselecttask,
 		onselectfolder,
 		settingsOpen = false,
+		settingsSection = null,
 		onsettingsclose,
 		onexport,
 		onresetdata,
@@ -69,6 +71,8 @@
 		onselecttask: (id: string) => void;
 		onselectfolder: (id: string) => void;
 		settingsOpen?: boolean;
+		/** Section Settings should land on, when a caller names one. */
+		settingsSection?: SettingsSection | null;
 		onsettingsclose: () => void;
 		onexport: () => void;
 		onresetdata: () => void;
@@ -152,6 +156,7 @@
 
 <SettingsPanel
 	open={settingsOpen}
+	initialSection={settingsSection}
 	onclose={onsettingsclose}
 	onexport={onexport}
 	onresetdata={onresetdata}

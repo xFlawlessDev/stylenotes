@@ -64,6 +64,12 @@ export const shell = {
 				'Notes untouched for a while can move to Archive to keep the list calm.',
 			time: { minutes: '{count}m ago', hours: '{count}h ago', yesterday: 'Yesterday' },
 		},
+		/** Raised by the app itself (not a seed row); see `stores/memory-nudge.ts`. */
+		memory: {
+			title: 'Semantic memory is off',
+			body: 'Open Settings → Memory and pick an embedder so the assistant can search your notes by meaning.',
+			time: 'Just now',
+		},
 	},
 } as const;
 

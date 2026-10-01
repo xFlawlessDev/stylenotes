@@ -13,8 +13,14 @@
  * v2 (#D19): the snapshot gained `today`, the user's civil date. The shim
  * requires it for date comparisons, so a v1 app gets `protocol_mismatch` and an
  * "update StyleNotes" message instead of quietly comparing against the UTC day.
+ *
+ * v3: `truncated` stopped meaning "index-only". Bodies are withheld per note
+ * and flagged with `McpSnapshotNote.truncated`, while the new `indexOnly` says
+ * whether none shipped at all — a v2 reader takes `truncated: true` as "no
+ * bodies anywhere", which would hide content that is right there. The split is
+ * what lets one oversized note stop punishing the whole workspace.
  */
-export const MCP_PROTOCOL = 2;
+export const MCP_PROTOCOL = 3;
 
 /** Error codes the shim and the host agree on. */
 export type McpErrorCode =
@@ -137,13 +143,25 @@ export type McpSnapshotMeta = {
 	 * shim makes MUST use this field, not `generatedAt`.
 	 */
 	today: string;
+	/**
+	 * Some content was left out: a capped list, a cut body, or a body withheld
+	 * by the size budget. Never means "no bodies" on its own — that is
+	 * `indexOnly`. Readers must surface it, or a withheld body reads as an
+	 * empty note.
+	 */
 	truncated: boolean;
+	/**
+	 * True only when **no** note carries a body, i.e. bodies were dropped
+	 * wholesale to fit the budget. A note with `truncated: true` but no
+	 * `indexOnly` around it still has its (possibly cut) text.
+	 */
+	indexOnly: boolean;
 	appRunning: boolean;
-	/** Why the snapshot fell back to index-only mode, when it did. */
+	/** Why the snapshot was trimmed, when it was: `note_count`, `task_count`, `body_size` or `snapshot_size`. */
 	truncatedReason?: string;
 };
 
-/** Per-note entry in the snapshot. Body is omitted in index-only mode. */
+/** Per-note entry in the snapshot. Body is omitted when withheld. */
 export type McpSnapshotNote = {
 	id: string;
 	workspaceId: string;
@@ -153,7 +171,18 @@ export type McpSnapshotNote = {
 	pinned: boolean;
 	overlay: boolean;
 	excerpt: string;
+	/**
+	 * Absent when the body was withheld (index-only mode or the size budget).
+	 * Never `undefined` because a note is empty: an empty note carries `''`.
+	 * That distinction is the whole point — a missing body must be reportable.
+	 */
 	body?: string;
+	/**
+	 * Set when `body` is missing or cut short at `MCP_MAX_BODY_BYTES`. Tells
+	 * the reader there is more text than was loaded, so "no body" is never
+	 * mistaken for "nothing there".
+	 */
+	truncated?: boolean;
 	/** Epoch milliseconds. Both come from the DB columns, never the display `updated` (#D13, #D17). */
 	createdAt: number;
 	updatedAt: number;
@@ -228,10 +257,16 @@ export type McpSnapshot = McpSnapshotMeta & {
 	graph: { nodes: McpSnapshotGraphNode[]; edges: McpSnapshotGraphEdge[] };
 };
 
-/** Size guards enforced in the app, never in the shim (#D3, Q4). */
+/**
+ * Size guards enforced in the app, never in the shim (#D3, Q4).
+ *
+ * A body over `MCP_MAX_BODY_BYTES` is cut on a line boundary and flagged
+ * `truncated`; it no longer throws the whole snapshot into index-only mode.
+ * Which bodies ship at all is then decided once, against
+ * `MCP_MAX_SNAPSHOT_BYTES`.
+ */
 export const MCP_MAX_BODY_BYTES = 256 * 1024;
 export const MCP_MAX_SNAPSHOT_BYTES = 32 * 1024 * 1024;
-export const MCP_FLAG_BODY_BYTES = 500 * 1024;
 export const MCP_MAX_NOTES = 20_000;
 export const MCP_MAX_TASKS = 20_000;
 

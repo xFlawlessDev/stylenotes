@@ -1,17 +1,23 @@
 import { t } from '$lib/i18n/index.svelte';
 
 /**
- * Seed notifications are written to SQLite on first run, so their `title`,
- * `body` and `time` are frozen in whatever language was active at seed time.
- * Instead of translating the stored rows (which would corrupt user data), the
- * panel asks this helper whether a row is still an untouched seed and, if so,
- * renders the keys from the catalog. Any user or later notification keeps its
- * stored text.
+ * Text for a notification the *app* owns: the four seed rows written on first
+ * run, plus anything it raises later (see `stores/memory-nudge.ts`). Those
+ * rows are written to SQLite in whatever language was active at the time, and
+ * re-translating the stored value would corrupt user data on every save — so
+ * instead the panel asks whether the id is one the app owns and, if so,
+ * renders the key from the catalog. Any other row keeps its stored text.
  *
- * Returns `null` for a non-seed id, so callers fall back to the stored fields.
+ * Returns `null` for an id the app does not own, so callers fall back to the stored fields.
  */
 export function seedNotificationText(id: string): { title: string; body: string; time: string } | null {
 	switch (id) {
+		case 'n-memory':
+			return {
+				title: t('shell.notification.memory.title'),
+				body: t('shell.notification.memory.body'),
+				time: t('shell.notification.memory.time'),
+			};
 		case 'n-weekly':
 			return {
 				title: t('shell.notification.seed.weeklyTitle'),

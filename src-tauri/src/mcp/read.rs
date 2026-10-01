@@ -188,6 +188,8 @@ pub fn list_notes(bridge: &Bridge, args: &Value) -> Value {
         .map(|mut note| {
             if !body {
                 note["body"] = Value::Null;
+            } else {
+                null_body(&mut note);
             }
             note
         })
@@ -201,12 +203,32 @@ pub fn list_notes(bridge: &Bridge, args: &Value) -> Value {
     }))
 }
 
-/// Whether the snapshot carries note bodies or fell back to index-only mode.
+/// Whether the snapshot carries note bodies, i.e. it is not index-only.
+///
+/// v3 splits the two meanings `truncated` used to carry: `indexOnly` says
+/// whether *no* body shipped, while `truncated` now only reports that content
+/// was trimmed somewhere — a cut or withheld body on one note no longer means
+/// every other note lost its text too. A pre-v3 snapshot has no `indexOnly`,
+/// and there `truncated` meant exactly this, hence the fallback.
 pub(crate) fn render_bodies(snapshot: &Value) -> bool {
+    if let Some(index_only) = snapshot.get("indexOnly").and_then(Value::as_bool) {
+        return !index_only;
+    }
     !snapshot
         .get("truncated")
         .and_then(Value::as_bool)
         .unwrap_or(false)
+}
+
+/// Forces `body` into a note payload: `null` when the snapshot withheld it.
+///
+/// An absent field reads as "the writer forgot"; `null` reads as "there is
+/// none here", which a client can pair with the note's `truncated` flag to
+/// tell a withheld body from one the user never wrote.
+fn null_body(item: &mut Value) {
+    if item.get("body").is_none() {
+        item["body"] = Value::Null;
+    }
 }
 
 pub(crate) fn matches_workspace(item: &Value, workspace: Option<&str>) -> bool {
@@ -239,6 +261,10 @@ pub fn search_notes(bridge: &Bridge, args: &Value) -> Value {
         .filter(|note| note_matches(note, &needle, body))
         .take(limit)
         .map(with_prefixed_id)
+        .map(|mut note| {
+            null_body(&mut note);
+            note
+        })
         .collect();
     hits.sort_by_key(|note| std::cmp::Reverse(score_note(note, &needle)));
     ok(json!({
@@ -324,6 +350,18 @@ pub fn get_note(bridge: &Bridge, args: &Value, workspace: Option<&str>) -> Value
     let mut payload = with_prefixed_id(note);
     payload["backlinks"] = Value::Array(backlinks);
     payload["outlinks"] = Value::Array(outlinks);
+
+    // A missing `body` means the size budget withheld it — an empty note
+    // carries `""`. Answering with an empty string would tell the client the
+    // user never wrote anything, so the omission is reported as an error that
+    // still hands over the excerpt and links instead of nothing at all.
+    if payload.get("body").and_then(Value::as_str).is_none() {
+        return protocol::tool_error_with_data(
+            "snapshot_truncated",
+            "This note's body was left out of the snapshot to keep it within the size budget; the note is not empty. Work from the excerpt and links below, or ask the user to narrow the workspace.",
+            payload,
+        );
+    }
     ok(payload)
 }
 
@@ -417,6 +455,8 @@ pub fn context(bridge: &Bridge, args: &Value) -> Value {
             let mut item = with_prefixed_id(note);
             if !body {
                 item["body"] = Value::Null;
+            } else {
+                null_body(&mut item);
             }
             item["score"] = json!(score);
             let node = graph_node_id("note", note);
@@ -567,5 +607,36 @@ mod tests {
         let hot = json!({ "title": "arsitektur MCP", "tags": [], "excerpt": "", "body": "" });
         let cold = json!({ "title": "lain", "tags": [], "excerpt": "", "body": "arsitektur" });
         assert!(score_note(&hot, "arsitektur") > score_note(&cold, "arsitektur"));
+    }
+
+    /// The v3 split: `truncated` only says content was trimmed, `indexOnly`
+    /// says no body shipped at all. Getting this backwards hides bodies that
+    /// are sitting right there in the file.
+    #[test]
+    fn render_bodies_follows_index_only_not_the_trim_flag() {
+        assert!(render_bodies(
+            &json!({ "truncated": true, "indexOnly": false })
+        ));
+        assert!(!render_bodies(
+            &json!({ "truncated": true, "indexOnly": true })
+        ));
+
+        // A pre-v3 snapshot has no `indexOnly`, where `truncated` meant
+        // exactly this — a stale file must still be readable.
+        assert!(!render_bodies(&json!({ "truncated": true })));
+        assert!(render_bodies(&json!({ "truncated": false })));
+    }
+
+    #[test]
+    fn null_body_reports_a_withheld_body_without_inventing_one() {
+        let mut withheld = json!({ "id": "a", "truncated": true });
+        null_body(&mut withheld);
+        assert_eq!(withheld["body"], Value::Null);
+
+        // An empty note keeps its empty string: withheld and empty stay
+        // distinguishable, which is the whole reason for the flag.
+        let mut empty = json!({ "id": "b", "body": "" });
+        null_body(&mut empty);
+        assert_eq!(empty["body"], json!(""));
     }
 }

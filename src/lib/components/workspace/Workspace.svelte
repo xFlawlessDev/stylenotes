@@ -58,6 +58,7 @@
 			onselecttask={controller.selectTask}
 			onselectfolder={controller.selectFolder}
 			settingsOpen={state.settingsOpen}
+			settingsSection={state.settingsSection}
 			onsettingsclose={() => (state.settingsOpen = false)}
 			onexport={() => controller.noteActions.exportAll(state.items, controller.folders)}
 			onresetdata={() => (state.resetOpen = true)}
@@ -67,7 +68,7 @@
 			onnewnote={controller.createNote}
 			onnewfolder={controller.openAddFolder}
 			ontogglemode={toggleMode}
-			onopensettings={controller.openSettings}
+			onopensettings={() => controller.openSettings()}
 			onopentasks={() => (state.section = 'tasks')}
 			onopengraph={() => (state.section = 'graph')}
 			oncreatenote={controller.commitNewNote}

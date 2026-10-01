@@ -9,16 +9,22 @@
 	import AiToolTrace from '$lib/components/ai/AiToolTrace.svelte';
 	import AiComposer from '$lib/components/note/AiComposer.svelte';
 	import AiQuestionCard from '$lib/components/ai/AiQuestionCard.svelte';
+	import MemoryNudge from '$lib/components/ai/MemoryNudge.svelte';
 	import type { AiMessage, AiToolCall } from '$lib/content/ai-types';
+	import type { SettingsSection } from '$lib/content/settings-sections';
+	import type { AppNotification } from '$lib/stores/notifications';
 	import type { WikiSource, WikiClick } from '$lib/content/wiki-links';
 	import type { AnsweredQuestion, QuestionItem } from '$lib/content/ai-questions';
 	import { mentionPool, mentionedIds } from '$lib/content/ai-mentions';
 	import { describeToolCall, executeToolCall, type ToolResult } from '$lib/content/ai-tools';
-	import { AI_TOOLS, toolDefinitions } from '$lib/content/ai-tool-schema';
+	import { AI_TOOLS, MEMORY_TOOL_NAMES, toolDefinitions } from '$lib/content/ai-tool-schema';
+	import { memoryReady } from '$lib/stores/memory.svelte';
+	import { raiseMemoryNudgeOnce } from '$lib/stores/memory-nudge';
 	import type { ToolTraceEntry } from '$lib/content/ai-trace';
 	import type { CitationEntity, CitationSource } from '$lib/content/ai-citations';
 	import { openExternalUrl } from '$lib/content/external-links';
 	import { loadToolContext, snapshotNotice } from '$lib/content/ai-context';
+	import { replayHistory } from '$lib/content/ai-history';
 	import type { McpSnapshot } from '$lib/content/mcp-types';
 	import {
 		aiReady,
@@ -40,6 +46,8 @@
 		tasks = [],
 		workspaceId,
 		onwikilink,
+		onnotify,
+		onopensettings,
 		onclose
 	}: {
 		open?: boolean;
@@ -48,6 +56,10 @@
 		workspaceId?: string;
 		/** Routes a `[[wiki link]]` clicked in a reply, like the note preview. */
 		onwikilink?: (click: WikiClick) => void;
+		/** Adds one to the workspace's notification list. */
+		onnotify?: (notification: AppNotification) => void;
+		/** Opens Settings, optionally on the section named. */
+		onopensettings?: (section: SettingsSection) => void;
 		onclose: () => void;
 	} = $props();
 
@@ -68,8 +80,12 @@
 		questions: QuestionItem[];
 		resolve: (answers: AnsweredQuestion[]) => void;
 	} | null>(null);
+	/** Set once a semantic tool has failed for want of an embedder. */
+	let memoryNudge = $state(false);
 
 	const ready = $derived(aiReady());
+	/** The offer stays up until they act on it, but vanishes once they do. */
+	const memoryBlocked = $derived(memoryNudge && !memoryReady());
 	const turnCount = $derived(aiStore.messages.length);
 	const pool = $derived(mentionPool({ notes, tasks }, workspaceId));
 	const grant = $derived({ access: aiStore.settings.access, scopes: aiStore.settings.scopes });
@@ -156,6 +172,9 @@
 					const confirmed = isWrite ? await requestWriteConsent(call) : false;
 					const result = await executeToolCall(context, call.name, call.arguments, { confirmed });
 					markToolResult(call, result);
+					// The one moment "memory is off" is news rather than a
+					// setting they already decided about: offer the switch.
+					if (MEMORY_TOOL_NAMES.includes(call.name) && !memoryReady()) void nudgeMemory();
 					return result;
 				}
 			});
@@ -203,6 +222,17 @@
 	}
 
 	/**
+	 * A semantic tool just failed with no embedder selected: offer the switch
+	 * in place, and leave one notification behind — raised at most once, so a
+	 * chat full of meaning-shaped questions cannot turn into a nag.
+	 */
+	async function nudgeMemory() {
+		memoryNudge = true;
+		if (!onnotify) return;
+		await raiseMemoryNudgeOnce(onnotify);
+	}
+
+	/**
 	 * A source clicked under a reply, or an inline `[n]` marker.
 	 *
 	 * A note or task needs a wiki click so the same routing as `[[link]]`
@@ -228,12 +258,14 @@
 	 * whatever its age. Unshifting them here made them the *first* thing a
 	 * long thread threw away — the question survived, the context attached to
 	 * it did not.
+	 *
+	 * The turns themselves come from `replayHistory`, which rebuilds each
+	 * stored exchange into the assistant call plus its results: without that
+	 * the model answered a follow-up having never seen what its own tool calls
+	 * had returned.
 	 */
 	function buildHistory(question: string, snapshot: McpSnapshot): AiMessage[] {
-		const turns: AiMessage[] = aiStore.messages.map((message) => ({
-			role: message.role,
-			content: message.content
-		}));
+		const turns: AiMessage[] = replayHistory(aiStore.messages);
 		// The question is normally already persisted by `appendMessage`; this
 		// keeps a failed write from sending a context-only request.
 		if (!turns.length) turns.push({ role: 'user', content: question });
@@ -403,6 +435,15 @@
 				</span>
 			{/if}
 		</div>
+
+		{#if memoryBlocked}
+			<div class="shrink-0 px-3 pb-3">
+				<MemoryNudge
+					onopen={() => onopensettings?.('memory')}
+					ondismiss={() => (memoryNudge = false)}
+				/>
+			</div>
+		{/if}
 
 		<div class="glass-divider h-px"></div>
 

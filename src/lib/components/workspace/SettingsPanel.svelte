@@ -22,6 +22,7 @@
 	} from '@lucide/svelte';
 	import { Button, ChoiceTile, Switch } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
+	import type { SettingsSection } from '$lib/content/settings-sections';
 	import {
 		settings,
 		updateSettings,
@@ -40,6 +41,7 @@
 
 	let {
 		open = false,
+		initialSection = null,
 		onclose,
 		onexport,
 		onresetdata,
@@ -48,6 +50,11 @@
 		onimportnotes,
 	}: {
 		open?: boolean;
+		/**
+		 * Land on this section when the panel opens — a nudge deep in the app
+		 * points at the setting it is about. `null` keeps the last section.
+		 */
+		initialSection?: SettingsSection | null;
 		onclose: () => void;
 		onexport: () => void;
 		onresetdata: () => void;
@@ -61,10 +68,16 @@
 
 	let importOpen = $state(false);
 
-	type Section = 'appearance' | 'editor' | 'dock' | 'ai' | 'mcp' | 'memory' | 'journal' | 'data' | 'about';
-	let section = $state<Section>('appearance');
+	let section = $state<SettingsSection>('appearance');
 
-	const nav: { id: Section; label: string; icon: typeof Sun }[] = [
+	// Runs whenever the caller's target changes, so it also lands on the right
+	// section when Settings is already open and someone asks for another one.
+	$effect(() => {
+		const wanted = initialSection;
+		if (open && wanted) section = wanted;
+	});
+
+	const nav: { id: SettingsSection; label: string; icon: typeof Sun }[] = [
 		{ id: 'appearance', label: t('settings.nav.appearance'), icon: Sun },
 		{ id: 'editor', label: t('settings.nav.editor'), icon: Type },
 		{ id: 'dock', label: t('settings.nav.dock'), icon: PictureInPicture2 },

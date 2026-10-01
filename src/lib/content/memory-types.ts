@@ -80,6 +80,8 @@ export const MEMORY_META_KEYS = {
 	threshold: 'meta:memory/threshold',
 	/** Target cluster count for `list_themes`. */
 	clusterCount: 'meta:memory/cluster-count',
+	/** Set once the "semantic memory is off" nudge has been raised. */
+	nudge: 'meta:memory/nudge',
 } as const;
 
 /** Default cosine floor above which a pair becomes an auto-link suggestion. */

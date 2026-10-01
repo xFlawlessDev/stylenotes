@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/base';
 	import AiAssistantPopover from '$lib/components/note/AiAssistantPopover.svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { applyGeneratedText, type AiApplyMode } from '$lib/content/ai-assistant';
+	import { applyGeneratedText, relatedTitlesFromBody, type AiApplyMode } from '$lib/content/ai-assistant';
 	import { hydrateAi } from '$lib/stores/ai.svelte';
 
 	/**
@@ -29,6 +29,11 @@
 	let open = $state(false);
 	/** Snapshot of what the assistant should act on, taken when it opens. */
 	let target = $state({ text: '', start: 0, end: 0 });
+	/**
+	 * The note's own wiki links, read once when it opens: the actions below
+	 * otherwise see a slab of text with no idea what the note is about.
+	 */
+	let related = $state<string[]>([]);
 
 	const hasSelection = $derived(target.end > target.start);
 
@@ -45,6 +50,7 @@
 				end > start
 					? { text: body.slice(start, end), start, end }
 					: { text: body, start: body.length, end: body.length };
+			related = relatedTitlesFromBody(body);
 		}
 		open = !open;
 	}
@@ -72,6 +78,7 @@
 		{anchor}
 		text={target.text}
 		{hasSelection}
+		{related}
 		onselect={apply}
 		onclose={() => (open = false)}
 	/>

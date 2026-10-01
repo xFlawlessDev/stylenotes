@@ -23,7 +23,12 @@ use tauri::{AppHandle, Manager, Runtime};
 /// Bumped to 2 when the snapshot gained the `today` field (#D19): the shim now
 /// requires it, and a v1 app must be told to update rather than silently
 /// comparing due dates against the UTC day.
-pub const MCP_PROTOCOL: u32 = 2;
+///
+/// Bumped to 3 when `truncated` stopped meaning "index-only": bodies are now
+/// withheld per note and flagged, and the new `indexOnly` says whether none
+/// shipped. A v2 reader would take `truncated: true` as "no bodies anywhere"
+/// and hide content that is sitting right there in the file.
+pub const MCP_PROTOCOL: u32 = 3;
 
 const DB_FILE: &str = "stylenotes.db";
 const MCP_DIR: &str = "mcp";

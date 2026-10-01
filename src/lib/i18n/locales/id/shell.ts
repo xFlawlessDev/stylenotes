@@ -67,5 +67,11 @@ export const shell: ShellMessages = {
 				'Catatan yang lama tidak disentuh bisa dipindah ke Arsip agar daftar tetap rapi.',
 			time: { minutes: '{count} mnt lalu', hours: '{count} jam lalu', yesterday: 'Kemarin' },
 		},
+		/** Dibangkitkan oleh aplikasi (bukan baris seed); lihat `stores/memory-nudge.ts`. */
+		memory: {
+			title: 'Memori semantik nonaktif',
+			body: 'Buka Pengaturan → Memori dan pilih embedder agar asisten bisa mencari catatanmu berdasarkan makna.',
+			time: 'Baru saja',
+		},
 	},
 };

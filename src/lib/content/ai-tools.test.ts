@@ -27,6 +27,7 @@ function snapshot(): McpSnapshot {
 		generatedAt: '2026-01-01',
 		today: '2026-01-01',
 		truncated: false,
+		indexOnly: false,
 		appRunning: true,
 		workspaces: [{ id: 'w1', name: 'Main' }],
 		notes: [

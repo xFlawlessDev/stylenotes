@@ -229,7 +229,27 @@ function getNote(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 		.filter((node): node is NonNullable<typeof node> => Boolean(node))
 		.map((node) => ({ ref: `${node.workspaceId}/${node.entityId}`, title: node.title, kind: node.kind }));
 
-	return { ok: true, data: { ...noteSummary(note), body: note.body ?? '', links: linked } };
+	// Absent means withheld by the size budget, never "the note is empty" —
+	// saying that would be the most confident wrong answer we could give.
+	if (note.body === undefined) {
+		return {
+			ok: false,
+			error:
+				'The body of this note was left out of the workspace snapshot to keep it within the size budget. The note is not empty: its excerpt, tags and links are in list_notes/search_notes, and the chat was told content was withheld. Ask the user to narrow the workspace if you need the full text.'
+		};
+	}
+
+	return {
+		ok: true,
+		data: {
+			...noteSummary(note),
+			body: note.body,
+			// Present only when the text was cut short at the byte cap, so the
+			// model knows to look for the rest instead of quoting it as all.
+			...(note.truncated ? { truncated: true } : {}),
+			links: linked
+		}
+	};
 }
 
 function listTasks(ctx: ToolContext, args: Record<string, unknown>): ToolResult {

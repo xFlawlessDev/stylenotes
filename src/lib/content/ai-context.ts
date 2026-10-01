@@ -7,6 +7,7 @@
  * on: the AI grant is separate.
  */
 import { buildMcpSnapshot } from '$lib/content/mcp-snapshot';
+import type { McpSnapshot } from '$lib/content/mcp-types';
 import type { MemoryHooks, ToolContext } from '$lib/content/ai-tools';
 import type { WriteContext } from '$lib/content/mcp-write-actions';
 import { listAllNotes } from '$lib/stores/notes';
@@ -69,4 +70,28 @@ function loadMemoryHooks(): MemoryHooks {
 		themes: (limit) => themesFor(limit),
 		contradictions: (limit) => contradictionsFor(limit)
 	};
+}
+
+/**
+ * The system block that tells the model the snapshot is incomplete.
+ *
+ * Without it the failure is invisible: a body withheld by the budget looks
+ * exactly like a note the user never wrote, and the model answers "this note
+ * is empty" with full confidence. Returns null when nothing was left out, so
+ * an ordinary chat pays nothing for the guarantee.
+ *
+ * Protocol copy addressed to the model — English, never translated (the i18n
+ * rule covers text the user reads; this is text the model reads).
+ */
+export function snapshotNotice(snapshot: McpSnapshot): string | null {
+	if (!snapshot.truncated) return null;
+	const reason = snapshot.truncatedReason ?? 'unknown';
+
+	if (snapshot.indexOnly) {
+		return `Context limit (${reason}): this workspace snapshot carries no note bodies at all — titles, excerpts, tags and links only. Bodies were withheld to fit the size budget, so a note that appears to have no text is not empty. Work from excerpts and search, and say plainly when you are answering without the full text.`;
+	}
+	if (reason === 'note_count' || reason === 'task_count') {
+		return `Context limit (${reason}): only part of this workspace is in the snapshot, so a note or task may be missing entirely rather than nonexistent. Do not conclude that something was deleted; say what you could not see.`;
+	}
+	return `Context limit (${reason}): part of this snapshot was trimmed. A note flagged \`truncated: true\` had its text cut short, and \`get_note\` failing because a body was withheld means there is more text than was loaded — in both cases the note is not empty. Work from excerpts and search, and say when you are missing the full text.`;
 }

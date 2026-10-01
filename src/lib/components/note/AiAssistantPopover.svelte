@@ -35,6 +35,7 @@
 		anchor,
 		text,
 		hasSelection,
+		related = [],
 		onselect,
 		onclose
 	}: {
@@ -43,6 +44,8 @@
 		/** The selection, or the whole body when there is no selection. */
 		text: string;
 		hasSelection: boolean;
+		/** Titles the note links to, handed to the action as its context. */
+		related?: string[];
 		/** Called with the generated text and the chosen apply mode. */
 		onselect: (generated: string, mode: AiApplyMode) => void;
 		onclose: () => void;
@@ -81,7 +84,7 @@
 
 		running = true;
 		try {
-			const message = buildActionMessage(next.id, text, instruction);
+			const message = buildActionMessage(next.id, text, instruction, related);
 			await streamCompletion({
 				messages: [message],
 				task: next.id,

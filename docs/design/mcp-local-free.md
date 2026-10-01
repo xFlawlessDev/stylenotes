@@ -131,13 +131,13 @@ Kenapa:
 
 **Keputusan:** app menulis **`mcp/snapshot.json`** ke direktori app, di-*refresh* dengan jadwal (saat `notes:changed`/`tasks:changed`/`dependencies:changed` + paling lambat tiap 2 detik, throttle). Tool baca menjawab dari snapshot — sehingga **tidak perlu ada eksekusi JS per tool call**.
 
-Snapshot berisi (bentuk lengkap di §4): `workspaces` (id, name), `notes` (id, workspaceId, title, folder, tags, pinned, excerpt, **body**, `createdAt`), `tasks` (semua field `Task` + `blocked` + `blockedBy`), `dependencies`, `folders`, dan `meta { generatedAt, revision, truncated }`.
+Snapshot berisi (bentuk lengkap di §4): `workspaces` (id, name), `notes` (id, workspaceId, title, folder, tags, pinned, excerpt, **body**, `createdAt`), `tasks` (semua field `Task` + `blocked` + `blockedBy`), `dependencies`, `folders`, dan `meta { generatedAt, revision, truncated, indexOnly }`.
 
 Yang **tidak** ada di snapshot: `notes.updated` (#1 temuan 5), `settings`, `notifications`, isi `ui_plugins`.
 
 **Kenapa body ikut:** semua query yang diminta user (**graph**, **context**, **monitor**) adalah operasi murni atas `body` → `parseWikiReferences` → `resolveWikiReference`, dan fungsi-fungsi itu hanya butuh `id/title/folder/workspaceId/body`. Kalau body tidak ada, `get_note`/`search_notes`/`context`/`graph` semuanya mati.
 
-**Limit (dijaga di app, bukan di shim):** body dipotong **256 KB/note** (>500 KB di-*flag* `truncated: true`), snapshot total ≤ 32 MB, maksimum 20.000 note + 20.000 task. Di atas itu snapshot ditulis dalam mode "index saja" (semua field kecuali `body`) dan tool `get_note` dijawab dengan error `snapshot_truncated` + saran `--workspace`. Ini mencegah satu vault besar membuat Settings/log membengkak.
+**Limit (dijaga di app, bukan di shim):** body dipotong **256 KB/note**, snapshot total ≤ 32 MB, maksimum 20.000 note + 20.000 task. Pemangkasan **bertingkat, bukan serba-hilang**: catatan yang kebesaran ditandai `truncated: true` pada nota itu sendiri, dan hanya anggaran 32 MB yang boleh membuang body — dengan cara membuang yang **terbesar dulu**, sehingga nota kecil tetap punya teks. `truncated: true` = "ada yang dipangkas"; `indexOnly: true` = "tidak satu pun body ikut". `get_note` atas nota yang body-nya ditahan membalas error `snapshot_truncated` (bukan `body: ""`), dan chat menyuntikkan system notice supaya model tidak menyimpulkan "nota ini kosong". Ini mencegah satu vault besar membuat Settings/log membengkak **dan** mencegah satu nota rakus menghapus isi seluruh workspace dari konteks model.
 
 ### D4 — Aturan ketegasan tulis (write semantics)
 
@@ -337,17 +337,19 @@ mcp/
 
 ```json
 {
-  "protocol": 1,
+  "protocol": 3,
   "revision": 128,
   "generatedAt": "2026-09-27T10:00:00.000Z",
+  "today": "2026-09-27",
   "truncated": false,
+  "indexOnly": false,
   "appRunning": true,
   "workspaces": [{ "id": "workspace-default", "name": "Personal" }],
   "notes": [{
     "id": "getting-started", "workspaceId": "workspace-default", "title": "Mulai di sini",
     "folder": "personal", "tags": ["intro"], "pinned": true,
     "excerpt": "Catatan pertama…", "body": "# Mulai\n\nLihat [[Roadmap]]…",
-    "createdAt": "2026-09-01T08:00:00Z"
+    "createdAt": 1788249600000, "updatedAt": 1788249600000
   }],
   "tasks": [{
     "id": "t-1", "workspaceId": "workspace-default", "title": "Desain MCP lokal",
@@ -586,14 +588,20 @@ Kasus tepi yang **wajib diuji** karena mudah salah:
 
 ---
 
-### F6 — Mode index saat vault besar (#D3)
+### F6 — Pemangkasan saat vault besar (#D3)
 
-**Pemicu:** total > 32 MB, sebuah body > 500 KB, atau > 20k note/task.
+**Pemicu:** total > 32 MB, sebuah body > 256 KB, atau > 20k note/task.
 
-1. `[H]` menulis `snapshot.json` dengan `truncated: true` dan **semua note tanpa `body`** (index saja: title, folder, tags, excerpt, `createdAt`).
-2. `search_notes` tetap bekerja (atas title/tags/excerpt) dan menyebut mode index di respons.
-3. `get_note` / `context` / `graph_query` yang butuh body membalas `snapshot_truncated` + saran: persempit dengan `workspace`/`folder`, atau naikkan batas di Settings.
-4. Settings menampilkan banner: *"Snapshot dalam mode index (1 note terlalu besar)"* — supaya user tahu **kenapa** kualitas jawaban turun, bukan mengira MCP rusak.
+Pemangkasan **bertingkat**, agar satu nota rakus tidak menghapus isi workspace dari konteks:
+
+1. Body > 256 KB dipotong pada batas baris, dan nota itu sendiri ditandai `truncated: true`. Sisanya **tetap utuh** — inilah perubahan dari desain awal yang membuang semua body begitu ada satu nota > 500 KB.
+2. Bila total masih > 32 MB, `[H]` membuang body **terbesar dulu** sampai muat (`packSnapshotBodies`), menandai tiap nota yang terbuang. `truncatedReason: 'snapshot_size'`.
+3. Baru bila anggarannya tidak sanggup memuat satu body pun, snapshot ditulis **index saja** (`indexOnly: true`: title, folder, tags, excerpt, `createdAt`).
+4. `search_notes` tetap bekerja (atas title/tags/excerpt) dan menyebut mode index di respons.
+5. `get_note` atas nota yang body-nya ditahan membalas `snapshot_truncated` **dengan payload excerpt + backlinks/outlinks**, bukan `body: ""` — `" kosong"` adalah jawaban paling percaya diri yang tidak boleh kita berikan. `list_notes`/`search_notes`/`context` mengirim `body: null` untuk nota tanpa body, ditemani `truncated: true`.
+6. Chat menyuntikkan **system notice** (`snapshotNotice` di `ai-context.ts`) begitu `truncated` terbaca, supaya model bekerja dari excerpt dan menyatakan apa yang tidak terlihat, bukan menyimpulkan catatan itu kosong.
+
+> Status butir banner Settings ("Snapshot dalam mode index") belum ada di kode — `truncatedReason` saat ini hanya dikonsumsi oleh notice chat, belum oleh UI.
 
 ---
 
@@ -701,7 +709,7 @@ Setiap tahap bisa dirilis sendiri, dan **M1 sudah berguna** tanpa satu pun jalur
 | **Q1** | Path DB absolut: apakah boleh menambah perintah Rust `db_path`, atau menunggu Fase 0 sync yang sudah menetapkan lokasi? | Menentukan apakah M1 bisa mengandalkan `app-info.json` atau tidak | ✅ **Dijawab: tambah perintah Rust `db_path` sekarang** (`#D14`). Fase 0 sync akan memakai nilai yang sama |
 | **Q2** | Apakah `stylenotes-mcp` perlu permission di `capabilities/default.json`? | Kalau salah, kelihatannya jalan di dev tapi gagal saat bundle | ✅ **Dijawab: kemungkinan tidak** (`#D15`) — diverifikasi empiris di M1 dengan build bundle, bukan `dev` |
 | **Q3** | Apakah V1 memberi `update_note_body`/`delete_note`? | Menyentuh body user = risiko tertinggi; dan body akan jadi CRDT di Pro | ✅ **Dijawab: ya, semuanya termasuk `delete_note`** (`#D16`). Wajib: `confirm: true`, mode `write` eksplisit, dan audit. Lihat §13a untuk mitigasi lengkap |
-| **Q4** | Batas ukuran snapshot & apakah butuh mode "index saja"? | Vault besar bisa membuat `snapshot.json` puluhan MB dan dipoll terus | ✅ **Dijawab: 256 KB/note, 32 MB total, 20k+20k** (`#D3`). Di atas batas → mode index + `snapshot_truncated`. **Tetap wajib diuji dengan vault nyata sebelum M1 selesai** |
+| **Q4** | Batas ukuran snapshot & apakah butuh mode "index saja"? | Vault besar bisa membuat `snapshot.json` puluhan MB dan dipoll terus | ✅ **Dijawab: 256 KB/note, 32 MB total, 20k+20k** (`#D3`). **Revisi (protokol v3):** pemangkasan jadi bertingkat — potong per-nota, lalu buang body terbesar dulu, dan mode index hanya sebagai cadangan terakhir; `truncated` (ada yang dipangkas) dipisah dari `indexOnly` (tidak ada body sama sekali). **Tetap wajib diuji dengan vault nyata sebelum M1 selesai** |
 | **Q5** | Apakah MCP perlu mode CLI (baca DB langsung saat app tertutup)? | Membuka jalan "agent bekerja tanpa app terbuka", tapi mengorbankan #D2 | ✅ **Dijawab: tidak di V1** (`#D5`). Kalau nanti ada permintaan, hanya read-only dan tanpa satu pun jalur tulis |
 | **Q6** | Setelah `updated_at INTEGER` (Fase 0 sync) ada, apakah `list_notes`/`daily_summary` menyertakannya? | Sorting "baru diubah" saat ini tidak akurat (temuan §1 #5/#6) | ✅ **Dijawab: tambah kolom `updated_at` sekarang** (`#D13`) — migrasi sendiri, tidak menunggu Fase 0 |
 | **Q7** | Bolehkah StyleNotes menulis config client MCP otomatis? | Salah merge `claude_desktop_config.json` = user kehilangan config server MCP lain miliknya | ✅ **Dijawab: salin snippet dulu** (`#D8`). Auto-config menyusul setelah ada backup + merge hati-hati |
@@ -931,7 +939,7 @@ label.
 |---|---|---|---|
 | D1 | Bentuk server | **Binary Rust + stdio**, satu proses per client | Tanpa port & tanpa auth; satu binary di `externalBin` |
 | D2 | Jalur tulis | **Lewat app**, via file bridge (#D4), **bukan** SQLite langsung | Validasi `canAddDependency`, event lintas window, dan guard ketikan tetap berlaku |
-| D3 | Jalur baca | **Snapshot JSON** dari app; shim tidak menyentuh DB untuk baca | Graph/context murah karena parser wiki murni; limit & `truncated` dijaga di app |
+| D3 | Jalur baca | **Snapshot JSON** dari app; shim tidak menyentuh DB untuk baca | Graph/context murah karena parser wiki murni; limit, `truncated` dan `indexOnly` dijaga di app |
 | D4 | Ketegasan tulis | Lewat store; tolak note saat edit lokal tertunda; eksekutor **hanya** window `workspace`; **lintas workspace eksplisit (baca + tulis, id ber-prefix workspace)**; timeout 5 s; job atomik; 1 in-flight | Tidak ada jalur tulis kedua yang bisa drift; konsekuensi lintas-workspace di §13b |
 | D5 | Siklus hidup | Shim **stateless**; app tertutup → error `app_not_running`; tidak ada fallback spawn/tulis | Hidup berdampingan dengan hide-on-close + tray; rekan multi-client aman |
 | D6 | Izin | **Default read-only**; tool write tetap terdaftar tapi menolak dengan `write_not_granted` | Model tidak kebingungan; pesan error mengarahkan user ke Settings |

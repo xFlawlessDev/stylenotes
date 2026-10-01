@@ -197,4 +197,4 @@ fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
 }
 
 /// Protocol version this shim speaks; mirrors `mcp_host::MCP_PROTOCOL`.
-pub const PROTOCOL: u32 = 2;
+pub const PROTOCOL: u32 = 3;

@@ -5,6 +5,7 @@ import {
 	applyGeneratedText,
 	availableApplyModes,
 	buildActionMessage,
+	relatedTitlesFromBody,
 	sanitizeThreadTitle,
 	titlePrompt
 } from '$lib/content/ai-assistant';
@@ -31,6 +32,39 @@ describe('buildActionMessage', () => {
 	it('defaults the custom instruction when blank', () => {
 		const message = buildActionMessage('custom', 'Text', '   ');
 		expect(message.content).toContain('Help me with this note.');
+	});
+
+	it('prepends the linked titles as context when there are any', () => {
+		const message = buildActionMessage('summarize', 'Body', undefined, ['Roadmap', 'Ideas']);
+		expect(message.content.startsWith('This note links to: Roadmap, Ideas.')).toBe(true);
+		expect(message.content).toContain('Summarize this note');
+		expect(message.content).toContain('Body');
+	});
+
+	it('says nothing about links when there are none', () => {
+		const message = buildActionMessage('summarize', 'Body');
+		expect(message.content.startsWith('Summarize this note')).toBe(true);
+	});
+});
+
+describe('relatedTitlesFromBody', () => {
+	it('collects linked titles in order, collapsing headings and aliases', () => {
+		const body = 'See [[Roadmap]], [[Ideas#Soon]] and [[roadmap|again]].';
+		expect(relatedTitlesFromBody(body)).toEqual(['Roadmap', 'Ideas']);
+	});
+
+	it('ignores a link inside a code fence', () => {
+		const body = '```\n[[Not a link]]\n```\n[[Real]]';
+		expect(relatedTitlesFromBody(body)).toEqual(['Real']);
+	});
+
+	it('stops at the limit', () => {
+		const body = Array.from({ length: 12 }, (_, index) => `[[Note ${index}]]`).join(' ');
+		expect(relatedTitlesFromBody(body, 3)).toEqual(['Note 0', 'Note 1', 'Note 2']);
+	});
+
+	it('returns nothing for a body with no links', () => {
+		expect(relatedTitlesFromBody('plain text')).toEqual([]);
 	});
 });
 

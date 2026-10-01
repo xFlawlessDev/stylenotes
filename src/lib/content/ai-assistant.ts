@@ -7,6 +7,7 @@
  */
 
 import type { AiMessage, AiTask } from '$lib/content/ai-types';
+import { parseWikiReferences } from '$lib/content/wiki-links';
 
 /** Longest title the UI will keep; longer output is clipped at a word boundary. */
 export const AI_TITLE_MAX = 60;
@@ -85,27 +86,65 @@ export const AI_QUICK_ACTIONS: AiQuickAction[] = [
 
 /**
  * Builds the single user message sent for a quick action. The selection (or
- * the whole body) is embedded so the model has the text it must act on.
+ * the whole body) is embedded so the model has the text it must act on, and
+ * the titles the note already links to are prepended as context.
+ *
+ * Without them an action sees only a slab of text: it cannot tell what the
+ * note is *about*, so a summary quietly drops the note the body spends its
+ * links on. Links are the note's own statement of relation, which makes them
+ * the cheapest context there is — no model call, no extra round trip.
  */
 export function buildActionMessage(
 	action: AiTask,
 	text: string,
-	instruction?: string
+	instruction?: string,
+	related: string[] = []
 ): AiMessage {
 	const trimmed = text.trim();
 	const body = trimmed.length ? trimmed : '(the note is empty)';
+	const context = related.length
+		? `This note links to: ${related.join(', ')}. Treat them as context, and do not invent other notes.\n\n`
+		: '';
 	switch (action) {
 		case 'summarize':
-			return { role: 'user', content: `Summarize this note:\n\n${body}` };
+			return { role: 'user', content: `${context}Summarize this note:\n\n${body}` };
 		case 'rewrite':
-			return { role: 'user', content: `Rewrite this text:\n\n${body}` };
+			return { role: 'user', content: `${context}Rewrite this text:\n\n${body}` };
 		case 'continue':
-			return { role: 'user', content: `Continue this note:\n\n${body}` };
+			return { role: 'user', content: `${context}Continue this note:\n\n${body}` };
 		default: {
 			const ask = instruction?.trim() || 'Help me with this note.';
-			return { role: 'user', content: `${ask}\n\nText:\n\n${body}` };
+			return { role: 'user', content: `${context}${ask}\n\nText:\n\n${body}` };
 		}
 	}
+}
+
+/** How many linked titles are handed to an editor action as context. */
+export const AI_RELATED_LIMIT = 8;
+
+/**
+ * The note titles a body already links to, in order of first appearance.
+ *
+ * Read through the same parser the preview uses, so a link inside a code
+ * fence is not mistaken for a relation, and headings/aliases collapse onto the
+ * note they point at. Unresolved links are kept: a `[[Roadmap]]` the user
+ * typed names a topic they care about even when no note carries the title yet.
+ *
+ * Called when the popover opens rather than on every keystroke — the parser
+ * runs over the whole body, and the note's links do not change while a
+ * selection is being highlighted.
+ */
+export function relatedTitlesFromBody(body: string, limit = AI_RELATED_LIMIT): string[] {
+	const titles: string[] = [];
+	const seen = new Set<string>();
+	for (const reference of parseWikiReferences(body)) {
+		const title = reference.path.trim();
+		if (!title || seen.has(title.toLowerCase())) continue;
+		seen.add(title.toLowerCase());
+		titles.push(title);
+		if (titles.length >= limit) break;
+	}
+	return titles;
 }
 
 /** What the result buttons should do after a generation finishes. */

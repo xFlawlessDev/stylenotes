@@ -60,7 +60,7 @@
 	onworkspacedelete={controller.deleteWorkspaceById}
 	onworkspaceunsaved={controller.unsavedWorkspaceRecords}
 	onpalette={controller.openPalette}
-	onsettings={controller.openSettings}
+	onsettings={() => controller.openSettings()}
 	{mode}
 	section={ws.section}
 	showpanelbuttons={!ws.fullPreview}
@@ -179,5 +179,7 @@
 	}))}
 	workspaceId={controller.selected?.workspaceId}
 	onwikilink={controller.handleChatWikiClick}
+	onnotify={controller.addNotification}
+	onopensettings={controller.openSettings}
 	onclose={() => (ws.assistantOpen = false)}
 />

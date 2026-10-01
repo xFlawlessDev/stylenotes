@@ -393,6 +393,20 @@ export function findAiTool(name: string): AiToolSpec | undefined {
 	return AI_TOOLS.find((tool) => tool.name === name);
 }
 
+/**
+ * The tools that answer from the semantic index. With no embedder selected
+ * they report "not ready" instead of an empty result (#D17), and that failure
+ * is what tells the chat the user has never been offered memory at all — it
+ * is the one moment where the switch is news rather than a setting they
+ * already decided about.
+ */
+export const MEMORY_TOOL_NAMES: readonly string[] = [
+	'semantic_search',
+	'related_notes',
+	'list_themes',
+	'find_contradictions'
+];
+
 /** Labels for the tool-call chip, keyed by tool name. */
 export function toolLabel(name: string): string {
 	return findAiTool(name)?.label ?? name;

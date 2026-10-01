@@ -189,5 +189,22 @@ export const AI_STREAM_TIMEOUT_MS = 120_000;
 /** Trims a request history so a long chat cannot blow past the context window. */
 export const AI_MAX_CONTEXT_MESSAGES = 20;
 
-/** How many tool-call round trips a single turn may make before giving up. */
-export const AI_MAX_TOOL_STEPS = 6;
+/**
+ * How many tool-call round trips a single turn may make before the loop is
+ * cut short. This is a **circuit breaker, not a creativity limit**: the loop
+ * already stops the moment the model answers in text, so the cap only ever
+ * bounds a model that keeps asking for tools — and there is no way for the
+ * user to cancel a stream, so without it a runaway would lock the panel.
+ * {@link AI_TOOL_BUDGET_NOTICE} is what the model is told when it trips.
+ */
+export const AI_MAX_TOOL_STEPS = 24;
+
+/**
+ * The system line sent once the tool budget has run out. The last turn runs
+ * with the tools withdrawn, so the user gets an answer instead of an empty
+ * bubble — and the model knows it is working from a partial picture rather
+ * than presenting one as complete. Protocol copy: the model reads it, so it
+ * stays English like every other tool-facing string.
+ */
+export const AI_TOOL_BUDGET_NOTICE =
+	'You have used the entire tool budget for this turn. Answer now from the results you already have, say plainly which parts you could not verify, and do not call any further tools.';

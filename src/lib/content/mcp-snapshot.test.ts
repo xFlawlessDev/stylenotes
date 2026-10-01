@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createNote } from '$lib/content/content';
 import { createTask, isTaskBlocked, type TaskDependency } from '$lib/stores/tasks';
-import { buildMcpSnapshot, localDay } from '$lib/content/mcp-snapshot';
-import { MCP_PROTOCOL } from '$lib/content/mcp-types';
+import { buildMcpSnapshot, localDay, packSnapshotBodies } from '$lib/content/mcp-snapshot';
+import { MCP_MAX_BODY_BYTES, MCP_PROTOCOL } from '$lib/content/mcp-types';
 
 const workspaces = [{ id: 'workspace-default', name: 'Personal', color: 'primary', createdAt: '' }];
 
@@ -108,32 +108,92 @@ describe('buildMcpSnapshot', () => {
 		expect(snapshot.graph.nodes[0].workspaceId).toBe('workspace-default');
 	});
 
-	it('falls back to index-only mode when a body is oversized', () => {
+	/**
+	 * The regression this replaced: one note over the old 500 KB flag threw
+	 * *every* body out of the snapshot, so the model saw titles and excerpts
+	 * for the whole workspace because of a single fat note.
+	 */
+	it('flags an oversized body instead of dropping every body', () => {
 		const huge = 'x'.repeat(600 * 1024);
-		const note = createNote({ id: 'big', title: 'Big', body: huge });
-		const snapshot = build({ notes: [note] });
+		const big = createNote({ id: 'big', title: 'Big', body: huge });
+		const small = createNote({ id: 'small', title: 'Small', body: 'keep me' });
+		const snapshot = build({ notes: [big, small] });
+
 		expect(snapshot.truncated).toBe(true);
 		expect(snapshot.truncatedReason).toBe('body_size');
-		expect(snapshot.notes[0].body).toBeUndefined();
+		// Not index-only: the other note still has its text.
+		expect(snapshot.indexOnly).toBe(false);
+		expect(snapshot.notes.find((note) => note.id === 'small')!.body).toBe('keep me');
+
+		const capped = snapshot.notes.find((note) => note.id === 'big')!;
+		expect(capped.truncated).toBe(true);
+		expect(new TextEncoder().encode(capped.body!).length).toBeLessThanOrEqual(MCP_MAX_BODY_BYTES);
 	});
 
-	it('caps a single note body under the byte limit', () => {
+	it('caps a single note body under the byte limit and says so', () => {
 		const large = 'word '.repeat(120_000); // ~600 KB
 		const note = createNote({ id: 'large', title: 'Large', body: large });
 		const snapshot = build({ notes: [note] });
-		// A single oversized body trips index-only mode rather than shipping it.
-		expect(snapshot.truncated).toBe(true);
+		// The cut is announced on the note, never silently served as "all of it".
+		expect(snapshot.notes[0].truncated).toBe(true);
+		expect(snapshot.notes[0].body!.length).toBeLessThanOrEqual(MCP_MAX_BODY_BYTES);
+		expect(snapshot.indexOnly).toBe(false);
 	});
 
 	it('keeps small snapshots intact', () => {
 		const note = createNote({ id: 'n1', title: 'A', body: 'hello' });
 		const snapshot = build({ notes: [note] });
 		expect(snapshot.truncated).toBe(false);
+		expect(snapshot.indexOnly).toBe(false);
 		expect(snapshot.notes[0].body).toBe('hello');
 		// Asserts the constant, not a literal: a protocol bump should not need
 		// this test edited, and a snapshot that reports the wrong version is a
 		// `protocol_mismatch` at the shim.
 		expect(snapshot.protocol).toBe(MCP_PROTOCOL);
 		expect(snapshot.appRunning).toBe(true);
+	});
+});
+
+describe('packSnapshotBodies', () => {
+	const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
+
+	const snapshotWith = () =>
+		build({
+			notes: [
+				createNote({ id: 'tiny', title: 'Tiny', body: 'tiny body' }),
+				createNote({ id: 'mid', title: 'Mid', body: 'y'.repeat(2000) }),
+				createNote({ id: 'big', title: 'Big', body: 'x'.repeat(4000) })
+			]
+		});
+
+	it('drops the largest body first so the most notes keep their text', () => {
+		const snapshot = snapshotWith();
+		// 1 KB over the full size: only the fattest body can pay for that.
+		const budget = bytes(snapshot) - 1000;
+		const packed = packSnapshotBodies(snapshot, budget);
+
+		expect(packed.truncated).toBe(true);
+		expect(packed.truncatedReason).toBe('snapshot_size');
+		expect(packed.indexOnly).toBe(false);
+		expect(packed.notes.find((note) => note.id === 'big')!.body).toBeUndefined();
+		expect(packed.notes.find((note) => note.id === 'big')!.truncated).toBe(true);
+		expect(packed.notes.find((note) => note.id === 'mid')!.body).toBe('y'.repeat(2000));
+		expect(packed.notes.find((note) => note.id === 'tiny')!.body).toBe('tiny body');
+		expect(bytes(packed)).toBeLessThanOrEqual(budget);
+	});
+
+	it('falls back to index-only when the budget cannot hold a single body', () => {
+		const packed = packSnapshotBodies(snapshotWith(), 200);
+		expect(packed.indexOnly).toBe(true);
+		expect(packed.truncated).toBe(true);
+		for (const note of packed.notes) {
+			expect(note.body).toBeUndefined();
+			expect(note.truncated).toBe(true);
+		}
+	});
+
+	it('returns the snapshot untouched when it already fits', () => {
+		const snapshot = snapshotWith();
+		expect(packSnapshotBodies(snapshot, 1_000_000)).toBe(snapshot);
 	});
 });

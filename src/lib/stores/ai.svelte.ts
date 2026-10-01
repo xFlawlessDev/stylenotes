@@ -5,6 +5,7 @@ import {
 	AI_PROVIDERS,
 	AI_MAX_CONTEXT_MESSAGES,
 	AI_MAX_TOOL_STEPS,
+	AI_TOOL_BUDGET_NOTICE,
 	type AiMessage,
 	type AiSettings,
 	type AiStreamEvent,
@@ -18,6 +19,8 @@ import {
 } from '$lib/content/ai-types';
 import type { McpScope } from '$lib/content/mcp-types';
 import type { ToolResult } from '$lib/content/ai-tools';
+import { formatToolResult } from '$lib/content/ai-tool-format';
+import { trimHistory } from '$lib/content/ai-history';
 import { aiRepo } from '$lib/db/ai';
 import { sanitizeThreadTitle, titlePrompt } from '$lib/content/ai-assistant';
 import { isTauri } from '$lib/windows';
@@ -143,15 +146,19 @@ export async function testAiConnection(): Promise<AiTestResult> {
 /**
  * Streams a completion for `messages`, calling `onDelta` for each token.
  *
- * The prompt history is trimmed to the newest `AI_MAX_CONTEXT_MESSAGES` turns.
+ * The prompt history is trimmed to the newest `AI_MAX_CONTEXT_MESSAGES` turns
+ * by `trimHistory`, which keeps the system blocks (mention bodies, the
+ * snapshot truncation notice) and never orphans a tool result.
  * Resolves with the full text once the stream ends (or throws), so callers can
  * persist it once. The Rust command returns as soon as the stream starts, so
  * this waits on the channel's terminal `done`/`error` event.
  *
  * When the model asks for tools, `toolRunner` executes them and the results are
- * appended as `tool` turns; the loop repeats until the model answers with text
- * or `AI_MAX_TOOL_STEPS` is reached. `options.tools` are the definitions sent
- * on every turn.
+ * appended as `tool` turns; the loop repeats until the model answers with text.
+ * Reaching `AI_MAX_TOOL_STEPS` is not an error: one last turn runs with the
+ * tools withdrawn and {@link AI_TOOL_BUDGET_NOTICE} in front of it, so an
+ * answer still arrives — and arrives knowing what it could not check. `options.tools`
+ * are the definitions sent on every turn.
  */
 export async function streamCompletion(options: {
 	messages: AiMessage[];
@@ -184,7 +191,9 @@ export async function streamCompletion(options: {
 	}
 	config.tools = options.tools ?? [];
 
-	const history = options.messages.slice(-AI_MAX_CONTEXT_MESSAGES).map((message) => ({ ...message }));
+	const history = trimHistory(options.messages, AI_MAX_CONTEXT_MESSAGES).map((message) => ({
+		...message
+	}));
 	// One timestamp per completion, so every provider turn in a tool loop
 	// reports the same "now".
 	const currentTime = options.currentTime ?? currentTimeString();
@@ -209,12 +218,19 @@ export async function streamCompletion(options: {
 				options.onToolResult?.(call, result);
 				history.push({
 					role: 'tool',
-					content: JSON.stringify(result),
+					content: formatToolResult(result),
 					toolCallId: call.id
 				});
 			}
 		}
-		return full;
+		// The circuit breaker tripped: every turn asked for yet another tool.
+		// Take one last turn with the tools withdrawn, so the model has to
+		// answer from what it already found — returning `full` here would hand
+		// the user the empty string that tool-only turns accumulate.
+		history.push({ role: 'system', content: AI_TOOL_BUDGET_NOTICE });
+		config.tools = [];
+		const last = await runProviderTurn(config, history, { ...options, currentTime });
+		return full + last.text;
 	} finally {
 		aiStore.streaming = false;
 	}
