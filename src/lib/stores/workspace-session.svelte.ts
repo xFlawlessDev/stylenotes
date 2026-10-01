@@ -51,12 +51,14 @@ export function startWorkspaceSession(
 ) {
 	onMount(() => {
 		void (async () => {
+			// Bring the remote MCP listener back if the user left it on, so a
+			// restart does not silently drop a running agent (#D12). Rust binds
+			// it from `setup` first; this is the fallback when the write pool was
+			// unavailable there, so it runs before the slower hydration below.
+			void resumeRemoteMcp().catch(() => undefined);
 			await hydrateWorkspaces();
 			await hydrateSettings();
 			await hydrateMemory().catch(() => undefined);
-			// Bring the remote MCP listener back if the user left it on, so a
-			// restart does not silently drop a running agent (#D12).
-			void resumeRemoteMcp().catch(() => undefined);
 			const [storedNotes, storedFolders, storedNotifications, storedTasks] = await Promise.all([
 				hydrateNotes(),
 				loadFolders(),

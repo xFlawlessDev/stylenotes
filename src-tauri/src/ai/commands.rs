@@ -34,6 +34,20 @@ fn cipher<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<CredentialCiph
     CredentialCipher::load_or_create(&secrets_path(app)?)
 }
 
+/// Decrypts a stored `enc:v1:` value for Rust callers that own a startup path.
+///
+/// The remote MCP listener resumes from `setup` and must open the same token
+/// the UI sealed; this exposes the one cipher rather than re-deriving it.
+/// Plaintext values pass through unchanged, mirroring `ai_decrypt_key`.
+pub(crate) fn decrypt_stored<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    stored: &str,
+) -> Result<String, String> {
+    cipher(app)
+        .and_then(|cipher| cipher.decrypt(stored))
+        .map_err(|error| error.to_string())
+}
+
 /// Encrypts an API key for storage. The `enc:v1:` marker is added here, never
 /// in the UI, so the frontend never handles the ciphertext format.
 #[tauri::command]

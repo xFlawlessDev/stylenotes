@@ -850,6 +850,14 @@ pub fn run() {
                     eprintln!("write pool unavailable, atomic note writes disabled: {error}");
                 }
             }
+            // Bring the remote MCP listener back before any webview hydrates, so
+            // an MCP client probing on launch finds port 7317 already open. The
+            // frontend's `resumeRemoteMcp` remains the fallback for the case
+            // where the write pool was unavailable here (#D12).
+            let mcp_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                remote_mcp::commands::resume_from_store(mcp_handle).await;
+            });
             #[cfg(desktop)]
             {
                 use tauri::Emitter;
