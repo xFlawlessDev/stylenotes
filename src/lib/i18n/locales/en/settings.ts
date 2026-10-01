@@ -245,6 +245,7 @@ export const settings = {
 			tunnelHint:
 				'Keeps the endpoint on this device. Point a Cloudflare Tunnel or Tailscale at it yourself.',
 			address: 'Endpoint',
+			copyUrl: 'Copy URL',
 			token: 'Token',
 			tokenHint: 'Current token ends {hint}',
 			tokenOnce:
@@ -252,7 +253,6 @@ export const settings = {
 			copy: 'Copy',
 			hide: 'Hide',
 			rotate: 'Rotate token',
-			kill: 'Turn off remote',
 			cancel: 'Cancel',
 		},
 	},

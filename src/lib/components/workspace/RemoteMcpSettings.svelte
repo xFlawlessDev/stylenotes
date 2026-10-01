@@ -24,6 +24,8 @@
 	 */
 	let confirmLan = $state(false);
 	let copied = $state(false);
+	/** The endpoint address whose copy button was just pressed. */
+	let copiedUrl = $state<string | null>(null);
 
 	onMount(() => void hydrateRemoteMcp());
 
@@ -50,7 +52,9 @@
 
 	async function onMode(next: string) {
 		const parsed = (next === 'lan' || next === 'tunnel' ? next : 'local') as RemoteMcpMode;
-		if (parsed === mode) return;
+		// A mode change restarts the listener; ignore input while one is already
+		// in flight so two restarts cannot race the fixed port.
+		if (parsed === mode || remoteMcpStore.busy) return;
 		if (parsed === 'lan' && !remoteMcpStore.enabled) {
 			remoteMcpStore.mode = parsed;
 			confirmLan = true;
@@ -67,6 +71,17 @@
 			setTimeout(() => (copied = false), 2000);
 		} catch {
 			/* clipboard denied: the token is still on screen to copy by hand */
+		}
+	}
+
+	async function copyAddress(address: string) {
+		const url = `${address}/mcp`;
+		try {
+			await navigator.clipboard.writeText(url);
+			copiedUrl = address;
+			setTimeout(() => (copiedUrl = null), 1500);
+		} catch {
+			/* clipboard denied: the URL is still on screen to copy by hand */
 		}
 	}
 </script>
@@ -93,6 +108,7 @@
 		value={mode}
 		items={modeItems}
 		ariaLabel={t('settings.mcp.remote.exposure')}
+		disabled={remoteMcpStore.busy}
 		onchange={onMode}
 	/>
 
@@ -120,9 +136,21 @@
 					{t('settings.mcp.remote.address')}
 				</span>
 				{#each remoteMcpStore.addresses as address (address)}
-					<code class="truncate rounded bg-surface-container-lowest/60 px-2 py-1 text-label-sm"
-						>{address}/mcp</code
-					>
+					<div class="flex items-center gap-2">
+						<code class="min-w-0 flex-1 truncate rounded bg-surface-container-lowest/60 px-2 py-1 text-label-sm"
+							>{address}/mcp</code
+						>
+						<Button
+							variant="secondary"
+							size="sm"
+							onclick={() => void copyAddress(address)}
+						>
+							<Copy size={13} />
+							{copiedUrl === address
+								? t('settings.mcp.copied')
+								: t('settings.mcp.remote.copyUrl')}
+						</Button>
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -158,9 +186,6 @@
 				onclick={rotateRemoteToken}
 			>
 				<RefreshCw size={13} /> {t('settings.mcp.remote.rotate')}
-			</Button>
-			<Button variant="danger-ghost" size="sm" onclick={() => void disableRemoteMcp()}>
-				<ShieldAlert size={13} /> {t('settings.mcp.remote.kill')}
 			</Button>
 		</div>
 	{/if}

@@ -245,6 +245,7 @@ export const settings: SettingsMessages = {
 			tunnelHint:
 				'Menjaga endpoint di perangkat ini. Arahkan Cloudflare Tunnel atau Tailscale ke sini sendiri.',
 			address: 'Endpoint',
+			copyUrl: 'Salin URL',
 			token: 'Token',
 			tokenHint: 'Token saat ini berakhiran {hint}',
 			tokenOnce:
@@ -252,7 +253,6 @@ export const settings: SettingsMessages = {
 			copy: 'Salin',
 			hide: 'Sembunyikan',
 			rotate: 'Rotasi token',
-			kill: 'Matikan remote',
 			cancel: 'Batal',
 		},
 	},

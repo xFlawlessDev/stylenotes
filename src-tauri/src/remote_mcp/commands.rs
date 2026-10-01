@@ -82,7 +82,7 @@ pub async fn remote_mcp_start(
     let hint = format!("…{}", &token[token.len().saturating_sub(6)..]);
     let hash = hash_token(&token);
 
-    stop_listener(&state);
+    stop_listener(&state).await;
     let handle = http::start(app, mode, hash.clone()).await?;
     // Report the address the listener actually bound, not the one we intended:
     // if the OS picked a different interface, the user must see the truth.
@@ -104,7 +104,15 @@ pub async fn remote_mcp_start(
 /// Stops the listener if it is running.
 #[tauri::command]
 pub fn remote_mcp_stop(state: tauri::State<'_, RemoteState>) -> Result<(), String> {
-    stop_listener(&state);
+    if let Ok(mut guard) = state.listener.lock() {
+        if let Some(handle) = guard.take() {
+            // The port is released when the accept loop returns. A plain
+            // fire-and-forget stop would let a follow-up start race the old
+            // socket and fail to bind (os error 10048), so wait it out here on
+            // the blocking pool rather than in the command's async context.
+            tauri::async_runtime::spawn(async move { handle.stop_and_wait().await });
+        }
+    }
     Ok(())
 }
 
@@ -150,11 +158,19 @@ pub fn remote_mcp_rotate() -> RemoteRotateResult {
     }
 }
 
-fn stop_listener(state: &tauri::State<'_, RemoteState>) {
-    if let Ok(mut guard) = state.listener.lock() {
-        if let Some(handle) = guard.take() {
-            handle.stop();
-        }
+/// Stops the running listener, waiting for the port to be released.
+///
+/// Awaiting matters on the restart path: `remote_mcp_start` calls this
+/// immediately before `http::start`, and binding while the old accept loop is
+/// still alive fails with `os error 10048` (address already in use).
+async fn stop_listener(state: &tauri::State<'_, RemoteState>) {
+    let handle = state
+        .listener
+        .lock()
+        .ok()
+        .and_then(|mut guard| guard.take());
+    if let Some(handle) = handle {
+        handle.stop_and_wait().await;
     }
 }
 

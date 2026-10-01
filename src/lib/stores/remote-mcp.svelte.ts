@@ -42,6 +42,24 @@ export const remoteMcpStore = $state<{
 
 let hydrated = false;
 
+/**
+ * Serializes lifecycle operations (start/stop/mode-change/rotate).
+ *
+ * Every one of them stops and restarts the listener, and the Rust side binds a
+ * fixed port. Two overlapping calls would tear down each other's listener and
+ * race the bind (`os error 10048`), so a call that arrives while one is running
+ * waits for it instead of starting a parallel cycle.
+ */
+let inFlight: Promise<boolean> | null = null;
+
+function runExclusive(task: () => Promise<boolean>): Promise<boolean> {
+	if (inFlight) return inFlight;
+	inFlight = task().finally(() => {
+		inFlight = null;
+	});
+	return inFlight;
+}
+
 /** Loads the persisted state; does not start a listener. */
 export async function hydrateRemoteMcp(): Promise<void> {
 	if (hydrated || !browser) {
@@ -89,7 +107,14 @@ async function openToken(stored: string): Promise<string | null> {
  * which is what a mode change or an explicit rotate wants. Only the encrypted
  * token and its hash are persisted.
  */
-export async function enableRemoteMcp(
+export function enableRemoteMcp(
+	mode: RemoteMcpMode,
+	token?: string | null
+): Promise<boolean> {
+	return runExclusive(() => enableRemoteMcpImpl(mode, token));
+}
+
+async function enableRemoteMcpImpl(
 	mode: RemoteMcpMode,
 	token?: string | null
 ): Promise<boolean> {
@@ -160,7 +185,11 @@ export async function resumeRemoteMcp(): Promise<void> {
 }
 
 /** Stops the listener while keeping the token, so it can resume later. */
-export async function disableRemoteMcp(): Promise<boolean> {
+export function disableRemoteMcp(): Promise<boolean> {
+	return runExclusive(disableRemoteMcpImpl);
+}
+
+async function disableRemoteMcpImpl(): Promise<boolean> {
 	if (!browser || !isTauri) return false;
 	remoteMcpStore.busy = true;
 	try {
@@ -185,19 +214,27 @@ export async function disableRemoteMcp(): Promise<boolean> {
  * Changes exposure mode. Always rotates the token: the old one may have been
  * seen on the previous interface and must not travel (#D12).
  */
-export async function changeRemoteMode(mode: RemoteMcpMode): Promise<boolean> {
+export function changeRemoteMode(mode: RemoteMcpMode): Promise<boolean> {
+	return runExclusive(() => changeRemoteModeImpl(mode));
+}
+
+async function changeRemoteModeImpl(mode: RemoteMcpMode): Promise<boolean> {
 	if (mode === remoteMcpStore.mode && remoteMcpStore.running) return true;
 	if (remoteMcpStore.enabled) {
 		// Restart at the new mode with no token, which mints and persists a fresh
 		// one; the old credential must not reach a wider interface.
-		return enableRemoteMcp(mode);
+		return enableRemoteMcpImpl(mode);
 	}
 	remoteMcpStore.mode = mode;
 	return remoteMcpRepo.saveState({ enabled: false, mode });
 }
 
 /** Issues a fresh token without changing exposure. */
-export async function rotateRemoteToken(): Promise<boolean> {
+export function rotateRemoteToken(): Promise<boolean> {
+	return runExclusive(rotateRemoteTokenImpl);
+}
+
+async function rotateRemoteTokenImpl(): Promise<boolean> {
 	if (!browser || !isTauri) return false;
 	remoteMcpStore.busy = true;
 	remoteMcpStore.error = null;
@@ -218,7 +255,7 @@ export async function rotateRemoteToken(): Promise<boolean> {
 		if (remoteMcpStore.running) {
 			// The live listener still holds the old hash; restart with the new
 			// token so the rotation takes effect immediately.
-			await enableRemoteMcp(remoteMcpStore.mode, result.token);
+			await enableRemoteMcpImpl(remoteMcpStore.mode, result.token);
 		}
 		remoteMcpStore.token = result.token;
 		remoteMcpStore.tokenHint = result.hint;

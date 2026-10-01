@@ -41,12 +41,21 @@ pub struct RemoteState<R: tauri::Runtime> {
 pub struct ListenerHandle {
     pub addr: SocketAddr,
     shutdown: tokio::sync::oneshot::Sender<()>,
+    /// Resolves when the accept loop has returned and the socket is released.
+    /// A restart waits on this so a rebind cannot race the old listener and
+    /// fail with `os error 10048` (address already in use).
+    released: tauri::async_runtime::JoinHandle<()>,
 }
 
 impl ListenerHandle {
-    /// Stops the listener. The port is released when the accept loop returns.
-    pub fn stop(self) {
+    /// Stops the listener and waits for the port to actually be released.
+    ///
+    /// The accept loop only observes the shutdown signal on its next `select!`
+    /// tick, so returning immediately would let the caller's `bind` collide
+    /// with the still-open socket.
+    pub async fn stop_and_wait(self) {
         let _ = self.shutdown.send(());
+        let _ = self.released.await;
     }
 }
 
@@ -66,9 +75,7 @@ pub async fn start<R: tauri::Runtime>(
         _ => IpAddr::V4(Ipv4Addr::LOCALHOST),
     };
     let addr = SocketAddr::new(ip, REMOTE_MCP_PORT);
-    let listener = TcpListener::bind(addr)
-        .await
-        .map_err(|error| format!("could not bind {addr}: {error}"))?;
+    let listener = bind_with_retry(addr).await?;
     let bound = listener.local_addr().map_err(|error| error.to_string())?;
 
     let state = Arc::new(RemoteState {
@@ -79,7 +86,7 @@ pub async fn start<R: tauri::Runtime>(
     });
 
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    tauri::async_runtime::spawn(async move {
+    let released = tauri::async_runtime::spawn(async move {
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
@@ -99,12 +106,42 @@ pub async fn start<R: tauri::Runtime>(
                 }
             }
         }
+        // Dropping `listener` here releases the port; `released` resolving is
+        // what lets a restart bind immediately afterwards.
+        drop(listener);
     });
 
     Ok(ListenerHandle {
         addr: bound,
         shutdown: shutdown_tx,
+        released,
     })
+}
+
+/// How many times a bind is retried, and the pause between attempts.
+const BIND_ATTEMPTS: u32 = 10;
+const BIND_RETRY_MS: u64 = 50;
+
+/// Binds `addr`, retrying briefly while the previous listener releases the port.
+///
+/// A stop -> start cycle should already be serialized (`stop_and_wait`), but a
+/// listener torn down by an app restart, or a socket in `TIME_WAIT` from a live
+/// client, can still briefly hold the port. Retrying turns a hard 10048 into a
+/// short wait instead of a failure the user sees in Settings.
+async fn bind_with_retry(addr: SocketAddr) -> Result<TcpListener, String> {
+    let mut last = String::new();
+    for attempt in 0..BIND_ATTEMPTS {
+        match TcpListener::bind(addr).await {
+            Ok(listener) => return Ok(listener),
+            Err(error) => {
+                last = error.to_string();
+                if attempt + 1 < BIND_ATTEMPTS {
+                    tokio::time::sleep(Duration::from_millis(BIND_RETRY_MS)).await;
+                }
+            }
+        }
+    }
+    Err(format!("could not bind {addr}: {last}"))
 }
 
 /// The machine's LAN address, or `None` when only loopback is available.
@@ -404,4 +441,51 @@ fn now_millis() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Grabs an ephemeral port and releases it, so a test can bind it for real.
+    async fn free_port() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral");
+        listener.local_addr().expect("addr").port()
+    }
+
+    /// The port is held, then freed mid-retry: `bind_with_retry` must wait it
+    /// out instead of failing the way a single bind would (os error 10048).
+    #[tokio::test]
+    async fn retries_until_the_port_is_released() {
+        let port = free_port().await;
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
+
+        let held = TcpListener::bind(addr).await.expect("hold the port");
+        let release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(75)).await;
+            drop(held);
+        });
+
+        let listener = bind_with_retry(addr)
+            .await
+            .expect("retry should win the port");
+        assert_eq!(listener.local_addr().expect("addr").port(), port);
+        release.await.expect("release task");
+    }
+
+    /// A port that never frees is reported, not retried forever.
+    #[tokio::test]
+    async fn gives_up_when_the_port_never_frees() {
+        let port = free_port().await;
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
+        let _held = TcpListener::bind(addr).await.expect("hold the port");
+
+        let error = bind_with_retry(addr).await.expect_err("must fail");
+        assert!(
+            error.contains("could not bind"),
+            "unexpected error: {error}"
+        );
+    }
 }
