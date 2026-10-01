@@ -70,10 +70,13 @@
 
 	/**
 	 * Keyboard hint for the search trigger. Not translated: a keybinding is not
-	 * copy, and the modifier differs per platform.
+	 * copy, and the modifier differs per platform. `Ctrl/Cmd+F` rather than
+	 * `Ctrl/Cmd+K`: the latter already opens the app-wide command palette
+	 * (workspace-controller `onGlobalKeydown`) and inserts an editor link, so it
+	 * would fire two handlers at once on the graph page.
 	 */
 	const SEARCH_SHORTCUT =
-		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K';
+		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘F' : 'Ctrl+F';
 
 	const graph = $derived(buildWorkspaceGraph(notes, tasks, { folders, dependencies, suggestions }));
 	/** Node id → title, so a suggestion can name both ends without a lookup. */
@@ -220,9 +223,10 @@
 		hoverScreen = node ? screen : null;
 	}
 
-	// Ctrl/Cmd+K opens the search list, matching the editor's command palette.
+	// Ctrl/Cmd+F opens the graph search list. Ctrl/Cmd+K is deliberately left to
+	// the app-wide command palette, so the two do not fight on this page.
 	function onkeydown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
+		if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLocaleLowerCase() === 'f') {
 			event.preventDefault();
 			searchOpen = true;
 		}
