@@ -133,20 +133,44 @@
 		);
 	});
 
-	const nodeLegend: { label: string; token: string }[] = [
+	/**
+	 * Node legend rows. `$derived.by` rather than a plain array: `t()` must be
+	 * re-read on every render or the labels stay in the language they were
+	 * first built in (AGENTS: never cache a translated string).
+	 */
+	const nodeLegend = $derived.by((): { label: string; token: string }[] => [
 		{ label: t('graph.node.note'), token: GRAPH_TOKENS.note },
 		...(['todo', 'doing', 'review', 'done'] as TaskStatus[]).map((status) => ({
 			label: t('tasks.statusLabel.' + status),
 			token: GRAPH_TOKENS.task[status],
 		})),
-	];
+	]);
 
-	const edgeLegend: { id: GraphEdgeKind; label: string; token: string }[] = [
-		{ id: 'wiki', label: t('graph.edge.wiki'), token: GRAPH_TOKENS.edges.wiki },
-		{ id: 'link', label: t('graph.edge.link'), token: GRAPH_TOKENS.edges.link },
-		{ id: 'dependency', label: t('graph.edge.dependency'), token: GRAPH_TOKENS.edges.dependency },
-		{ id: 'related', label: t('graph.edge.related'), token: GRAPH_TOKENS.edges.related },
-	];
+	/** Kinds that only earn a legend row once one of them actually exists. */
+	const LATE_EDGE_KINDS: GraphEdgeKind[] = ['semantic', 'contradicts'];
+
+	/**
+	 * Link legend rows. The swatch here and the ribbon on the canvas resolve the
+	 * same `graphEdgeColor(kind)` token, so they cannot drift apart: the legend
+	 * promises `--graph-edge-dependency` pink, the canvas draws it.
+	 * `semantic`/`contradicts` (accepted suggestions) are appended when their
+	 * count is non-zero — a "Contradicts 0" toggle on a graph that has never
+	 * produced one is noise.
+	 */
+	const edgeLegend = $derived.by((): { id: GraphEdgeKind; label: string; token: string }[] => {
+		const rows: { id: GraphEdgeKind; label: string; token: string }[] = [
+			{ id: 'wiki', label: t('graph.edge.wiki'), token: GRAPH_TOKENS.edges.wiki },
+			{ id: 'link', label: t('graph.edge.link'), token: GRAPH_TOKENS.edges.link },
+			{ id: 'dependency', label: t('graph.edge.dependency'), token: GRAPH_TOKENS.edges.dependency },
+			{ id: 'related', label: t('graph.edge.related'), token: GRAPH_TOKENS.edges.related },
+		];
+		for (const id of LATE_EDGE_KINDS) {
+			if (graph.counts[id] > 0) {
+				rows.push({ id, label: t('graph.edge.' + id), token: GRAPH_TOKENS.edges[id] });
+			}
+		}
+		return rows;
+	});
 
 	/** Resolve a theme token to a hex colour, re-evaluated on theme changes. */
 	function legendColor(token: string): string {
@@ -173,6 +197,22 @@
 			hovered = null;
 			hoverScreen = null;
 		}
+	}
+
+	/**
+	 * Accepting a suggestion also switches its kind on in the legend. The
+	 * suggestion kinds start hidden (`defaultEdgeKinds`) so a fresh index does
+	 * not redraw the graph without being asked — but a link the user just
+	 * accepted must appear at once, or the button reads as if it did nothing.
+	 */
+	function acceptSuggestion(id: string) {
+		const suggestion = pendingSuggestions.find((item) => item.id === id);
+		if (suggestion) {
+			const next = { ...kinds };
+			next[suggestion.kind] = true;
+			kinds = next;
+		}
+		onacceptsuggestion?.(id);
 	}
 
 	function onHover(node: GraphNode | null, screen: { x: number; y: number } | null) {
@@ -297,7 +337,7 @@
 				suggestions={pendingSuggestions}
 				sourceTitle={(item) => suggestionTitle(item, 'source')}
 				targetTitle={(item) => suggestionTitle(item, 'target')}
-				onaccept={(id) => onacceptsuggestion?.(id)}
+				onaccept={acceptSuggestion}
 				onreject={(id) => onrejectsuggestion?.(id)}
 				onclose={() => (suggestionsOpen = false)}
 			/>

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import type { GraphEdge, GraphEdgeKind, GraphNode } from '$lib/content/workspace-graph';
-import { GRAPH_TOKENS, graphNodeColor, graphTokenColor } from '$lib/components/graph/graph-palette';
+import {
+	GRAPH_TOKENS,
+	graphEdgeColor,
+	graphNodeColor,
+	graphTokenColor,
+} from '$lib/components/graph/graph-palette';
 import { buildGraphLayout, type GraphLayout } from '$lib/components/graph/graph-layout';
 import { NO_FOCUS, nodeSize } from '$lib/components/graph/graph-appearance';
 import {
@@ -192,16 +197,16 @@ export function buildGraphScene(nodes: GraphNode[], links: GraphEdge[]): GraphSc
 		const to = layout.positions[target];
 		edgeCurves.push([from, to]);
 
-		// Each endpoint keeps its own node's legend colour, so a connection between
-		// two colours reads as a blend from one to the other and every link stays
-		// traceable back to the legend.
-		const fromColor = new THREE.Color(graphNodeColor(nodes[source]));
-		const toColor = new THREE.Color(graphNodeColor(nodes[target]));
+		// One colour for the whole span, taken from the legend's Links swatch for
+		// this kind. Blending the two endpoint *nodes'* colours here made every
+		// link read as a note-to-task tint and left the legend promising colours
+		// the canvas never drew: a dependency was blue→teal, never its pink.
+		const edgeColor = new THREE.Color(graphEdgeColor(edge.kind));
 		const width = edgeWidth(edge.kind);
 
 		const points = [from, from, to, to];
 		const others = [to, to, from, from];
-		const colors = [fromColor, fromColor, toColor, toColor];
+		const colors = [edgeColor, edgeColor, edgeColor, edgeColor];
 		const sides = [-1, 1, -1, 1];
 
 		for (let vertex = 0; vertex < VERTICES_PER_LINK; vertex += 1) {
@@ -330,7 +335,8 @@ export function buildGraphScene(nodes: GraphNode[], links: GraphEdge[]): GraphSc
  * `themeColors` maps `note:<id>` / `task:<id>` to a packed RGB. When it is set,
  * a node in the map takes that colour and every node outside it is desaturated
  * toward the surface, so the chosen theme reads as the subject and the rest as
- * context — without moving anything.
+ * context — without moving anything. Links carry their kind's legend colour and
+ * are only faded the same way, never recoloured: the Links swatch is a promise.
  */
 export function retintGraphScene(
 	scene: GraphScene,
@@ -354,26 +360,18 @@ export function retintGraphScene(
 	});
 	nodeColors.needsUpdate = true;
 
-	// Each link's two endpoints each carry their node's colour.
+	// Links keep their kind's legend colour; a selected theme only fades the ones
+	// that fall outside the cluster, mirroring how its member nodes are recoloured.
 	const edgeColors = scene.edges.geometry.getAttribute('aColor') as THREE.BufferAttribute;
 	const array = edgeColors.array as Float32Array;
-	const indexOf = new Map(scene.ids.map((id, index) => [id, index]));
 	links.forEach((edge, link) => {
-		const source = indexOf.get(edge.source);
-		const target = indexOf.get(edge.target);
-		if (source === undefined || target === undefined) return;
+		const color = new THREE.Color(graphEdgeColor(edge.kind));
+		const outside = themeColors !== null && !themeColors.has(edge.source) && !themeColors.has(edge.target);
+		if (outside) color.lerp(surface, 0.72);
 
-		const fromColor = colorFor(nodes[source]);
-		const toColor = colorFor(nodes[target]);
 		const base = link * VERTICES_PER_LINK;
-		// Vertex order matches `buildGraphScene`: source, source, target, target.
-		for (const [offset, color] of [
-			[0, fromColor],
-			[1, fromColor],
-			[2, toColor],
-			[3, toColor],
-		] as const) {
-			color.toArray(array, (base + offset) * 3);
+		for (let vertex = 0; vertex < VERTICES_PER_LINK; vertex += 1) {
+			color.toArray(array, (base + vertex) * 3);
 		}
 	});
 	edgeColors.needsUpdate = true;

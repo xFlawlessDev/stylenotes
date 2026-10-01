@@ -18,6 +18,7 @@
 		items,
 		size = 'xs',
 		ariaLabel,
+		disabled = false,
 		class: className,
 		itemClass,
 		onchange
@@ -26,6 +27,8 @@
 		items: SegmentItem[];
 		size?: Extract<ButtonSize, 'xs' | 'sm' | 'md'>;
 		ariaLabel?: string;
+		/** Disables every segment; used to block changes while one is in flight. */
+		disabled?: boolean;
 		class?: string;
 		/** Extra classes applied to every segment button. */
 		itemClass?: string;
@@ -33,7 +36,7 @@
 	} = $props();
 
 	function pick(id: string) {
-		if (value === id) return;
+		if (disabled || value === id) return;
 		value = id;
 		onchange?.(id);
 	}
@@ -49,6 +52,7 @@
 		<Button
 			variant={value === item.id ? 'secondary' : 'ghost'}
 			{size}
+			{disabled}
 			class={cn('flex-1', itemClass)}
 			aria-label={item.ariaLabel}
 			aria-pressed={value === item.id}

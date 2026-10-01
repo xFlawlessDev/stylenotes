@@ -99,8 +99,9 @@ export const NODE_FRAGMENT_SHADER = /* glsl */ `
  * `aSide` picks the edge, `aWidth` is the thickness in CSS pixels, and
  * `uResolution` converts pixels to world units at that vertex's depth.
  *
- * `aColor` is per-vertex, so a link can be tinted from its source's colour to its
- * target's — the legend's colours, blended along the connection.
+ * `aColor` is per-vertex (a ribbon has four corners) and every corner reads the
+ * same colour: the link kind's own token, exactly as the legend's Links swatch
+ * shows it. See `graphEdgeColor`.
  */
 export const EDGE_VERTEX_SHADER = /* glsl */ `
 	attribute vec3 aColor;
