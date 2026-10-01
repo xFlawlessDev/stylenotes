@@ -18,6 +18,19 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Tauri (and its `glib-sys`/`webkit2gtk-sys` build scripts) needs these
+      # system libraries on Linux; without them `clippy` fails in the build
+      # script, not in our code. See https://v2.tauri.app/start/prerequisites/
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev
+
       - name: Typecheck (app)
         run: bun run check
 
