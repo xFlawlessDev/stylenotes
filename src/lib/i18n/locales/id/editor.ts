@@ -10,6 +10,7 @@ export const editor: EditorMessages = {
 		link: 'Tautan',
 		wikiLink: 'Tautan wiki',
 		image: 'Gambar',
+		attach: 'Lampirkan berkas',
 		heading1: 'Judul 1',
 		heading2: 'Judul 2',
 		heading3: 'Judul 3',

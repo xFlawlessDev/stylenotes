@@ -16,7 +16,8 @@
 	import { captureNoteVersion, notePatchFromVersion } from '$lib/content/note-versioning';
 	import RecordHistoryDialog from '$lib/components/dialogs/RecordHistoryDialog.svelte';
 	import type { EntityVersion } from '$lib/content/version-types';
-	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
+	import { insertAttachment, attachmentLinkTarget } from '$lib/content/attachments';
+	import { pickAttachments, openAttachment } from '$lib/content/attachment-actions';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { annotatePreviewLines } from '$lib/content/preview-lines';
 	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
@@ -355,6 +356,7 @@
 	async function togglePreviewCheckbox(event: MouseEvent) {
 		if (!previewEl) return;
 		if (await handlePreviewAction(event, previewEl)) return;
+		if (await handleAttachmentLinkClick(event, previewEl)) return;
 		if (handleExternalLink(event, previewEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, previewEl);
 		if (wikiClick) {
@@ -382,9 +384,8 @@
 		});
 	}
 
-	function attachFiles(paths: string[]) {
-		if (!note || !paths.length) return;
-		const markdown = joinAttachmentMarkdown(paths);
+	function attachMarkdown(markdown: string) {
+		if (!note || !markdown) return;
 		const editing = view === 'write' || view === 'split';
 		const current =
 			editing && textareaEl
@@ -397,10 +398,30 @@
 			textareaEl?.setSelectionRange(next.start, next.end);
 		});
 	}
+
+	/** Attaches a file chosen from the native picker (or an image for the toolbar). */
+	async function pickAndAttach(kind: 'image' | 'file') {
+		if (!note) return;
+		const markdown = await pickAttachments(kind).catch(() => '');
+		if (markdown) attachMarkdown(markdown);
+	}
+
+	/**
+	 * Opens a clicked attachment link (a stored blob or a legacy local file) with
+	 * the OS default app, instead of navigating the webview to it.
+	 */
+	async function handleAttachmentLinkClick(event: MouseEvent, root: HTMLElement): Promise<boolean> {
+		const target = attachmentLinkTarget(event.target, root);
+		if (!target) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		await openAttachment(target);
+		return true;
+	}
 </script>
 
 <main class="glass-panel relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl">
-	<FileDropZone class="relative z-10 flex min-h-0 flex-1 flex-col" onfiles={attachFiles}>
+	<FileDropZone class="relative z-10 flex min-h-0 flex-1 flex-col" onmarkdown={attachMarkdown}>
 		{#snippet children(droppable)}
 			{#if droppable && note}
 				<div
@@ -451,7 +472,7 @@
 			{/if}
 
 			{#if view !== 'preview'}
-				<EditorFormatBar oncommand={runCommand} onguide={() => (guideOpen = true)} />
+				<EditorFormatBar oncommand={runCommand} onattach={pickAndAttach} onguide={() => (guideOpen = true)} />
 			{/if}
 
 			<NoteEditorBody

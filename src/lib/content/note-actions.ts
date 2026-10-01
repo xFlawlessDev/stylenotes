@@ -6,10 +6,17 @@ import { katex } from '@mdit/plugin-katex';
 import { fencedLanguages, installShiki, loadLanguages } from '$lib/content/code-highlight';
 import wrapperlessFenceRule from '@olets/markdown-it-wrapperless-fence-rule';
 import { addCodeCopyButtons } from '$lib/content/preview-actions';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { noteMarkdown, type Note } from '$lib/content/content';
 import { preserveBlankLines } from '$lib/content/markdown-preview';
-import { repairLocalImageLinks, resolveLocalImages } from '$lib/content/attachments';
+import {
+	repairLocalImageLinks,
+	resolveAttachmentSources,
+	rewriteAttachmentReferences
+} from '$lib/content/attachments';
+import {
+	primeAttachmentStore,
+	resolveAttachmentUrl
+} from '$lib/content/attachment-url';
 import { TOC_DIGEST_ATTR } from '$lib/content/preview-toc';
 import { slugifyFolder } from '$lib/stores/notes';
 import { isTauri } from '$lib/windows';
@@ -22,9 +29,11 @@ import {
 } from '$lib/content/wiki-links';
 import { t } from '$lib/i18n/index.svelte';
 
-/** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset protocol. */
+/** Keeps DOMPurify's default URI allow-list while accepting the Tauri asset
+ * protocol and the store's own portable scheme (so a blob missing on this device
+ * still survives sanitising as an unresolved reference rather than vanishing). */
 const ALLOWED_URI =
-	/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|asset):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+	/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|asset|stylenotes-attachment):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
 function createMarkdownParser() {
 	const parser = new MarkdownIt({ breaks: true, html: true, linkify: true });
@@ -113,16 +122,14 @@ async function getMarkdownParser(): Promise<MarkdownItType.MarkdownIt> {
 	return markdownSetup;
 }
 
-function assetUrl(path: string): string | null {
-	if (!isTauri) return null;
-	try {
-		return convertFileSrc(path);
-	} catch {
-		return null;
-	}
+function assetUrl(target: string): string | null {
+	return resolveAttachmentUrl(target);
 }
 
 export async function renderNoteHtml(body: string, wiki?: WikiRenderContext): Promise<string> {
+	// Make sure the store root is known before resolving references; the call is
+	// cached, so this is a no-op after the first render.
+	if (isTauri) await primeAttachmentStore();
 	const source = repairLocalImageLinks(body);
 	const markdownSource = preserveBlankLines(source);
 	const codeLangs = fencedLanguages(markdownSource).filter((lang) => lang !== 'mermaid');
@@ -138,7 +145,7 @@ export async function renderNoteHtml(body: string, wiki?: WikiRenderContext): Pr
 			rendered = fallbackMarkdown.render(markdownSource, { wiki });
 		}
 	}
-	const resolved = resolveLocalImages(rendered, assetUrl);
+	const resolved = resolveAttachmentSources(rendered, assetUrl);
 	const sanitized = DOMPurify.sanitize(resolved, { ALLOWED_URI_REGEXP: ALLOWED_URI });
 	return addCodeCopyButtons(sanitized);
 }
@@ -267,7 +274,7 @@ function downloadMarkdown(fileName: string, content: string): string {
 }
 
 export async function exportNoteMarkdown(note: Note): Promise<string | null> {
-	const content = noteMarkdown(note);
+	const content = rewriteAttachmentReferences(noteMarkdown(note));
 	const fileName = noteFileName(note);
 	if (isTauri) return saveMarkdownDialog(fileName, content);
 	return downloadMarkdown(fileName, content);
@@ -306,7 +313,8 @@ export async function exportNotesToFolder(
 ): Promise<FolderExport | null> {
 	if (!isTauri) {
 		// Browser/dev fallback: no folder picker on the web, download one file per note.
-		for (const note of notes) downloadMarkdown(noteFileName(note), noteMarkdown(note));
+		for (const note of notes)
+			downloadMarkdown(noteFileName(note), rewriteAttachmentReferences(noteMarkdown(note)));
 		return { dir: 'Downloads', written: notes.length, failed: [] };
 	}
 
@@ -338,7 +346,7 @@ export async function exportNotesToFolder(
 				madeDirs.add(dirPath.toLowerCase());
 			}
 			const file = uniqueFileName(dirPath, markdownBaseName(note.title), used);
-			await writeTextFile(joinPath(dirPath, file), noteMarkdown(note));
+			await writeTextFile(joinPath(dirPath, file), rewriteAttachmentReferences(noteMarkdown(note)));
 			written += 1;
 		} catch {
 			failed.push(note.title || 'Untitled note');

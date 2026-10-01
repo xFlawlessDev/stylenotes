@@ -14,6 +14,7 @@
 		ListChecks,
 		ListOrdered,
 		Minus,
+		Paperclip,
 		Quote,
 		SquareCheck,
 		SquareCode,
@@ -27,8 +28,10 @@
 	import { MOD } from '$lib/content/markdown-shortcuts';
 	import { t } from '$lib/i18n/index.svelte';
 
+	/** `image`/`attach` are picker actions, not text transforms. */
+	type ToolId = EditorCommand | 'attach';
 	type Tool = {
-		id: EditorCommand;
+		id: ToolId;
 		label: string;
 		shortcut?: string;
 		icon: Component;
@@ -43,6 +46,7 @@
 			{ id: 'link', label: t('editor.format.link'), shortcut: `${MOD}+K`, icon: Link },
 			{ id: 'wikilink', label: t('editor.format.wikiLink'), shortcut: `${MOD}+Shift+K`, icon: SquareLibrary },
 			{ id: 'image', label: t('editor.format.image'), icon: Image },
+			{ id: 'attach', label: t('editor.format.attach'), icon: Paperclip },
 		],
 		[
 			{ id: 'heading1', label: t('editor.format.heading1'), shortcut: `${MOD}+Alt+1`, icon: Heading1 },
@@ -63,11 +67,20 @@
 
 	let {
 		oncommand,
+		onattach,
 		onguide,
 	}: {
 		oncommand: (command: EditorCommand) => void;
+		/** Pick a file (or image) from disk and attach it. */
+		onattach?: (kind: 'image' | 'file') => void;
 		onguide?: () => void;
 	} = $props();
+
+	function activate(tool: Tool) {
+		if (tool.id === 'image') onattach?.('image');
+		else if (tool.id === 'attach') onattach?.('file');
+		else oncommand(tool.id);
+	}
 </script>
 
 <div
@@ -81,7 +94,7 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} size="icon-sm" class={buttonClass} aria-label={tool.label} onclick={() => oncommand(tool.id)}>
+						<Button {...props} size="icon-sm" class={buttonClass} aria-label={tool.label} onclick={() => activate(tool)}>
 							<tool.icon size={16} />
 						</Button>
 					{/snippet}

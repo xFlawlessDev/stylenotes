@@ -33,6 +33,7 @@
     "positioner:default",
     "desktop-underlay:default",
     "opener:default",
+    "opener:allow-open-path",
     "dialog:default",
     "fs:allow-write-text-file",
     "fs:allow-write-file",

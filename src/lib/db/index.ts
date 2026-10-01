@@ -9,6 +9,8 @@ export { notesRepo } from './notes';
 export { foldersRepo } from './folders';
 export { notificationsRepo } from './notifications';
 export { metaRepo } from './meta';
+export { attachmentsRepo } from './attachments';
+export type { AttachmentRecord, AttachmentWrite } from './attachments';
 export { embeddingsRepo } from './embeddings';
 export type { EmbeddingRecord, EmbeddingWrite } from './embeddings';
 export { suggestionsRepo } from './suggestions';

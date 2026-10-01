@@ -8,6 +8,7 @@ export const editor = {
 		link: 'Link',
 		wikiLink: 'Wiki link',
 		image: 'Image',
+		attach: 'Attach file',
 		heading1: 'Heading 1',
 		heading2: 'Heading 2',
 		heading3: 'Heading 3',

@@ -1,15 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import {
+	attachmentKind,
+	attachmentLinkTarget,
 	attachmentMarkdown,
+	attachmentObjectPath,
+	attachmentReference,
 	fileExtension,
 	fileNameFromPath,
+	fileLinkKind,
 	insertAttachment,
+	isAttachmentReference,
+	isEmbeddablePath,
 	isImagePath,
+	isVideoPath,
 	joinAttachmentMarkdown,
 	localFilePath,
+	normalizeExtension,
+	parseAttachmentReference,
 	repairLocalImageLinks,
+	resolveAttachmentSources,
 	resolveLocalImages,
+	rewriteAttachmentReferences,
+	targetExtension,
 } from '$lib/content/attachments';
+
+const HASH = 'a'.repeat(64);
 
 describe('fileNameFromPath', () => {
 	it('handles windows and posix separators', () => {
@@ -138,5 +153,169 @@ describe('insertAttachment', () => {
 	it('adds no breaks when the body is empty', () => {
 		const result = insertAttachment('', 0, 0, '[a.txt](/a.txt)');
 		expect(result.value).toBe('[a.txt](/a.txt)');
+	});
+});
+
+describe('normalizeExtension', () => {
+	it('lowercases and strips a leading dot', () => {
+		expect(normalizeExtension('.PNG')).toBe('png');
+		expect(normalizeExtension('Jpeg')).toBe('jpeg');
+	});
+
+	it('rejects anything that is not a short alphanumeric token', () => {
+		expect(normalizeExtension('')).toBe('');
+		expect(normalizeExtension('tar.gz')).toBe('');
+		expect(normalizeExtension('a b')).toBe('');
+		expect(normalizeExtension('toolongextensionname')).toBe('');
+	});
+});
+
+describe('attachment references', () => {
+	it('builds a reference with and without an extension', () => {
+		expect(attachmentReference(HASH, 'png')).toBe(`stylenotes-attachment://${HASH}.png`);
+		expect(attachmentReference(HASH, '')).toBe(`stylenotes-attachment://${HASH}`);
+	});
+
+	it('round-trips through parse', () => {
+		expect(parseAttachmentReference(`stylenotes-attachment://${HASH}.pdf`)).toEqual({
+			id: HASH,
+			ext: 'pdf',
+		});
+		expect(parseAttachmentReference(`stylenotes-attachment://${HASH}`)).toEqual({ id: HASH, ext: '' });
+	});
+
+	it('rejects foreign and malformed urls', () => {
+		expect(parseAttachmentReference('https://x.test/a.png')).toBeNull();
+		expect(parseAttachmentReference('asset://localhost/a.png')).toBeNull();
+		expect(parseAttachmentReference('stylenotes-attachment://')).toBeNull();
+		expect(parseAttachmentReference('stylenotes-attachment://nothex!.png')).toBeNull();
+		expect(isAttachmentReference(`stylenotes-attachment://${HASH}.png`)).toBe(true);
+	});
+});
+
+describe('attachmentKind', () => {
+	it('classifies by extension', () => {
+		expect(attachmentKind('cat.png')).toBe('image');
+		expect(attachmentKind('clip.mp4')).toBe('video');
+		expect(attachmentKind('song.flac')).toBe('audio');
+		expect(attachmentKind('paper.pdf')).toBe('pdf');
+		expect(attachmentKind('notes.txt')).toBe('file');
+	});
+
+	it('accepts a bare extension and a store reference', () => {
+		expect(attachmentKind('png')).toBe('image');
+		expect(attachmentKind(`stylenotes-attachment://${HASH}.mp4`)).toBe('video');
+	});
+
+	it('exposes embeddable and media predicates', () => {
+		expect(isEmbeddablePath('a.png')).toBe(true);
+		expect(isEmbeddablePath('a.mp4')).toBe(true);
+		expect(isEmbeddablePath('a.pdf')).toBe(false);
+		expect(isVideoPath('a.webm')).toBe(true);
+		expect(isImagePath('a.pdf')).toBe(false);
+	});
+});
+
+describe('attachmentObjectPath', () => {
+	it('shards by hash prefix and mirrors the Rust layout', () => {
+		expect(attachmentObjectPath('ab12cd', 'png')).toBe('attachments/ab/ab12cd.png');
+		expect(attachmentObjectPath('ab12cd', '')).toBe('attachments/ab/ab12cd');
+	});
+
+	it('agrees with targetExtension for a reference', () => {
+		expect(targetExtension(`stylenotes-attachment://${HASH}.webp`)).toBe('webp');
+		expect(targetExtension('C:/pics/cat.PNG')).toBe('png');
+	});
+});
+
+describe('attachmentMarkdown for store references', () => {
+	it('embeds media and links documents, keeping the label', () => {
+		expect(attachmentMarkdown(`stylenotes-attachment://${HASH}.png`, 'shot.png')).toBe(
+			`![shot.png](stylenotes-attachment://${HASH}.png)`
+		);
+		expect(attachmentMarkdown(`stylenotes-attachment://${HASH}.pdf`, 'plan.pdf')).toBe(
+			`[plan.pdf](stylenotes-attachment://${HASH}.pdf)`
+		);
+	});
+
+	it('falls back to a display name when no label is given', () => {
+		expect(attachmentMarkdown(`stylenotes-attachment://${HASH}.png`)).toBe(
+			`![attachment.png](stylenotes-attachment://${HASH}.png)`
+		);
+	});
+});
+
+describe('rewriteAttachmentReferences', () => {
+	it('turns references into store-relative paths for export', () => {
+		const body = `Here: ![x](stylenotes-attachment://${HASH}.png) and [d](stylenotes-attachment://${HASH}.pdf).`;
+		expect(rewriteAttachmentReferences(body)).toBe(
+			`Here: ![x](attachments/aa/${HASH}.png) and [d](attachments/aa/${HASH}.pdf).`
+		);
+	});
+
+	it('leaves ordinary links and text untouched', () => {
+		const body = '[x](https://x.test/a.png) [[Wiki]] plain text';
+		expect(rewriteAttachmentReferences(body)).toBe(body);
+	});
+});
+
+describe('resolveAttachmentSources', () => {
+	// Mirrors the real resolver: only attachment targets are rewritten.
+	const resolve = (target: string) =>
+		isAttachmentReference(target)
+			? `asset://localhost/${encodeURIComponent(target)}`
+			: null;
+
+	it('rewrites image, video, audio and source elements', () => {
+		const html =
+			`<p><img src="stylenotes-attachment://${HASH}.png">` +
+			`<video src="stylenotes-attachment://${HASH}.mp4"></video>` +
+			`<audio src="stylenotes-attachment://${HASH}.mp3"></audio>` +
+			`<video><source src="stylenotes-attachment://${HASH}.webm"></video></p>`;
+		const out = resolveAttachmentSources(html, resolve);
+		expect(out).toContain(`asset://localhost/${encodeURIComponent(`stylenotes-attachment://${HASH}.png`)}`);
+		expect(out).toContain(`asset://localhost/${encodeURIComponent(`stylenotes-attachment://${HASH}.mp4`)}`);
+		expect(out).toContain(`asset://localhost/${encodeURIComponent(`stylenotes-attachment://${HASH}.mp3`)}`);
+		expect(out).toContain(`asset://localhost/${encodeURIComponent(`stylenotes-attachment://${HASH}.webm`)}`);
+	});
+
+	it('leaves file links alone so a click opens them in the OS', () => {
+		const html = `<a href="stylenotes-attachment://${HASH}.pdf">doc</a>`;
+		expect(resolveAttachmentSources(html, resolve)).toBe(html);
+	});
+
+	it('returns the original html when nothing changed', () => {
+		const html = '<img src="https://x.test/a.png"><img src="data:image/png;base64,AAAA">';
+		expect(resolveAttachmentSources(html, resolve)).toBe(html);
+	});
+});
+
+describe('fileLinkKind and attachmentLinkTarget', () => {
+	function root(html: string): HTMLElement {
+		const el = document.createElement('div');
+		el.innerHTML = html;
+		document.body.append(el);
+		return el;
+	}
+
+	it('recognises stored and legacy document links', () => {
+		expect(fileLinkKind(`stylenotes-attachment://${HASH}.pdf`)).toBe('pdf');
+		expect(fileLinkKind('/docs/plan.pdf')).toBe('pdf');
+		expect(fileLinkKind(`stylenotes-attachment://${HASH}.zip`)).toBe('file');
+		expect(fileLinkKind('https://x.test/a.pdf')).toBeNull();
+	});
+
+	it('finds an attachment link target but ignores wiki and remote links', () => {
+		const el = root(
+			`<a href="stylenotes-attachment://${HASH}.pdf" id="doc">doc</a>` +
+				'<a href="https://x.test/a.pdf" id="web">web</a>' +
+				'<a href="#" data-wiki-target="n1" id="wiki">wiki</a>'
+		);
+		expect(attachmentLinkTarget(el.querySelector('#doc'), el)).toBe(
+			`stylenotes-attachment://${HASH}.pdf`
+		);
+		expect(attachmentLinkTarget(el.querySelector('#web'), el)).toBeNull();
+		expect(attachmentLinkTarget(el.querySelector('#wiki'), el)).toBeNull();
+		el.remove();
 	});
 });

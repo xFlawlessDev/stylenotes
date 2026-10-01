@@ -9,7 +9,8 @@
 	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
 	import type { TocEntry } from '$lib/content/preview-toc';
 	import { outlineFor, scrollPreviewToHeading, trackPreviewHeadings } from '$lib/content/preview-toc-sync';
-	import { insertAttachment, joinAttachmentMarkdown } from '$lib/content/attachments';
+	import { insertAttachment, attachmentLinkTarget } from '$lib/content/attachments';
+	import { pickAttachments, openAttachment } from '$lib/content/attachment-actions';
 	import { renderNoteHtml } from '$lib/content/note-actions';
 	import { wikiClickFromTarget, type WikiClick } from '$lib/content/wiki-links';
 	import type { Note } from '$lib/content/content';
@@ -299,6 +300,7 @@
 	async function togglePreviewCheckbox(event: MouseEvent) {
 		if (!previewEl) return;
 		if (await handlePreviewAction(event, previewEl)) return;
+		if (await handleAttachmentLinkClick(event, previewEl)) return;
 		if (handleExternalLink(event, previewEl)) return;
 		const wikiClick = wikiClickFromTarget(event.target, previewEl);
 		if (wikiClick) {
@@ -324,9 +326,8 @@
 		});
 	}
 
-	function attachFiles(paths: string[]) {
-		if (!paths.length) return;
-		const markdown = joinAttachmentMarkdown(paths);
+	function attachMarkdown(markdown: string) {
+		if (!markdown) return;
 		const editing = view === 'write' || view === 'split';
 		const current =
 			editing && textareaEl
@@ -339,9 +340,25 @@
 			textareaEl?.setSelectionRange(next.start, next.end);
 		});
 	}
+
+	/** Attaches a file chosen from the native picker (or an image for the toolbar). */
+	async function pickAndAttach(kind: 'image' | 'file') {
+		const markdown = await pickAttachments(kind).catch(() => '');
+		if (markdown) attachMarkdown(markdown);
+	}
+
+	/** Opens a clicked attachment link (stored blob or legacy local file) via the OS. */
+	async function handleAttachmentLinkClick(event: MouseEvent, root: HTMLElement): Promise<boolean> {
+		const target = attachmentLinkTarget(event.target, root);
+		if (!target) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		await openAttachment(target);
+		return true;
+	}
 </script>
 
-<FileDropZone class="relative z-10 flex min-h-0 flex-1 flex-col" onfiles={attachFiles}>
+<FileDropZone class="relative z-10 flex min-h-0 flex-1 flex-col" onmarkdown={attachMarkdown}>
 	{#snippet children(droppable)}
 		{#if droppable}
 			<div
@@ -354,7 +371,7 @@
 		{/if}
 
 		{#if view !== 'preview'}
-			<EditorFormatBar oncommand={runCommand} onguide={() => (guideOpen = true)} />
+			<EditorFormatBar oncommand={runCommand} onattach={pickAndAttach} onguide={() => (guideOpen = true)} />
 		{/if}
 
 		<div class="relative grid min-h-0 flex-1 overflow-hidden">

@@ -81,11 +81,21 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 - **Provider embedding is the third path.** An OpenAI-compatible `/embeddings` call lives in `embed/provider.rs` (non-streaming, unlike the chat SSE path) and reuses the decrypted key. Anthropic has no embeddings endpoint, so provider embedding is OpenAI-compatible only.
 - **Tests pin the contract.** `embeddings.test.ts` and `semantic.test.ts` cover the codec, hash, ranking and the #D8 anti-spam rules; `embed::onnx::embedder::tests::onnx_embeds_for_real` is `#[ignore]`d and is the only end-to-end proof the model runs: `cargo test --features local-embed -- --ignored onnx_embeds_for_real`.
 
+## Attachments / artifact store (local-first, S3-ready)
+
+- **A blob's identity is its bytes.** Dragging/pasting/picking a file copies it into `<app_data_dir>/attachments/<ab>/<sha256>.<ext>` and the note holds a portable `stylenotes-attachment://<sha256>[.<ext>]` reference — never the original absolute path. Design + #A1–#A10: `docs/design/artifacts.md`.
+- **Rust owns the store; the frontend owns markdown.** `src-tauri/src/attachments/mod.rs` is pure (hash, `object_rel_path`, `parse_reference`, ext normalisation); `commands.rs` does I/O and exposes `attachment_import` / `attachment_import_bytes` / `attachment_resolve` / `attachment_path` / `attachment_root` / `attachment_open`. All are in `generate_handler!`. The store writes `*.part` then renames.
+- **The `rel_path` is the S3 object key** (`attachments/<ab>/<id>.<ext>`), so cloud sync uploads exactly the referenced blobs with no translation table. `attachments` (migration 24) is a **derived index**, not truth: a bad row never fails an import (the on-disk blob is real), and a missing blob renders as `exists: false`, not a broken image.
+- **Rendering resolves references, not paths.** `content/attachment-url.ts` (no SQLite, no IPC beyond one cached `attachment_root`) turns a reference into an `asset://` URL; `content/note-actions.ts` calls it via `resolveAttachmentSources`, which also covers `video`/`audio`/`source`. A file link (`<a href="stylenotes-attachment://…">`) is **not** rewritten — it stays clickable and opens through `attachment_open` (`tauri-plugin-opener` via Rust, so no `open-path` permission in the webview). `attachmentLinkTarget` is checked **before** `handleExternalLink`.
+- **Kinds decide embed vs. link:** `image`/`video`/`audio` embed (`![]`, `<video>`, `<audio>`), `pdf`/`file` link. `stylenotes-attachment:` is in DOMPurify's `ALLOWED_URI` so an unresolved reference survives sanitising instead of vanishing.
+- **Legacy absolute paths still work** (render and open) so notes written before the store do not break — but new attachments never write one. Export rewrites references to `attachments/<ab>/<id>.<ext>` (`rewriteAttachmentReferences`).
+- **Frontend pieces:** pure `content/attachments.ts`; `content/attachment-url.ts` (resolve); `content/attachment-actions.ts` (import/open/pick + catalog); repo `lib/db/attachments.ts`; `workspace/FileDropZone.svelte` (drop + clipboard paste, serialised); toolbar `Image`/`attach` actions in `EditorFormatBar.svelte` via `onattach`.
+
 ## Database / migrations
 
 - SQLite via `tauri-plugin-sql`; URL `sqlite:stylenotes.db` is defined in **two places that must stay in sync**: `src-tauri/src/lib.rs` (`DB_URL`) and `tauri.conf.json` `plugins.sql.preload`.
 - Schema/migrations live **only** in `src-tauri/src/lib.rs`. Add a new `Migration` entry with an incremented `version`; never edit an applied migration.
-- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `tasksRepo`, `metaRepo`), `src/lib/db/ui-plugins.ts`, and `src/lib/db/mcp.ts` (`mcpRepo`). Stores in `src/lib/stores/` wrap these and call them.
+- Frontend DB access is `src/lib/db/index.ts` (`notesRepo`, `foldersRepo`, `notificationsRepo`, `settingsRepo`, `tasksRepo`, `metaRepo`, `attachmentsRepo`), `src/lib/db/ui-plugins.ts`, and `src/lib/db/mcp.ts` (`mcpRepo`). Stores in `src/lib/stores/` wrap these and call them.
 - **`notes.updated_at`** (migration 12) is the machine-readable timestamp; `notes.updated` stays a display string. Any new note write must set `updatedAt` (`notesRepo.upsert` stamps it when absent). Cloud-sync Phase 0 must **backfill**, not re-add the column.
 - Outside Tauri, `getDb()` rejects and stores fall back to seed data (`src/lib/content/content.ts`, markdown in `src/lib/content/notes/`). Guard new DB work with `browser`/`isTauri` and swallow errors like existing stores do.
 
@@ -154,4 +164,4 @@ StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust 
 
 ## Skills
 
-Repo-local skills are in `.agents/skills/` (`svelte`, `shadcn-svelte`, `tauri-v2`). Load them when working in those areas.
+Repo-local skills are in `.agents/skills/` (`svelte`, `shadcn-svelte`, `tauri-v2`, `stylenotes-mcp`). Load them when working in those areas. The `stylenotes-mcp` skill compounds the local MCP server's tool contract; its tracked source is `skills/stylenotes-mcp/` (install by copying that directory into `.agents/skills/`).

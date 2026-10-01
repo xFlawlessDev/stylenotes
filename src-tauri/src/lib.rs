@@ -5,6 +5,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 mod tray;
 
 mod ai;
+mod attachments;
 mod db_tx;
 mod embed;
 mod import;
@@ -39,6 +40,9 @@ mod read_tasks;
 #[allow(dead_code)]
 #[path = "mcp/read_workspaces.rs"]
 mod read_workspaces;
+#[allow(dead_code)]
+#[path = "mcp/semantic.rs"]
+mod semantic;
 #[path = "mcp/registry.rs"]
 mod registry;
 
@@ -772,6 +776,34 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Attachment artifacts (docs/design/artifacts.md). One row per *content*
+        // blob, keyed by its SHA-256 id: the store is content-addressed, so the
+        // same file dragged into two notes is one row and one blob on disk.
+        //
+        // This is the catalog the cloud sync layer will read to know which S3
+        // objects a workspace references. `rel_path` is the object key
+        // (`attachments/<ab>/<id>.<ext>`); `origin_path` is only the last file
+        // the user attached from, kept for diagnostics, never synced as truth.
+        Migration {
+            version: 24,
+            description: "create_attachments",
+            sql: "
+                CREATE TABLE IF NOT EXISTS attachments (
+                    id          TEXT PRIMARY KEY,
+                    ext         TEXT NOT NULL DEFAULT '',
+                    name        TEXT NOT NULL DEFAULT '',
+                    size        INTEGER NOT NULL DEFAULT 0,
+                    rel_path    TEXT NOT NULL DEFAULT '',
+                    origin_path TEXT NOT NULL DEFAULT '',
+                    created_at  INTEGER NOT NULL,
+                    last_seen_at INTEGER NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_attachments_created_at
+                    ON attachments (created_at);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -816,6 +848,12 @@ pub fn run() {
             embed::commands::memory_model_status,
             embed::commands::memory_download_model,
             import::import_read_markdown,
+            attachments::commands::attachment_import,
+            attachments::commands::attachment_import_bytes,
+            attachments::commands::attachment_resolve,
+            attachments::commands::attachment_path,
+            attachments::commands::attachment_root,
+            attachments::commands::attachment_open,
             remote_mcp::commands::remote_mcp_start,
             remote_mcp::commands::remote_mcp_stop,
             remote_mcp::commands::remote_mcp_status,
