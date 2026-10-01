@@ -39,7 +39,7 @@
 		label={t('shell.workspace.label')}
 		variant="chip"
 		size="sm"
-		class="max-w-[170px] border-0"
+		class="min-w-0 max-w-[170px] border-0"
 		onchange={(id) => onchange?.(id)}
 	>
 		{#snippet footer()}

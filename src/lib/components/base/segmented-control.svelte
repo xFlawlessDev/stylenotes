@@ -21,6 +21,7 @@
 		disabled = false,
 		class: className,
 		itemClass,
+		labelClass,
 		onchange
 	}: {
 		value?: string;
@@ -32,6 +33,12 @@
 		class?: string;
 		/** Extra classes applied to every segment button. */
 		itemClass?: string;
+		/**
+		 * Extra classes applied to every label span, e.g. `hidden sm:inline` to
+		 * collapse to icons on small screens without hiding the control. The
+		 * button keeps an `aria-label`, so a hidden label is still announced.
+		 */
+		labelClass?: string;
 		onchange?: (value: string) => void;
 	} = $props();
 
@@ -54,7 +61,7 @@
 			{size}
 			{disabled}
 			class={cn('flex-1', itemClass)}
-			aria-label={item.ariaLabel}
+			aria-label={item.ariaLabel ?? item.label}
 			aria-pressed={value === item.id}
 			onclick={() => pick(item.id)}
 		>
@@ -62,7 +69,7 @@
 				<Icon size={size === 'xs' ? 13 : 15} />
 			{/if}
 			{#if item.label}
-				<span class="truncate">{item.label}</span>
+				<span class={cn('truncate', labelClass)}>{item.label}</span>
 			{/if}
 		</Button>
 	{/each}

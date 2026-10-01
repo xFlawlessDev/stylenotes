@@ -98,6 +98,27 @@ describe('base components', () => {
 		target.remove();
 	});
 
+	it('collapses segment labels via labelClass without losing the accessible name', () => {
+		const { target, app } = mountInto(SegmentedControl, {
+			value: 'a',
+			items: [
+				{ id: 'a', label: 'Notes' },
+				{ id: 'b', label: 'Tasks' }
+			],
+			labelClass: 'hidden lg:inline',
+			onchange: noop
+		});
+		const labels = target.querySelectorAll('button > span');
+		expect(labels.length).toBeGreaterThan(0);
+		for (const span of Array.from(labels)) {
+			expect(span.className).toContain('hidden');
+			expect(span.className).toContain('lg:inline');
+		}
+		expect(target.querySelector('button')?.getAttribute('aria-label')).toBe('Notes');
+		unmount(app);
+		target.remove();
+	});
+
 	it('labels a select whose selected option has an empty value', () => {
 		const { target, app } = mountInto(Select, {
 			value: '',
