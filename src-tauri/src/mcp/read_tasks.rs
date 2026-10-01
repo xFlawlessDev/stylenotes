@@ -48,11 +48,11 @@ fn due_key(task: &Value) -> String {
 
 // --- list_tasks -------------------------------------------------------------
 
-pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
-    let snapshot = match snapshot_or_error(bridge) {
-        Ok(value) => value,
-        Err(error) => return error,
-    };
+/// Applies the shared task filters exactly as `search_tasks` does:
+/// workspace, status, priority, folder, `dueBefore`, `overdueOnly` and
+/// `includeDone`. One place, so a text search and a plain list can never
+/// disagree about which tasks are in scope.
+pub(crate) fn filtered_tasks<'a>(snapshot: &'a Value, args: &Value) -> Vec<&'a Value> {
     let workspace = workspace_arg(args);
     let status = string_arg(args, "status");
     let priority = string_arg(args, "priority");
@@ -60,9 +60,8 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
     let due_before = string_arg(args, "dueBefore");
     let overdue_only = bool_arg(args, "overdueOnly").unwrap_or(false);
     let include_done = bool_arg(args, "includeDone").unwrap_or(true);
-    let limit = limit_arg(args, "limit", 100, 1000);
 
-    let mut tasks: Vec<Value> = array_of(&snapshot, "tasks")
+    array_of(snapshot, "tasks")
         .iter()
         .filter(|task| matches_workspace(task, workspace.as_deref()))
         .filter(|task| {
@@ -86,7 +85,19 @@ pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
                 .as_deref()
                 .is_none_or(|limit| task["dueAt"].as_str().is_some_and(|due| due < limit))
         })
-        .filter(|task| !overdue_only || is_overdue(task, &snapshot))
+        .filter(|task| !overdue_only || is_overdue(task, snapshot))
+        .collect()
+}
+
+pub fn list_tasks(bridge: &Bridge, args: &Value) -> Value {
+    let snapshot = match snapshot_or_error(bridge) {
+        Ok(value) => value,
+        Err(error) => return error,
+    };
+    let limit = limit_arg(args, "limit", 100, 1000);
+
+    let mut tasks: Vec<Value> = filtered_tasks(&snapshot, args)
+        .into_iter()
         .cloned()
         .collect();
 

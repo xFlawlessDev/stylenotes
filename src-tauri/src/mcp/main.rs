@@ -6,12 +6,14 @@
 
 mod bridge;
 mod protocol;
+mod rank;
 mod read;
 mod read_deps;
 mod read_graph;
 mod read_tasks;
 mod read_workspaces;
 mod registry;
+mod search;
 mod semantic;
 mod write;
 

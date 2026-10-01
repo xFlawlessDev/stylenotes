@@ -11,6 +11,8 @@ import type { McpScope, McpToolDescriptor, McpToolKind } from '$lib/content/mcp-
 export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'list_notes', kind: 'read', scope: 'notes', description: 'List notes with optional workspace, folder, tag and pin filters.' },
 	{ name: 'search_notes', kind: 'read', scope: 'notes', description: 'Substring search over note titles, tags and bodies.' },
+	{ name: 'search_tasks', kind: 'read', scope: 'tasks', description: 'Substring search over task titles and notes, with the list_tasks filters.' },
+	{ name: 'search_all', kind: 'read', scope: 'notes', description: 'One ranked search across notes and tasks, returned as two lists.' },
 	{ name: 'get_note', kind: 'read', scope: 'notes', description: 'One note plus its wiki backlinks and outlinks.' },
 	{ name: 'context', kind: 'read', scope: 'notes', description: 'Relevant notes for a query, with their neighbourhood in the graph.' },
 	{ name: 'semantic_search', kind: 'read', scope: 'notes', description: 'Meaning-based search over notes and tasks. Prefer search_notes for exact terms or ids.' },

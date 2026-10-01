@@ -10,7 +10,7 @@ app's remote HTTP endpoint.
 - **What the app is for** — StyleNotes is the user's second brain, a local-first
   home for their thinking and their commitments, where a workspace is a vault — so
   an agent recalls from their notes instead of answering from its own memory.
-- **Which tool for which question** — a short routing table instead of 32
+- **Which tool for which question** — a short routing table instead of 34
   undifferentiated tools.
 - **Which body write to use** — patch in place, add to the end, or rewrite;
   the cheapest one that fits, so a one-word fix does not cost a full note.
@@ -47,7 +47,7 @@ app's remote HTTP endpoint.
 stylenotes-mcp/
 ├── SKILL.md                          # entry point: model, workflow, traps
 ├── references/
-│   ├── tool-reference.md             # all 32 tools, args, response fields
+│   ├── tool-reference.md             # all 34 tools, args, response fields
 │   ├── errors.md                     # error codes -> cause -> fix
 │   └── workflows.md                  # longer end-to-end recipes
 ├── scripts/

@@ -10,7 +10,7 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes an MCP server in two forms over the same 32 tools — 17 read,
+StyleNotes exposes an MCP server in two forms over the same 34 tools — 19 read,
 15 write. A **local** endpoint speaks stdio through a thin shim; a **remote**
 endpoint speaks Streamable HTTP from the app itself. Either way every write goes
 through the same validation the UI uses, not straight to the database.
@@ -85,7 +85,7 @@ Never guess an id. Find the workspace first, then the entity:
 ```
 list_workspaces                                  -> ids, names, counts
 list_notes / list_tasks  { workspace, folder, ... } -> refs
-search_notes            { query, workspace }        -> ranked note refs
+search_notes / search_tasks / search_all  { query } -> ranked refs
 ```
 
 `list_workspaces` takes no arguments and always returns every workspace with
@@ -100,6 +100,8 @@ Pick the narrowest tool that answers the question:
 |---|---|
 | "What do I know about X?" | `context { query, workspace, depth }` |
 | "Find my note about X" | `search_notes { query, workspace }` |
+| "Find my task about X" | `search_tasks { query, status, ... }` |
+| "Where did I write about X?" | `search_all { query }` — notes and tasks together |
 | "Show that note" | `get_note { id }` |
 | "What links to / from this note?" | `get_note` — its `backlinks` / `outlinks` |
 | "What folders / tags do I have?" | `list_folders` / `list_tags` |
@@ -248,6 +250,6 @@ Trace a dependency chain:
 
 ## Reference
 
-- [references/tool-reference.md](references/tool-reference.md) — all 32 tools, arguments, response fields.
+- [references/tool-reference.md](references/tool-reference.md) — all 34 tools, arguments, response fields.
 - [references/errors.md](references/errors.md) — error codes, causes, and fixes.
 - [references/workflows.md](references/workflows.md) — longer end-to-end recipes, including second-brain recall and capture.

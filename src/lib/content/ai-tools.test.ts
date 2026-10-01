@@ -113,6 +113,45 @@ describe('read tools', () => {
 		expect(notes[0].ref).toBe('w1/n2');
 	});
 
+	it('ranks a title hit above a body hit', async () => {
+		const custom: ToolContext = {
+			...context(),
+			snapshot: {
+				...snapshot(),
+				notes: [
+					{ ...snapshot().notes[0], id: 'body', title: 'Other', body: 'beans' },
+					{ ...snapshot().notes[0], id: 'title', title: 'Beans', body: '' }
+				]
+			}
+		};
+		const result = await executeToolCall(custom, 'search_notes', '{"query":"beans"}', { confirmed: false });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const notes = (result.data as { notes: { ref: string }[] }).notes;
+		expect(notes[0].ref).toBe('w1/title');
+	});
+
+	it('searches tasks by title and notes, honouring filters', async () => {
+		const hit = await executeToolCall(context(), 'search_tasks', '{"query":"ship"}', { confirmed: false });
+		expect(hit.ok).toBe(true);
+		if (!hit.ok) return;
+		expect((hit.data as { tasks: { ref: string }[] }).tasks[0].ref).toBe('w1/t1');
+
+		const noTitle = await executeToolCall(context(), 'search_tasks', '{"query":"ship","priority":"low"}', { confirmed: false });
+		expect(noTitle.ok).toBe(true);
+		if (!noTitle.ok) return;
+		expect((noTitle.data as { tasks: unknown[] }).tasks).toHaveLength(0);
+	});
+
+	it('search_all returns notes and tasks as two lists', async () => {
+		const result = await executeToolCall(context(), 'search_all', '{"query":"a"}', { confirmed: false });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const data = result.data as { notes: unknown[]; tasks: unknown[] };
+		expect(data.notes.length).toBeGreaterThan(0);
+		expect(data.tasks).toBeDefined();
+	});
+
 	it('returns a note body and its links', async () => {
 		const result = await executeToolCall(context(), 'get_note', '{"id":"n1"}', { confirmed: false });
 		expect(result.ok).toBe(true);

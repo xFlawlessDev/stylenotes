@@ -40,6 +40,18 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "Substring search over note titles, tags and bodies.",
     },
     ToolDescriptor {
+        name: "search_tasks",
+        kind: ToolKind::Read,
+        scope: "tasks",
+        description: "Substring search over task titles and notes, with the list_tasks filters.",
+    },
+    ToolDescriptor {
+        name: "search_all",
+        kind: ToolKind::Read,
+        scope: "notes",
+        description: "One ranked search across notes and tasks, returned as two lists.",
+    },
+    ToolDescriptor {
         name: "get_note",
         kind: ToolKind::Read,
         scope: "notes",
@@ -259,9 +271,35 @@ fn schema_for(name: &str) -> Value {
             properties["id"] = json!({ "type": "string", "description": "Entity id, optionally prefixed with <workspaceId>/." });
             required.push("id");
         }
-        "list_notes" | "search_notes" | "list_tasks" | "task_board" | "list_dependencies"
-        | "critical_path" | "graph_query" | "context" | "daily_summary" | "list_folders"
-        | "list_tags" => {}
+        "list_notes" | "task_board" | "list_dependencies" | "critical_path" | "graph_query"
+        | "daily_summary" | "list_folders" | "list_tags" => {}
+        "context" => {
+            properties["query"] =
+                json!({ "type": "string", "description": "What to find context for." });
+            properties["limit"] = json!({ "type": "integer" });
+            properties["depth"] = json!({ "type": "integer" });
+            required.push("query");
+        }
+        "search_notes" | "search_all" => {
+            properties["query"] = json!({ "type": "string", "description": "Text to search for." });
+            properties["limit"] =
+                json!({ "type": "integer", "description": "Max results (default 20)." });
+            required.push("query");
+        }
+        "search_tasks" | "list_tasks" => {
+            if name == "search_tasks" {
+                properties["query"] =
+                    json!({ "type": "string", "description": "Text to search for." });
+                required.push("query");
+            }
+            properties["status"] = json!({ "type": "string" });
+            properties["priority"] = json!({ "type": "string" });
+            properties["folder"] = json!({ "type": "string" });
+            properties["dueBefore"] = json!({ "type": "string" });
+            properties["overdueOnly"] = json!({ "type": "boolean" });
+            properties["includeDone"] = json!({ "type": "boolean" });
+            properties["limit"] = json!({ "type": "integer" });
+        }
         "semantic_search" => {
             properties["query"] =
                 json!({ "type": "string", "description": "Text to search by meaning." });

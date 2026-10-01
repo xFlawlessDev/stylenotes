@@ -1,6 +1,6 @@
 # Tool reference
 
-All 32 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
+All 34 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
 are executed by the running app. `workspace` is optional on every tool that
 takes it and falls back to `workspace-default`.
 
@@ -89,8 +89,42 @@ Returns `{ ok, total, returned, indexOnly, notes[] }`. Bodies are `null` when
 | `workspace` | string | |
 | `limit` | number | default 20, max 200 |
 
-Case-insensitive substring over title, tags, excerpt and body. Ranking weights
-title above tags above body.
+Case-insensitive substring over title, tags, excerpt and body, ranked by weight
+(title 10, tags 5, excerpt 3, body 1). The same weights the Rust shim uses in
+`rank.rs` are mirrored in `search-rank.ts`, so every search tool agrees.
+
+### `search_tasks`
+
+Find a task by text instead of by id. Takes every `list_tasks` filter, so you
+can search a title and filter to an overdue, high-priority, open task in one call.
+
+| Argument | Type | Notes |
+|---|---|---|
+| `query` | string | **required**; matched against the title and the task's `notes` field |
+| `workspace`, `status`, `priority`, `folder` | string | exact match |
+| `dueBefore` | string | `YYYY-MM-DD`, strictly before |
+| `overdueOnly` | boolean | due before the user's local day and not `done` |
+| `includeDone` | boolean | default `true` |
+| `limit` | number | default 20, max 200 |
+
+Ranked title 10, notes 3. Returns `{ ok, query, tasks[] }` with each task in
+`list_tasks` shape.
+
+### `search_all`
+
+One ranked search across notes **and** tasks, for "where did I write about X"
+when it is unclear whether it is a note or a task.
+
+| Argument | Type | Notes |
+|---|---|---|
+| `query` | string | **required** |
+| `workspace` | string | |
+| `includeDone` | boolean | default `true` (applies to the task half) |
+| `limit` | number | default 20, max 200 — per kind |
+
+Returns `{ ok, query, indexOnly, notes[], tasks[] }`. The two lists are kept
+separate rather than interleaved: a task's `notes` mention and a note's title hit
+score on different scales, so a merged ordering would compare unlike numbers.
 
 ### `get_note`
 

@@ -226,7 +226,7 @@ pub(crate) fn render_bodies(snapshot: &Value) -> bool {
 /// An absent field reads as "the writer forgot"; `null` reads as "there is
 /// none here", which a client can pair with the note's `truncated` flag to
 /// tell a withheld body from one the user never wrote.
-fn null_body(item: &mut Value) {
+pub(crate) fn null_body(item: &mut Value) {
     if item.get("body").is_none() {
         item["body"] = Value::Null;
     }
@@ -237,91 +237,6 @@ pub(crate) fn matches_workspace(item: &Value, workspace: Option<&str>) -> bool {
         Some(workspace) => item.get("workspaceId").and_then(Value::as_str) == Some(workspace),
         None => true,
     }
-}
-
-// --- search_notes -----------------------------------------------------------
-
-pub fn search_notes(bridge: &Bridge, args: &Value) -> Value {
-    let Some(snapshot) = bridge.read_snapshot() else {
-        return fail(
-            "snapshot_unavailable",
-            "Snapshot unavailable; try again once the app settles.",
-        );
-    };
-    let Some(query) = string_arg(args, "query") else {
-        return fail("bad_arguments", "`query` is required.");
-    };
-    let needle = query.to_lowercase();
-    let workspace = workspace_arg(args);
-    let limit = limit_arg(args, "limit", 20, 200);
-    let body = render_bodies(&snapshot);
-
-    let mut hits: Vec<Value> = array_of(&snapshot, "notes")
-        .iter()
-        .filter(|note| matches_workspace(note, workspace.as_deref()))
-        .filter(|note| note_matches(note, &needle, body))
-        .take(limit)
-        .map(with_prefixed_id)
-        .map(|mut note| {
-            null_body(&mut note);
-            note
-        })
-        .collect();
-    hits.sort_by_key(|note| std::cmp::Reverse(score_note(note, &needle)));
-    ok(json!({
-        "ok": true,
-        "indexOnly": !body,
-        "query": query,
-        "notes": hits
-    }))
-}
-
-fn note_matches(note: &Value, needle: &str, body: bool) -> bool {
-    let title = note["title"].as_str().unwrap_or("").to_lowercase();
-    if title.contains(needle) {
-        return true;
-    }
-    let tags = note["tags"].as_array().cloned().unwrap_or_default();
-    if tags
-        .iter()
-        .any(|tag| tag.as_str().unwrap_or("").to_lowercase().contains(needle))
-    {
-        return true;
-    }
-    let excerpt = note["excerpt"].as_str().unwrap_or("").to_lowercase();
-    if excerpt.contains(needle) {
-        return true;
-    }
-    body && note["body"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase()
-        .contains(needle)
-}
-
-/// Title hits outrank tag hits, which outrank body hits.
-fn score_note(note: &Value, needle: &str) -> i64 {
-    let title = note["title"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase()
-        .matches(needle)
-        .count() as i64;
-    let tags: i64 = note["tags"]
-        .as_array()
-        .map(|tags| {
-            tags.iter()
-                .filter(|tag| tag.as_str().unwrap_or("").to_lowercase().contains(needle))
-                .count()
-        })
-        .unwrap_or(0) as i64;
-    let body = note["body"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase()
-        .matches(needle)
-        .count() as i64;
-    title * 10 + tags * 5 + body
 }
 
 // --- get_note ---------------------------------------------------------------
@@ -379,7 +294,7 @@ pub(crate) fn graph_node_id(kind: &str, item: &Value) -> String {
 }
 
 /// Incoming and outgoing wiki edges for a node, resolved to display refs.
-fn links_for(snapshot: &Value, node: &str) -> (Vec<Value>, Vec<Value>) {
+pub(crate) fn links_for(snapshot: &Value, node: &str) -> (Vec<Value>, Vec<Value>) {
     let node_index = snapshot
         .get("graph")
         .and_then(|graph| graph.get("nodes"))
@@ -419,92 +334,6 @@ fn links_for(snapshot: &Value, node: &str) -> (Vec<Value>, Vec<Value>) {
     (backlinks, outlinks)
 }
 
-// --- context ----------------------------------------------------------------
-
-/// "What do I know about X?": score notes for a query, then attach each hit's
-/// one-hop graph neighbourhood so the model can walk outward on its own.
-pub fn context(bridge: &Bridge, args: &Value) -> Value {
-    let Some(snapshot) = bridge.read_snapshot() else {
-        return fail(
-            "snapshot_unavailable",
-            "Snapshot unavailable; try again once the app settles.",
-        );
-    };
-    let Some(query) = string_arg(args, "query") else {
-        return fail("bad_arguments", "`query` is required.");
-    };
-    let workspace = workspace_arg(args);
-    let limit = limit_arg(args, "limit", 5, 25);
-    let depth = limit_arg(args, "depth", 1, 3);
-    let needle = query.to_lowercase();
-    let body = render_bodies(&snapshot);
-
-    let mut scored: Vec<(&Value, i64)> = array_of(&snapshot, "notes")
-        .iter()
-        .filter(|note| matches_workspace(note, workspace.as_deref()))
-        .filter_map(|note| {
-            let score = score_context(note, &needle, body);
-            (score > 0).then_some((note, score))
-        })
-        .collect();
-    scored.sort_by_key(|entry| std::cmp::Reverse(entry.1));
-
-    let hits: Vec<Value> = scored
-        .into_iter()
-        .take(limit)
-        .map(|(note, score)| {
-            let mut item = with_prefixed_id(note);
-            if !body {
-                item["body"] = Value::Null;
-            } else {
-                null_body(&mut item);
-            }
-            item["score"] = json!(score);
-            let node = graph_node_id("note", note);
-            let (backlinks, outlinks) = links_for(&snapshot, &node);
-            item["neighbours"] = json!({
-                "backlinks": backlinks,
-                "outlinks": outlinks,
-                "depth": depth
-            });
-            item
-        })
-        .collect();
-    ok(json!({
-        "ok": true,
-        "query": query,
-        "indexOnly": !body,
-        "notes": hits
-    }))
-}
-
-/// Weighted score over title (strong), tags (medium) and body (weak).
-fn score_context(note: &Value, needle: &str, body: bool) -> i64 {
-    let title = note["title"].as_str().unwrap_or("").to_lowercase();
-    let title_hits = if title.contains(needle) { 3 } else { 0 };
-    let tag_hits = note["tags"]
-        .as_array()
-        .map(|tags| {
-            tags.iter()
-                .filter(|tag| tag.as_str().unwrap_or("").to_lowercase().contains(needle))
-                .count()
-                .min(2)
-        })
-        .unwrap_or(0) as i64;
-    let body_hits = if body
-        && note["body"]
-            .as_str()
-            .unwrap_or("")
-            .to_lowercase()
-            .contains(needle)
-    {
-        1
-    } else {
-        0
-    };
-    title_hits * 4 + tag_hits * 2 + body_hits
-}
-
 /// Runs one read tool against the snapshot, so the stdio shim and the remote
 /// HTTP listener share a single implementation (#D2, #D3).
 ///
@@ -517,9 +346,11 @@ pub fn dispatch(name: &str, bridge: &Bridge, args: &Value, instance: &str) -> Va
     let workspace = workspace_arg(args);
     match name {
         "list_notes" => list_notes(bridge, args),
-        "search_notes" => search_notes(bridge, args),
+        "search_notes" => crate::search::search_notes(bridge, args),
+        "search_tasks" => crate::search::search_tasks(bridge, args),
+        "search_all" => crate::search::search_all(bridge, args),
         "get_note" => get_note(bridge, args, workspace.as_deref()),
-        "context" => context(bridge, args),
+        "context" => crate::search::context(bridge, args),
         "list_tasks" => crate::read_tasks::list_tasks(bridge, args),
         "get_task" => crate::read_tasks::get_task(bridge, args, workspace.as_deref()),
         "task_board" => crate::read_tasks::task_board(bridge, args),
@@ -601,13 +432,6 @@ mod tests {
             Resolved::One(item) => assert_eq!(item["workspaceId"], "two"),
             _ => panic!("expected prefix to disambiguate"),
         }
-    }
-
-    #[test]
-    fn search_ranks_title_above_body() {
-        let hot = json!({ "title": "arsitektur MCP", "tags": [], "excerpt": "", "body": "" });
-        let cold = json!({ "title": "lain", "tags": [], "excerpt": "", "body": "arsitektur" });
-        assert!(score_note(&hot, "arsitektur") > score_note(&cold, "arsitektur"));
     }
 
     /// The v3 split: `truncated` only says content was trimmed, `indexOnly`

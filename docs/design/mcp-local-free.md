@@ -377,7 +377,9 @@ mcp/
 | Tool | Implementasi (yang sudah ada, jangan tulis ulang) |
 |---|---|
 | `list_notes` | `notesRepo.list` → filter `workspaceId`/`folder`/`tag`/`pinned` |
-| `search_notes` | pencarian teks sederhana atas title/body/tag (substring, case-insensitive); **bukan** FTS — cukup untuk V1 |
+| `search_notes` | pencarian teks sederhana atas title/body/tag (substring, case-insensitive), **di-rank** dengan bobot title 10 > tags 5 > excerpt 3 > body 1; **bukan** FTS — cukup untuk V1 |
+| `search_tasks` | pencarian teks atas title + `notes` task, filter yang sama dengan `list_tasks`; bobot title 10 > notes 3 |
+| `search_all` | satu pencarian teks lintas note+task, dikembalikan sebagai dua daftar terpisah (skala skor antar jenis tidak dibandingkan langsung) |
 | `get_note` | snapshot + `parseWikiReferences` untuk `outlinks`, indeks terbalik untuk `backlinks` |
 | `context` | skor `term` atas title/excerpt/body (bobot title > tag > body) + 1-hop `graph_query` sebagai relasi |
 | `list_tasks` | filter + urut `sortTasks`/`sortOverlayTasks` (logika yang sudah ada) |

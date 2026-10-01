@@ -74,13 +74,42 @@ export const AI_TOOLS: AiToolSpec[] = [
 			}
 		}),
 	tool('search_notes', 'Search notes', 'notes', 'read',
-		'Substring search over note titles, tags and bodies.',
+		'Substring search over note titles, tags, excerpts and bodies, ranked so title hits beat body hits. Prefer this over search_all when you only need notes.',
 		{
 			type: 'object',
 			properties: {
 				query: { type: 'string', description: 'Text to search for.' },
 				workspace,
 				limit: { type: 'integer', description: 'Max notes to return (default 20).' }
+			},
+			required: ['query']
+		}),
+	tool('search_tasks', 'Search tasks', 'tasks', 'read',
+		'Substring search over task titles and their notes field, ranked, and combinable with every list_tasks filter. Use it to find tasks by text when you do not know the id.',
+		{
+			type: 'object',
+			properties: {
+				query: { type: 'string', description: 'Text to search for.' },
+				workspace,
+				status: { type: 'string', enum: ['todo', 'doing', 'review', 'done'] },
+				priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+				folder: { type: 'string' },
+				dueBefore: { type: 'string', description: 'YYYY-MM-DD; only tasks due strictly before this day.' },
+				overdueOnly: { type: 'boolean', description: 'Only tasks overdue as of the user’s local day.' },
+				includeDone: { type: 'boolean', description: 'Include done tasks (default true).' },
+				limit: { type: 'integer', description: 'Max tasks to return (default 20).' }
+			},
+			required: ['query']
+		}),
+	tool('search_all', 'Search everything', 'notes', 'read',
+		'One ranked text search across both notes and tasks, returned as two separate lists. Use it when the user asks "where did I write about X" without saying whether it is a note or a task.',
+		{
+			type: 'object',
+			properties: {
+				query: { type: 'string', description: 'Text to search for.' },
+				workspace,
+				includeDone: { type: 'boolean', description: 'Include done tasks (default true).' },
+				limit: { type: 'integer', description: 'Max results per kind (default 20).' }
 			},
 			required: ['query']
 		}),
@@ -147,6 +176,8 @@ export const AI_TOOLS: AiToolSpec[] = [
 				status: { type: 'string', enum: ['todo', 'doing', 'review', 'done'] },
 				priority: { type: 'string', enum: ['low', 'medium', 'high'] },
 				folder: { type: 'string' },
+				dueBefore: { type: 'string', description: 'YYYY-MM-DD; only tasks due strictly before this day.' },
+				overdueOnly: { type: 'boolean', description: 'Only tasks overdue as of the user’s local day.' },
 				includeDone: { type: 'boolean', description: 'Include done tasks (default true).' },
 				limit: { type: 'integer', description: 'Max tasks to return (default 50).' }
 			}

@@ -65,6 +65,67 @@ export function matchesQuery(note: McpSnapshotNote, query: string): boolean {
 	);
 }
 
+/** Substring search over a task's title and its own `notes` field. */
+export function matchesTaskQuery(task: McpSnapshotTask, query: string): boolean {
+	const needle = query.toLowerCase();
+	return (
+		task.title.toLowerCase().includes(needle) ||
+		task.notes.toLowerCase().includes(needle)
+	);
+}
+
+/** A task is overdue when its due date is strictly before the user's local day. */
+export function isOverdue(task: McpSnapshotTask, today: string): boolean {
+	if (task.status === 'done') return false;
+	if (!task.dueAt) return false;
+	// A snapshot without a usable day cannot judge overdue-ness; stay
+	// conservative rather than flag everything. Mirrors `is_overdue` in Rust.
+	return today.length >= 10 && task.dueAt < today;
+}
+
+/**
+ * The filter set shared by `list_tasks` and `search_tasks`. `includeDone`
+ * defaults to true; `overdueOnly` compares against the snapshot's own `today`.
+ */
+export type TaskFilters = {
+	workspace?: string;
+	status?: string;
+	priority?: string;
+	folder?: string;
+	dueBefore?: string;
+	overdueOnly?: boolean;
+	includeDone?: boolean;
+};
+
+export function filterTasks(
+	snapshot: McpSnapshot,
+	filters: TaskFilters
+): McpSnapshotTask[] {
+	const includeDone = filters.includeDone ?? true;
+	return tasksOf(snapshot, filters.workspace).filter(
+		(task) =>
+			(!filters.status || task.status === filters.status) &&
+			(!filters.priority || task.priority === filters.priority) &&
+			(!filters.folder || task.folder === filters.folder) &&
+			(includeDone || task.status !== 'done') &&
+			(!filters.dueBefore || (task.dueAt !== null && task.dueAt < filters.dueBefore)) &&
+			(!filters.overdueOnly || isOverdue(task, snapshot.today))
+	);
+}
+
+/** Reads the task filters off a raw tool-arguments record. */
+export function taskFiltersFrom(args: Record<string, unknown>): TaskFilters {
+	return {
+		workspace: str(args, 'workspace'),
+		status: str(args, 'status'),
+		priority: str(args, 'priority'),
+		folder: str(args, 'folder'),
+		dueBefore: str(args, 'dueBefore'),
+		overdueOnly: bool(args, 'overdueOnly'),
+		includeDone: bool(args, 'includeDone')
+	};
+}
+
 /**
  * Finds one item by bare id or prefixed ref. Ambiguous ids resolve to null so
  * the caller can explain rather than act on the wrong record.

@@ -26,6 +26,9 @@ mod bridge;
 #[path = "mcp/protocol.rs"]
 mod protocol;
 #[allow(dead_code)]
+#[path = "mcp/rank.rs"]
+mod rank;
+#[allow(dead_code)]
 #[path = "mcp/read.rs"]
 mod read;
 #[allow(dead_code)]
@@ -42,6 +45,9 @@ mod read_tasks;
 mod read_workspaces;
 #[path = "mcp/registry.rs"]
 mod registry;
+#[allow(dead_code)]
+#[path = "mcp/search.rs"]
+mod search;
 #[allow(dead_code)]
 #[path = "mcp/semantic.rs"]
 mod semantic;

@@ -59,6 +59,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 const ENTITY_LIST_TOOLS = new Set([
 	'list_notes',
 	'search_notes',
+	'search_tasks',
+	'search_all',
 	'semantic_search',
 	'related_notes',
 	'list_tasks',
