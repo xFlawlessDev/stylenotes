@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { emit } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { settingsRepo } from '$lib/db';
 import type { DockEdge } from '$lib/dock';
 import { localDay } from '$lib/content/mcp-snapshot';
@@ -131,12 +132,20 @@ export async function hydrateSettings() {
 
 export async function refreshSettings(): Promise<Settings> {
 	if (!browser) return settings;
+	// Capture before any await so a concurrent local change is still detected.
 	const startedAt = revision;
-	try {
-		const stored = await settingsRepo.load();
-		if (stored && startedAt === revision) Object.assign(settings, defaults, stored);
-	} catch {
-		/* keep the current settings when the database is unavailable */
+	// A pending debounced write is newer than the row, so reading now would
+	// resurrect the older value (and the timer would re-save it). Flush it so the
+	// database matches our state; if a change lands during the flush, skip the
+	// read entirely and keep the newer local state.
+	if (persistTimer) await flushSettings();
+	if (startedAt === revision) {
+		try {
+			const stored = await settingsRepo.load();
+			if (stored && startedAt === revision) Object.assign(settings, defaults, stored);
+		} catch {
+			/* keep the current settings when the database is unavailable */
+		}
 	}
 	hydrated = true;
 	if (startedAt === revision) applySettings();
@@ -149,10 +158,55 @@ export function persistSettings() {
 	if (!browser) return;
 	if (persistTimer) clearTimeout(persistTimer);
 	persistTimer = setTimeout(() => {
+		persistTimer = null;
 		void settingsRepo.save({ ...settings }).catch(() => {
 			/* ignore persistence failures */
 		});
 	}, 150);
+}
+
+/**
+ * Writes the current settings immediately, cancelling any pending debounce.
+ *
+ * Settings changes are debounced, so a change made just before the app quits
+ * (or a window hides) could still be sitting in the timer. Quit and lifecycle
+ * handlers call this so the last toggle is never lost.
+ */
+export async function flushSettings(): Promise<void> {
+	if (persistTimer) {
+		clearTimeout(persistTimer);
+		persistTimer = null;
+	}
+	if (!browser) return;
+	try {
+		await settingsRepo.save({ ...settings });
+	} catch {
+		/* ignore persistence failures */
+	}
+}
+
+/**
+ * Flushes pending settings when the window is hidden. The workspace-family
+ * windows are hidden (not closed) on close, and the app may be killed from the
+ * tray at any time, so hiding is the last reliable moment to persist.
+ */
+export function flushSettingsOnHide(): () => void {
+	if (!browser || !isTauri) return () => undefined;
+	const win = getCurrentWindow();
+	let disposed = false;
+	let cleanup: () => void = () => undefined;
+	void win
+		.onFocusChanged(({ payload: focused }) => {
+			if (!focused) void flushSettings();
+		})
+		.then((unlisten) => {
+			if (disposed) unlisten();
+			else cleanup = unlisten;
+		});
+	return () => {
+		disposed = true;
+		cleanup();
+	};
 }
 
 const PREPAINT_KEY = 'stylenotes.theme.v1';

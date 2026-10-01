@@ -19,6 +19,8 @@ import {
 	applySettings,
 	applySettingsSnapshot,
 	persistSettings,
+	flushSettings,
+	refreshSettings,
 	resetStoredSettings,
 	accents,
 } from '$lib/stores/settings.svelte';
@@ -203,5 +205,37 @@ describe('resetStoredSettings', () => {
 	it('clears the stored row', async () => {
 		await resetStoredSettings();
 		expect(settingsRepo.clear).toHaveBeenCalled();
+	});
+});
+
+describe('flushSettings', () => {
+	it('writes the current state immediately and cancels the debounce', async () => {
+		updateSettings({ mode: 'light' });
+		await flushSettings();
+		expect(settingsRepo.save).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(settingsRepo.save).mock.calls[0][0].mode).toBe('light');
+
+		// The debounced write must not fire a second time.
+		vi.advanceTimersByTime(200);
+		expect(settingsRepo.save).toHaveBeenCalledTimes(1);
+	});
+
+	it('still writes when nothing is pending', async () => {
+		await flushSettings();
+		expect(settingsRepo.save).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('refreshSettings race', () => {
+	it('flushes a pending write before reading, so it is not reverted', async () => {
+		updateSettings({ mode: 'light' });
+		vi.mocked(settingsRepo.load).mockResolvedValue({ mode: 'dark' });
+		await refreshSettings();
+		// The pending change reached the database first, so the read must not
+		// resurrect the older stored value...
+		expect(vi.mocked(settingsRepo.save).mock.calls[0][0].mode).toBe('light');
+		// ...and the debounced timer must not fire a second, stale write.
+		vi.advanceTimersByTime(200);
+		expect(settingsRepo.save).toHaveBeenCalledTimes(1);
 	});
 });

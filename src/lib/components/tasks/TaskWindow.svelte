@@ -320,7 +320,8 @@
 			})
 			.then((fn) => (disposed ? fn() : unlisteners.push(fn)));
 
-		// Flush before the tray's Quit exits, so the last edit is not lost.
+		// Flush before the app quits, so the last edit is not lost. Settings are
+		// flushed by the layout's own handler in this same window.
 		void registerQuitFlush(() => queue.flush()).then((fn) =>
 			disposed ? fn() : unlisteners.push(fn)
 		);

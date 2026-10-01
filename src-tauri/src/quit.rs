@@ -1,10 +1,11 @@
-//! Graceful shutdown: let the detail windows flush pending edits before exit.
+//! Graceful shutdown: let every window flush pending writes before exit.
 //!
-//! Note/task windows debounce their writes (see `save-queue.svelte.ts`), so at
-//! quit time a window can still hold an unsaved edit. The tray's Quit used to
+//! Note/task windows debounce their edits (`save-queue.svelte.ts`) and the
+//! workspace-family windows debounce settings (`settings.svelte.ts`), so at
+//! quit time a window can still hold an unsaved change. The tray's Quit used to
 //! call `app.exit(0)` immediately, which discarded it. Instead we ask every
-//! detail window to flush, wait for them to acknowledge, and only then exit —
-//! with a hard timeout so a wedged window cannot block the app forever.
+//! window to flush, wait for them to acknowledge, and only then exit — with a
+//! hard timeout so a wedged window cannot block the app forever.
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,7 +13,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-/// Sent to detail windows when the user asks to quit.
+/// Sent to every window when the user asks to quit.
 pub const QUIT_REQUESTED_EVENT: &str = "app:quit-requested";
 
 /// How long to wait for windows to flush before exiting anyway.
@@ -25,22 +26,18 @@ pub struct QuitState {
     quitting: AtomicBool,
 }
 
-/// Asks every open note/task window to flush, then exits.
+/// Asks every window to flush, then exits.
 ///
-/// Windows that are not detail windows (workspace, overlay, kanban) have no
-/// save queue, so they are not waited on.
+/// Every role carries something debounced: note/task windows a save queue, and
+/// the workspace/overlay/kanban windows a debounced settings write. Waiting for
+/// all of them is what keeps the last change from being lost on Quit.
 pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<QuitState>();
     if state.quitting.swap(true, Ordering::SeqCst) {
         return;
     }
 
-    let labels: Vec<String> = app
-        .webview_windows()
-        .keys()
-        .filter(|label| label.starts_with("note-") || label.starts_with("task-"))
-        .cloned()
-        .collect();
+    let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
 
     if labels.is_empty() {
         app.exit(0);
@@ -52,7 +49,7 @@ pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
         pending.extend(labels.iter().cloned());
     }
 
-    // Broadcast once; every detail window flushes and acks by label.
+    // Broadcast once; every window flushes and acks by label.
     let _ = app.emit(QUIT_REQUESTED_EVENT, ());
 
     // Safety net: exit even if an ack never arrives.

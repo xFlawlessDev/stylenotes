@@ -2,7 +2,12 @@
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
-	import { hydrateSettings } from '$lib/stores/settings.svelte';
+	import {
+		flushSettings,
+		flushSettingsOnHide,
+		hydrateSettings
+	} from '$lib/stores/settings.svelte';
+	import { registerQuitFlush } from '$lib/stores/quit-flush';
 	import { prewarmNoteRenderer } from '$lib/content/note-actions';
 	import { prewarmMermaid } from '$lib/content/mermaid-preview';
 	import {
@@ -19,6 +24,12 @@
 	onMount(() => {
 		void hydrateSettings();
 		void hydrateUiPlugins();
+		// Persist pending settings when this window loses focus (hides) and when
+		// the app quits: every window renders the layout, so every window keeps
+		// the single settings row current. Without this a toggle made just before
+		// a quick Quit would still be sitting in the debounce and be lost.
+		const stopHideFlush = flushSettingsOnHide();
+		void registerQuitFlush(() => flushSettings());
 
 		let idleId: number | undefined;
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -51,6 +62,7 @@
 		return () => {
 			disposed = true;
 			unlisten?.();
+			stopHideFlush();
 			if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
 			if (timeoutId !== undefined) clearTimeout(timeoutId);
 		};
