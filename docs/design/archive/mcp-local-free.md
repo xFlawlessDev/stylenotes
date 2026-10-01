@@ -4,9 +4,9 @@
 > Tanggal: 2026-09-27
 > Scope: **Local MCP (stdio) untuk user Free**, plus halaman Settings yang mengaturnya.
 > Dokumen terkait:
-> - `business-model.md` — **Local MCP = gratis (B5)**, remote MCP = Plus/Pro (§2). Dokumen bisnis adalah induk keputusan di sini.
-> - `cloud-sync-ai-mcp.md` — §9 sudah menetapkan "remote-only dulu"; dokumen ini **membalik urutan itu untuk Free** (§1 alasan).
-> - `collaboration.md` — tempat task/org/CRDT ke depan; memengaruhi scope write MCP (#D11).
+> - the business model — **Local MCP = gratis (B5)**, remote MCP = Plus/Pro (§2). Dokumen bisnis adalah induk keputusan di sini.
+> - the cloud sync design — §9 sudah menetapkan "remote-only dulu"; dokumen ini **membalik urutan itu untuk Free** (§1 alasan).
+> - the collaboration design — tempat task/org/CRDT ke depan; memengaruhi scope write MCP (#D11).
 
 ---
 
@@ -38,13 +38,13 @@ Dibaca dari `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src/lib/db/index.ts
 | 3 | **Multi-window menulis SQLite yang sama** (`workspace`, `overlay`, `kanban`, `note-*`, `task-*`). | Tulis MCP dari proses yang tidak menjaga guard in-memory (note window: `if (!queue.state.dirty)`, Workspace: `if (persistTimer) return`) berisiko **menimpa ketikan user yang belum ter-persist**. → aturan #D4. |
 | 4 | **Windows tidak pernah benar-benar tutup.** `hide_on_close` hanya menyembunyikan `workspace`/`overlay`/`kanban`; user menutup app lewat tray. Detail window (`note-*`/`task-*`) **`destroy()` saat ditutup** (`TaskWindow.svelte:247`). | 3 hal: (a) workspace selalu hidup → "tulis lewat app" selalu tersedia; (b) **tidak boleh** menargetkan window `task-*` sebagai eksekutor; (c) "app sedang jalan" adalah asumsi yang aman (#D5). |
 | 5 | **`notes.updated` adalah string display** (`"Just now"`), dan seed notes punya nilai aneh (mis. `'Baru saja'`); `tasks` punya `updated_at TEXT datetime('now')`, `overlay` (migrasi 5), `workspace_id` (migrasi 8). | Snapshot MCP (#D3) **tidak boleh menyajikan `notes.updated`** sebagai waktu. Pakai `notes.created_at` (satu-satunya TEXT datetime yang ada) — sampai Fase 0 sync (`updated_at INTEGER`) jadi (#Q6). |
-| 6 | **FK tidak di-enforce** oleh SQLite (`delete = hard delete`, tanpa tombstone; lihat `cloud-sync-ai-mcp.md` §1 #2). `tasksRepo.remove` sudah membersihkan `task_dependencies` + `task_notes` manual. | Perjalanan write wajib **melewati store**, kalau tidak akan lahir baris yatim (`task_notes`/`tags` yang menggantung). |
+| 6 | **FK tidak di-enforce** oleh SQLite (`delete = hard delete`, tanpa tombstone; lihat the cloud sync design §1 #2). `tasksRepo.remove` sudah membersihkan `task_dependencies` + `task_notes` manual. | Perjalanan write wajib **melewati store**, kalau tidak akan lahir baris yatim (`task_notes`/`tags` yang menggantung). |
 | 7 | **`body` adalah string bebas**, dibaca render/search/export/checklist/AI. Wiki link `[[...]]` di-parse `markdown-it` (`wiki-links.ts`), dan **`resolveWikiReference` hanya butuh `id/title/folder/workspaceId/body`**. | **Graph query bisa dilakukan tanpa eksekusi JS di dalam app** — cukup snapshot (#D3). Ini yang membuat fitur "monitor task / dependency / konteks" murah. |
 | 8 | `task_dependencies` punya **aturan first-class**: `canAddDependency` (tolak diri sendiri, lintas-workspace, dan **cycle**), `isTaskBlocked`, `taskBlockers`, `taskDependents`. | Operasi `link_tasks` **wajib** lewat `addDependency` di app. Cek cycle sendiri di Rust = duplikasi logika → drift. |
 | 9 | **Belum ada proses spawn apa pun** di Rust (`std::process` belum dipakai); `capabilities/default.json` hanya memuat permission window/fs/sql/plugin yang sudah ada. | Menambah binary + spawn **butuh** perubahan `Cargo.toml`, `tauri.conf.json` (`externalBin`) dan pemikiran ulang permission (#D12). Tidak ada permission `shell`/`process` di set sekarang. |
 | 10 | Repo memakai **Vitest** (`src/**/*.test.ts`) + `bun run check`/`clippy`/`fmt:check`; logika murni ditaruh di `src/lib/content/*` atau `src/lib/stores/*.ts` dengan unit test. | Logika baru (snapshot build, filter tool, validasi registry) harus **murni + teruji**, dan file kecil (≤300 LOC target, 500 hard cap). |
 | 11 | `ui_plugins` (migrasi 7) + `ui-plugins.svelte.ts` adalah **pola persis** yang dibutuhkan: tabel → repo (`boolean`) → store `.svelte.ts` (hydrate/refresh/save/notify lintas window) → komponen Settings. | Halaman MCP di Settings **tidak perlu pola baru**; cukup meniru jalur ui_plugins, dengan tambahan komponen `McpSettings.svelte` (#D10). |
-| 12 | `cloud-sync-ai-mcp.md` §9 menetapkan **"remote-only dulu, local stdio menyusul"**. | Dokumen ini **membalik urutan untuk Free** (§0 alasan), dan **mewajibkan** hasilnya di-fold balik ke §9 supaya dua dokumen tidak bertentangan (lihat roadmap §10). |
+| 12 | the cloud sync design §9 menetapkan **"remote-only dulu, local stdio menyusul"**. | Dokumen ini **membalik urutan untuk Free** (§0 alasan), dan **mewajibkan** hasilnya di-fold balik ke §9 supaya dua dokumen tidak bertentangan (lihat roadmap §10). |
 
 ---
 
@@ -285,7 +285,7 @@ Belum ada di `SettingsPanel.svelte`: tambah satu entri nav `{ id: 'mcp', label: 
 
 | | Local stdio MCP (Free) | Remote MCP (Plus/Pro) |
 |---|---|---|
-| Auth | **Tidak ada** — batas kepercayaan = proses lokal yang berhasil `spawn` | OAuth 2.1 (`cloud-sync-ai-mcp.md` #23) |
+| Auth | **Tidak ada** — batas kepercayaan = proses lokal yang berhasil `spawn` | OAuth 2.1 (the cloud sync design #23) |
 | Audience | user di mesinnya sendiri | dari device mana pun |
 
 Alasannya: siapa pun yang bisa menjalankan proses di mesin user **sudah bisa membaca file DB-nya langsung**. Menambahkan token tidak menambah keamanan apa pun; ia hanya menambah satu hal lagi yang bisa salah config untuk fitur gratis. Yang benar-benar melindungi user adalah **master switch** (#D7) + **default read-only** (#D6) + **audit** (#D7), bukan kredensial.
@@ -636,7 +636,7 @@ Ini yang membenarkan pemisahan §D3: **semua** pertanyaan yang user sebut ("moni
 
 ## 6. Temuan operasional: lokasi database
 
-`cloud-sync-ai-mcp.md` Fase 0 akan mengubah `stylenotes.db` menjadi target sync. Untuk MCP, path DB **hanya berguna sebagai jaring pengaman** (mode CLI saat app tertutup — #Q5). Meski begitu, temuan #1 (temuan §1) harus diselesaikan lebih dulu:
+the cloud sync design Fase 0 akan mengubah `stylenotes.db` menjadi target sync. Untuk MCP, path DB **hanya berguna sebagai jaring pengaman** (mode CLI saat app tertutup — #Q5). Meski begitu, temuan #1 (temuan §1) harus diselesaikan lebih dulu:
 
 - **Sekarang:** URL relatif `sqlite:stylenotes.db` di 3 tempat. Path fisik ditentukan internal `tauri-plugin-sql` → **tidak diketahui kode kita** dan tidak boleh ditebak.
 - **Yang dibutuhkan:** `dbPath` absolut yang ditulis ke `app-info.json` saat startup.
@@ -685,22 +685,22 @@ Setiap tahap bisa dirilis sendiri, dan **M1 sudah berguna** tanpa satu pun jalur
 
 | Hal | Kenapa bukan di dokumen ini |
 |---|---|
-| Remote MCP (Streamable HTTP, OAuth 2.1) | Plus/Pro — `cloud-sync-ai-mcp.md` §9, #23 |
-| Tools AI (summarize/RAG/rewrite) | Butuh server + kuota; Free = 0 AI (`business-model.md` §3) |
+| Remote MCP (Streamable HTTP, OAuth 2.1) | Plus/Pro — the cloud sync design §9, #23 |
+| Tools AI (summarize/RAG/rewrite) | Butuh server + kuota; Free = 0 AI (the business model §3) |
 | MCP **server** yang dilayani StyleNotes | Bukan permintaan; arah di sini adalah StyleNotes sebagai **client-facing** provider untuk agent user |
-| Scope `org_id` / CRDT | `collaboration.md`; memengaruhi **isi** tool nanti (#D11), bukan transport |
+| Scope `org_id` / CRDT | the collaboration design; memengaruhi **isi** tool nanti (#D11), bukan transport |
 | Auto-update & signing binary | Menyusul; V1 mengandalkan update aplikasi |
 
 ---
 
 ## 10. Yang harus di-fold balik ke dokumen lain
 
-1. **`cloud-sync-ai-mcp.md` §9** — pernyataan "local stdio menyusul; remote-only dulu" harus direvisi: **local stdio untuk Free dikerjakan lebih dulu** karena nol biaya server dan menyelesaikan kebutuhan Free (#D1). Tambahkan rujukan ke dokumen ini.
-2. **`business-model.md` §2** — baris "Local MCP (stdio) ✅ Free" tetap benar; tambahkan catatan bahwa **semua tool write lokal = gratis untuk user Free** (sejalan B5 dan B9), sehingga Free juga bisa mengubah task lewat agent — selaras dengan "yang dijual adalah kapasitas & koordinasi".
-3. **`cloud-sync-ai-mcp.md` §13** — tambahkan butir: *path DB absolut harus ditetapkan sebagai bagian Fase 0* (temuan §6 dokumen ini), karena MCP dan export sama-sama membutuhkannya.
+1. **the cloud sync design §9** — pernyataan "local stdio menyusul; remote-only dulu" harus direvisi: **local stdio untuk Free dikerjakan lebih dulu** karena nol biaya server dan menyelesaikan kebutuhan Free (#D1). Tambahkan rujukan ke dokumen ini.
+2. **the business model §2** — baris "Local MCP (stdio) ✅ Free" tetap benar; tambahkan catatan bahwa **semua tool write lokal = gratis untuk user Free** (sejalan B5 dan B9), sehingga Free juga bisa mengubah task lewat agent — selaras dengan "yang dijual adalah kapasitas & koordinasi".
+3. **the cloud sync design §13** — tambahkan butir: *path DB absolut harus ditetapkan sebagai bagian Fase 0* (temuan §6 dokumen ini), karena MCP dan export sama-sama membutuhkannya.
 4. **`AGENTS.md`** — saat M1 masuk: catat crate `stylenotes-mcp`, `externalBin`, dan bahwa halaman MCP ada di Settings. Jangan sampai `app-info.json`/`snapshot.json`/`backups/` dianggap "app data" dan ikut di-commit.
-5. **`cloud-sync-ai-mcp.md` §3.1 / §11 Fase 0** — **wajib (#D13):** kolom `notes.updated_at` (INTEGER) **sudah ditambahkan lebih dulu** oleh pekerjaan MCP. Fase 0 tidak boleh meng-`ALTER` kolom itu lagi — cukup backfill bila perlu — atau migrasi akan gagal dengan duplicate column dan app tidak bisa start.
-6. **`cloud-sync-ai-mcp.md` §9, bagian Tools** — daftar tool di sana masih versi remote-only (`search_notes`, `get_note`, `list_tasks`, `daily_summary`, `create_note`, `create_task`, `complete_task`). Setelah ini, **registry MCP menjadi satu sumber**: tools lokal (#D9) dan remote memakai nama yang sama, hanya scope & data source yang berbeda. Tambahkan catatan itu supaya remote tidak lahir sebagai registry kedua.
+5. **the cloud sync design §3.1 / §11 Fase 0** — **wajib (#D13):** kolom `notes.updated_at` (INTEGER) **sudah ditambahkan lebih dulu** oleh pekerjaan MCP. Fase 0 tidak boleh meng-`ALTER` kolom itu lagi — cukup backfill bila perlu — atau migrasi akan gagal dengan duplicate column dan app tidak bisa start.
+6. **the cloud sync design §9, bagian Tools** — daftar tool di sana masih versi remote-only (`search_notes`, `get_note`, `list_tasks`, `daily_summary`, `create_note`, `create_task`, `complete_task`). Setelah ini, **registry MCP menjadi satu sumber**: tools lokal (#D9) dan remote memakai nama yang sama, hanya scope & data source yang berbeda. Tambahkan catatan itu supaya remote tidak lahir sebagai registry kedua.
 
 ---
 
@@ -725,7 +725,7 @@ Tiga jawaban (§11) memilih opsi yang **berbeda dari rekomendasi**. Ketiganya bo
 
 ### 13a. `update_note_body` + `delete_note` di V1 (#D16)
 
-Risiko yang diterima: body note adalah tulisan user, dan delete di StyleNotes **hard delete tanpa tombstone** (`cloud-sync-ai-mcp.md` §1 #2) — tidak ada undo. Mitigasi yang **wajib** ikut V1:
+Risiko yang diterima: body note adalah tulisan user, dan delete di StyleNotes **hard delete tanpa tombstone** (the cloud sync design §1 #2) — tidak ada undo. Mitigasi yang **wajib** ikut V1:
 
 1. **Hanya di mode `write`** dengan scope `notes` aktif. `delete_note` **wajib** `confirm: true` — tanpa itu, tolak, karena model bahasa bisa memanggil tool destruktif tanpa maksud destruktif.
 2. **Tolak saat ada edit lokal yang belum ter-persist** (guard #D4). Tanpa ini, agent akan menimpa kalimat yang user baru ketik di note window.
@@ -733,7 +733,7 @@ Risiko yang diterima: body note adalah tulisan user, dan delete di StyleNotes **
 4. **Tampilkan di audit** dengan `beforeChars`/`afterChars`, bukan hanya nama tool.
 5. **Tegaskan di dialog izin** bahwa membuka scope `notes` berarti agent bisa mengubah dan menghapus isi note.
 
-> Catatan lintas dokumen: saat Pro masuk, `notes.body` menjadi turunan `Y.Doc` (`business-model.md` §5). `update_note_body` adalah satu-satunya tool yang **harus ditulis ulang** untuk jalur CRDT — jangan bagun logika body yang diasumsikan permanen. Body adalah teks bebas, jadi jangan percaya asumsi "body selalu markdown valid".
+> Catatan lintas dokumen: saat Pro masuk, `notes.body` menjadi turunan `Y.Doc` (the business model §5). `update_note_body` adalah satu-satunya tool yang **harus ditulis ulang** untuk jalur CRDT — jangan bagun logika body yang diasumsikan permanen. Body adalah teks bebas, jadi jangan percaya asumsi "body selalu markdown valid".
 
 ### 13b. Baca & tulis lintas workspace (#D4)
 
@@ -750,7 +750,7 @@ Ini keputusan dengan biaya implementasi paling besar dari kedelapan jawaban, kar
 
 Menambah kolom ini di luar Fase 0 sync berarti **Fase 0 dan MCP menyentuh tabel `notes` yang sama**, dengan urutan yang tidak dijamin. Aturan yang mengikat:
 
-1. **`ALTER TABLE notes ADD COLUMN updated_at INTEGER`** — nullable, di-backfill `strftime('%s', created_at) * 1000` (sama seperti rencana Fase 0 di `cloud-sync-ai-mcp.md` §3.1).
+1. **`ALTER TABLE notes ADD COLUMN updated_at INTEGER`** — nullable, di-backfill `strftime('%s', created_at) * 1000` (sama seperti rencana Fase 0 di the cloud sync design §3.1).
 2. **Satu kolom, satu penulis.** `notesRepo.upsert` dan `replaceAll` harus menulis `updated_at` di setiap operasi — kalau tidak, nilai itu hanya berubah saat migrasi dan sorting "baru diubah" langsung bohong.
 3. **Fase 0 sync WAJIB menganggap kolom ini sudah ada** dan **tidak** meng-`ALTER` lagi. Ini harus masuk daftar revisi dokumen sync (§10 butir 3), karena `ALTER TABLE ADD COLUMN` yang terduplikasi = migrasi gagal = app tidak start.
 4. Kolom display lama `notes.updated` (`"Just now"`, `"Baru saja"`) **tetap** dipakai UI sampai ada pekerjaan terpisah menggantinya dengan derivasi dari `updated_at`. Snapshot MCP **tidak** memakai kolom display itu.

@@ -11,10 +11,9 @@ Desain di folder ini **sudah diimplementasikan** dan diarsipkan dari `docs/desig
 | `constella-features.md` | Semantic memory, auto-link, clustering, contradiction, remote MCP, import markdown | migrasi 19–21, `src-tauri/src/{embed,remote_mcp}/`, `content/{semantic,clusters,contradictions,embeddings,markdown-import}.ts`, `stores/memory.svelte.ts` |
 | `auto-save-versioning.md` | Auto-save hardening + note/task versioning | pragmas di `db/connection.ts`, `save-queue` `minGap`, `db_tx.rs`, `quit.rs`, migrasi 15, `stores/versioning.ts`, `RecordHistoryDialog.svelte` |
 
-Desain yang **belum** diimplementasikan tetap di `docs/design/`: `mobile.md`,
-`ui-extensions.md`, dan `repo-split.md` (meta).
+Desain yang **belum** diimplementasikan tetap di `docs/design/`: `mobile.md` dan
+`ui-extensions.md`.
 
-Dokumen **cloud** (`cloud-sync-ai-mcp.md`, `collaboration.md`, `business-model.md`)
-tidak ada di sini — ia tinggal di repo privat `stylenotes-cloud`. Dokumen publik
-yang menyebutnya memakai nama berkas telanjang, tanpa path; lihat `repo-split.md`
-§6 "Konvensi referensi ke dokumen privat".
+Dokumen desain untuk **layanan cloud** (sync, kolaborasi, model bisnis) dikelola
+bersama layanan itu, di luar repo ini. Dokumentasi publik menyebutnya lewat
+deskripsi (mis. "the cloud sync design §4"), bukan lewat nama berkas atau tautan.

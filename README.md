@@ -11,7 +11,7 @@ StyleNotes is **open core**: this repository is the full, free desktop app. Clou
 | The app (`src/`, `src-tauri/`) | [AGPL-3.0-only](LICENSE) |
 | The shared protocol (`packages/shared/`) | [MIT](packages/shared/LICENSE) |
 
-`packages/shared` is the sync contract (types, Hybrid Logical Clock, entitlements) shared with the cloud service. It is deliberately framework-free so third parties can build their own client or server against the same protocol. See `docs/design/repo-split.md`.
+`packages/shared` is the sync contract (types, Hybrid Logical Clock, entitlements) shared with the cloud service. It is deliberately framework-free so third parties can build their own client or server against the same protocol.
 
 Contributions are welcome under the CLA described in [CONTRIBUTING.md](CONTRIBUTING.md).
 

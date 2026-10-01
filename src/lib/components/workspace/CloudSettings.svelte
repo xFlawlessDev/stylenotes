@@ -11,7 +11,7 @@
 	} from '$lib/stores/cloud.svelte';
 
 	/**
-	 * Cloud settings (cloud-sync-ai-mcp.md). The cloud is off until a
+	 * Cloud settings (cloud sync design). The cloud is off until a
 	 * server URL is set, so by default the app looks (and is) fully offline. The
 	 * business logic lives behind the server; this page only configures the seam.
 	 */

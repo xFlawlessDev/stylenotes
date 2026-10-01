@@ -3,7 +3,7 @@
 > Status: **Diimplementasikan & diarsipkan** (Phase A + Phase B selesai; lihat §7).
 > Tanggal: 2026-09-28 (status diperbarui 2026-10-01)
 > Scope: memperkuat jalur auto-save yang sudah ada (`save-queue.svelte.ts`) dan menambahkan riwayat versi lokal untuk note & task.
-> Terkait: `cloud-sync-ai-mcp.md` (Fase 0 sync readiness), `collaboration.md` (CRDT `Y.Text`, keputusan C13), `docs/design/archive/mcp-local-free.md` (#D13 `notes.updated_at`, #13a backup body).
+> Terkait: the cloud sync design (Fase 0 sync readiness), the collaboration design (CRDT `Y.Text`, keputusan C13), `docs/design/archive/mcp-local-free.md` (#D13 `notes.updated_at`, #13a backup body).
 
 Dokumen ini adalah kelanjutan dari review arsitektur. Urutannya sengaja: **Phase A (prasyarat) harus selesai sebelum Phase B**, karena menulis versi di atas SQLite yang belum WAL dan masih rawan `SQLITE_BUSY` hanya memperburuk masalah.
 
@@ -39,8 +39,8 @@ Ringkasan keputusan ada di §6; hal yang butuh keputusan user ada di §7.
 - Skema versi **kompatibel** dengan roadmap sync/CRDT (tidak dibuang saat Fase 2b).
 
 **Non-tujuan**
-- Multi-device sync / konflik antar-device (itu `cloud-sync-ai-mcp.md` Fase 2a, LWW/HLC).
-- Real-time collaborative merge (itu `collaboration.md` Fase 2b, Yjs).
+- Multi-device sync / konflik antar-device (itu the cloud sync design Fase 2a, LWW/HLC).
+- Real-time collaborative merge (itu the collaboration design Fase 2b, Yjs).
 - Versioning untuk `folders`, `settings`, `kanbanBoards` (di luar scope; hanya note & task).
 - Cloud backup / server apa pun.
 

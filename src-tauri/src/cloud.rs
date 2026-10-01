@@ -1,7 +1,7 @@
 //! The cloud session token, held in the **OS credential store** — Windows
 //! Credential Manager, macOS Keychain, or Secret Service on Linux.
 //!
-//! Why not SQLite or `localStorage` (`cloud-sync-ai-mcp.md` #4):
+//! Why not SQLite or `localStorage` (cloud sync design #4):
 //! the session token is an opaque bearer credential, so a leak is full access
 //! until revocation. It is small, device-local and secret — exactly what a
 //! keychain is for. Everything else cloud-related (server URL, account, plan)

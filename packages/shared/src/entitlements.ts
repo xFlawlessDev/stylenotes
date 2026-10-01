@@ -1,5 +1,5 @@
 /**
- * Entitlements — the tier limits as *data* (`business-model.md` B6, §6b).
+ * Entitlements — the tier limits as *data* (business model B6, §6b).
  *
  * "Limits are data, not `if`s scattered through the code": the server is the
  * source of truth and returns the user's effective entitlements; the client

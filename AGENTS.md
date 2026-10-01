@@ -2,15 +2,15 @@
 
 StyleNotes: Tauri v2 + SvelteKit (Svelte 5) + TypeScript desktop note app. Rust backend in `src-tauri`, frontend in `src`. Package manager is **bun** (not npm/pnpm).
 
-## Open core: two repos
+## Open core
 
-This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared`). The paid cloud (sync, AI gateway, remote MCP, billing) is a **separate private repo** (`stylenotes-cloud`) and must never be imported here. One desktop build is shipped; it is **cloud-ready** but offline by default — see `docs/design/repo-split.md`.
+This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared`). The paid cloud (sync, AI gateway, remote MCP, billing) is a **separate, private service**: it is not in this repo and must never be imported here. One desktop build is shipped; it is **cloud-ready** but offline by default.
 
 - `packages/shared` (`@stylenotes/shared`) is the contract shared with the cloud: HLC, sync envelope, wire DTOs, entitlements. It is built into `src/` as a nested workspace package. **It must never import `$lib`, `$app/*`, or `@tauri-apps/*`** — it is framework-free so the cloud can use it.
 - The client seam is `content/cloud-types.ts` + `content/cloud-client.ts` (the only HTTP caller) + `db/cloud.ts` + `stores/cloud.svelte.ts` + `workspace/CloudSettings.svelte`. Cloud is `disabled` until a server URL is set; entitlements default to the most restricted set.
 - Enforcement is **server-side**; the client only reads entitlements to show/hide UI.
 - `bun run check:all` also typechecks `packages/shared`; Vitest covers `packages/**`.
-- Some design docs are **private** and live in the `stylenotes-cloud` repo: `cloud-sync-ai-mcp.md`, `collaboration.md`, `business-model.md`. Public docs (and code comments) refer to them by **bare filename** — a marker, not a link. See `docs/design/repo-split.md` §6.
+- The cloud's own design docs live with the cloud service, not here. When a comment needs to point at one, cite the **section or decision id** (e.g. "cloud sync design §4") — the doc itself is not in this repo.
 
 ## Commands
 
@@ -58,7 +58,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 
 ## AI assistant (BYOK, device-local)
 
-- **Free tier is bring-your-own-key.** The user configures an OpenAI-compatible or Anthropic endpoint in `Settings → AI`; there is no server in this repo. `cloud-sync-ai-mcp.md` §8 describes the future hosted gateway; the client provider contract is designed so it can move behind that gateway without UI changes.
+- **Free tier is bring-your-own-key.** The user configures an OpenAI-compatible or Anthropic endpoint in `Settings → AI`; there is no server in this repo. A hosted gateway (cloud sync design §8) may sit in front of it later; the client provider contract is designed so it can move behind that gateway without UI changes.
 - **Rust owns crypto + network; the frontend owns persistence.** `src-tauri/src/ai/` holds the provider stack (ported from the `alnair-router` gateway), the AES-256-GCM cipher, and the commands. The key is encrypted at rest in `ai_settings.api_key` (`enc:v1:` marker); the cipher key lives in `app_data_dir()/ai/secrets.key` and is created on first use. The key crosses IPC as plaintext only for the duration of a request.
 - **Commands:** `ai_encrypt_key`, `ai_decrypt_key`, `ai_test_connection`, `ai_stream` (streams tokens over a Tauri `Channel`). All registered in `generate_handler!`.
 - **Frontend pieces:** store `src/lib/stores/ai.svelte.ts`, repo `src/lib/db/ai.ts`, contract `src/lib/content/ai-types.ts`, pure UI logic `src/lib/content/ai-assistant.ts`. Settings UI is `AiSettings.svelte`; the editor popover is `note/AiAssistantPopover.svelte` (via `note/AiEditorAssist.svelte`); the docked chat is `workspace/AiChatPanel.svelte`.

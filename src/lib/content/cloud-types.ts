@@ -1,5 +1,5 @@
 /**
- * Cloud client contract (`cloud-sync-ai-mcp.md`).
+ * Cloud client contract (cloud sync design).
  *
  * This is the *seam* between the OSS desktop app and the closed-source cloud
  * service. The app ships the client and the empty default; the business logic

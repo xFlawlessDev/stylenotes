@@ -34,8 +34,8 @@ Security-sensitive areas worth a look:
 - **Attachments** (`src-tauri/src/attachments/`): path handling and extension
   normalisation.
 
-The **cloud service** is a separate, private repository; report issues in it to
-the maintainers as well.
+The **cloud service** is operated separately; report issues in it to the
+maintainers as well.
 
 ## Please do not
 

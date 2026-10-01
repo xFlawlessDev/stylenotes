@@ -4,14 +4,10 @@
 > Tanggal: 2026-09-29
 > Scope: bagaimana StyleNotes mendapat **mobile app** (Android + iOS) tanpa mem-fork logika inti.
 > Dokumen terkait:
-> - `cloud-sync-ai-mcp.md` — sync delta, auth, AI, MCP (#1–#27). Fase 6 dokumen itu ("Mobile / web — pakai `shared/` yang sama") **direvisi di sini menjadi lebih konkret** (§8).
-> - `collaboration.md` — org/permission/CRDT (#C1–#C16). Menentukan apakah mobile ikut mode CRDT.
+> - the cloud sync design — sync delta, auth, AI, MCP (#1–#27). Fase 6 dokumen itu ("Mobile / web — pakai `shared/` yang sama") **direvisi di sini menjadi lebih konkret** (§8). Dikelola bersama layanan cloud.
+> - the collaboration design — org/permission/CRDT (#C1–#C16). Menentukan apakah mobile ikut mode CRDT. Dikelola bersama layanan cloud.
 > - `docs/design/archive/mcp-local-free.md` — local MCP (#D1–#D16). **Tidak ikut ke mobile** (#M7).
-> - `business-model.md` — open core, Plus/Pro (#B1–#B13). Menentukan tier fitur mobile.
->
-> (`cloud-sync-ai-mcp.md`, `collaboration.md`, dan `business-model.md` adalah
-> dokumen di repo **privat** `stylenotes-cloud`; nama berkasnya dipakai sebagai
-> penanda, bukan tautan.)
+> - the business model — open core, Plus/Pro (#B1–#B13). Menentukan tier fitur mobile. Dikelola bersama layanan cloud.
 
 ---
 
@@ -34,7 +30,7 @@ Prinsip pembentuk desain:
 
 Konsekuensi:
 
-1. **Monorepo bertahap.** `content/` + `db/` + `i18n/` + `shared/` (rencana sync) + `api/` masuk ke `packages/*`. `src/` **tidak dipindah dulu** — memindahkannya menambah risiko tanpa manfaat selagi hanya ada satu app (merevisi `cloud-sync-ai-mcp.md` §10). Lihat #M2.
+1. **Monorepo bertahap.** `content/` + `db/` + `i18n/` + `shared/` (rencana sync) + `api/` masuk ke `packages/*`. `src/` **tidak dipindah dulu** — memindahkannya menambah risiko tanpa manfaat selagi hanya ada satu app (merevisi the cloud sync design §10). Lihat #M2.
 2. **Mobile adalah app kedua yang tipis.** Fase pertama hanya notes + editor + tasks list. Kanban/graph/gantt/overlay **tidak** ikut MVP (#M6).
 3. **Mobile butuh sync lebih dulu.** Tanpa sync, mobile adalah pulau data. Urutannya: Fase 0 sync readiness → Fase 2 sync engine → **baru** Fase 6 mobile (#M5).
 
@@ -42,7 +38,7 @@ Konsekuensi:
 
 ## 1. Kondisi saat ini (temuan yang menentukan desain)
 
-Dibaca dari `src/lib/**`, `src-tauri/tauri.conf.json`, `package.json`, `vite.config.js`, serta `cloud-sync-ai-mcp.md` §10–§13 dan `mcp-local-free.md`.
+Dibaca dari `src/lib/**`, `src-tauri/tauri.conf.json`, `package.json`, `vite.config.js`, serta the cloud sync design §10–§13 dan `mcp-local-free.md`.
 
 | # | Temuan (terverifikasi) | Implikasi ke mobile |
 |---|---|---|
@@ -116,7 +112,7 @@ desktop (src/) ──► semua packages (alias `$lib/...` dipertahankan sementar
 | `db/*` repo + **definisi migrasi SQL** | Skema harus **identik** antar platform atau sync rusak (#M8) |
 | `i18n/locales/**`, `catalog.ts`, `format.ts` | Murni; `en` tetap schema, `id` tetap typed |
 | `components/base/**` + token `layout.css` | Primitif presentational; satu-satunya sumber tombol/input |
-| `shared/*` (protokol sync, HLC, TypeBox) | Sudah dirancang lintas platform (`cloud-sync-ai-mcp.md` #5) |
+| `shared/*` (protokol sync, HLC, TypeBox) | Sudah dirancang lintas platform (the cloud sync design #5) |
 | Tipe domain `Note`/`Task`/`TaskDependency`/`CustomFolder`/`Workspace`/`AppNotification` | Sekarang tersebar di `stores/*`; dipindah ke `core/domain/` (#M3) |
 | Fungsi murni `stores/notes.ts` & `stores/tasks.ts` (tanpa rune/emit) | `canAddDependency`, `isTaskBlocked`, normalisasi, `taskNoteIds` |
 
@@ -159,7 +155,7 @@ desktop (src/) ──► semua packages (alias `$lib/...` dipertahankan sementar
 | # | Topik | Keputusan | Implikasi |
 |---|---|---|---|
 | **M1** | **Teknologi shell mobile** | **Tauri v2 mobile (WebView)**, bukan native UI dan bukan React Native | Satu-satunya pilihan yang membuat `content/` (markdown+mermaid+shiki+DOM) tetap bernilai. Konsekuensi: perf scroll harus dijaga |
-| **M2** | **Struktur repo** | **Bertahap**: tambah `packages/*` sekarang; `src/` tetap di root; `apps/mobile/` menyusul. Pindah `src/`→`apps/desktop` **ditunda** sampai app kedua hidup | Merevisi `cloud-sync-ai-mcp.md` §10: opsi `apps/*` yang dulu ditolak, kini **diterima sebagian dan ditunda** (§8) |
+| **M2** | **Struktur repo** | **Bertahap**: tambah `packages/*` sekarang; `src/` tetap di root; `apps/mobile/` menyusul. Pindah `src/`→`apps/desktop` **ditunda** sampai app kedua hidup | Merevisi the cloud sync design §10: opsi `apps/*` yang dulu ditolak, kini **diterima sebagian dan ditunda** (§8) |
 | **M3** | **Isi `packages/core`** | `src/lib/content/**` dipindah apa adanya **plus** tipe domain dari `stores/notes` & `stores/tasks`; refactor impor `workspace-graph.ts` | Satu-satunya refactor wajib. Tanpa ini `core` akan mengimpor store dan menyeret rune+tauri |
 | **M4** | **Satu `src` atau dua shell** | **Dua shell.** Share lewat packages, bukan lewat `if (mobile)` | Menolak "responsive single codebase": 125 guard akan jadi percabangan permanen |
 | **M5** | **Urutan** | **Sync dulu, mobile kemudian.** Mobile = **Fase 6**, tidak mulai sebelum Fase 0 & 2 sync selesai | Mobile tanpa sync = pulau; juga mencegah skema lokal kedua lahir sebelum `updated_at INTEGER`/tombstone stabil |
@@ -168,10 +164,10 @@ desktop (src/) ──► semua packages (alias `$lib/...` dipertahankan sementar
 | **M8** | **DB & migrasi mobile** | **Skema identik** desktop; definisi migrasi sebagai data di `packages/db`, dijalankan tiap platform | Kalau skema bercabang, sync rusak senyap. Alasan `db/` masuk packages lebih awal |
 | **M9** | **Quality gate** | `check:all` diperluas: typecheck `packages/*` + `apps/mobile`; Vitest mencakup `packages/**/*.test.ts`. Cap 300/500 berlaku untuk `apps/mobile` | Tanpa ini paket bersama jadi tempat sampah tak teruji |
 | **M10** | **UI mobile** | `packages/ui` hanya primitif; **layout** mobile ditulis di `apps/mobile` | Mencegah `packages/ui` tumbuh jadi komponen desktop yang di-`if`-kan |
-| **M11** | **Auth mobile** | Callback loopback/deep-link versi mobile (bukan jalur desktop); token di **secure storage OS** | `cloud-sync-ai-mcp.md` #4 & §13 **diterapkan ulang**, bukan di-copy |
+| **M11** | **Auth mobile** | Callback loopback/deep-link versi mobile (bukan jalur desktop); token di **secure storage OS** | the cloud sync design #4 & §13 **diterapkan ulang**, bukan di-copy |
 | **M12** | **Boundary paket** | Prefix `@stylenotes/*`; larangan impor `$lib`/`$app`/`@tauri-apps` kecuali `packages/db` | Satu aturan yang menjaga batas tetap nyata |
 | **M13** | **Store mobile** | **Core + host + thunk** (pilihan a). Fungsi murni dipindah ke `packages/core/state/` dalam bentuk **thunk** (`(id, value, ctx) => state`) yang **mengembalikan state berikutnya + daftar efek**; efek (`write`, `emit`, `notify`, `refresh`) dieksekusi shell platform | Menolak (b): `canAddDependency`, `isTaskBlocked`, normalisasi note-id, rollback, coalescing `save-queue` akan ter-duplikasi di dua app. Menolak (c): `emit`/`listen`/`getCurrentWindow` tidak ada di mobile, memaksa percabangan di store |
-| **M14** | **Sync engine** | **Satu engine TS di `packages/sync`**, dipakai desktop & mobile (pilihan a). **Window `sync` tersembunyi dihapus** → merevisi `cloud-sync-ai-mcp.md` #3 | Engine yang sama = satu perilaku konflik. Pembungkus host dipisah: desktop menjalankannya di window `workspace` (yang sudah selalu hidup), mobile di app foreground. **Tidak** memakai background task Rust (pilihan b) — mengunci logika sync ke Rust berarti jalur logika ganda. Menolak (c) karena itu bukan alternatif dari (a)/(b), melainkan kebijakan penjadwalan yang dipakai di kedua platform |
+| **M14** | **Sync engine** | **Satu engine TS di `packages/sync`**, dipakai desktop & mobile (pilihan a). **Window `sync` tersembunyi dihapus** → merevisi the cloud sync design #3 | Engine yang sama = satu perilaku konflik. Pembungkus host dipisah: desktop menjalankannya di window `workspace` (yang sudah selalu hidup), mobile di app foreground. **Tidak** memakai background task Rust (pilihan b) — mengunci logika sync ke Rust berarti jalur logika ganda. Menolak (c) karena itu bukan alternatif dari (a)/(b), melainkan kebijakan penjadwalan yang dipakai di kedua platform |
 | **M15** | **AI di mobile** | **Ya, penuh di v1** (chat + read tools + write tools dengan grant). Grant di mobile adalah **Allow/Decline inline per write**, sama seperti desktop (tidak ada halaman Settings yang setara di MVP) | `src-tauri/src/ai/` + `web.rs` ikut ke target mobile; UI chat mobile ditulis ulang tipis di `apps/mobile`; `ask_user_question` memakai komponen kartu inline milik mobile. **Tidak butuh** `capabilities` desktop — kanal IPC + command yang sama |
 
 ### Konsekuensi lintas keputusan
@@ -182,7 +178,7 @@ desktop (src/) ──► semua packages (alias `$lib/...` dipertahankan sementar
 - **M7 + M11**: tanpa MCP di mobile, tidak ada OAuth MCP di sana — satu jalur auth saja (Better Auth + OS storage).
 - **M13 + M14 + M15**: ketiganya menuju arah yang sama — **logika turun ke `packages/*`, shell host menipis**. Engine sync dan store state menjadi milik core; desktop kehilangan window `sync` tapi tidak kehilangan kemampuan. Ini juga alasan `packages/sync` harus dibuat **sebelum** `apps/mobile`, bukan bersamanya.
 - **M13 + M14**: thunk (`M13`) dan engine sync (`M14`) sama-sama mengubah state lewat fungsi murni, jadi keduanya wajib berbagi tipe state yang sama di `packages/core`. Jangan biarkan engine sync punya salinan `Note`/`Task` sendiri.
-- **M14 + #M5**: karena window `sync` dihapus, Fase 2 sync di `cloud-sync-ai-mcp.md` §11 **berubah bentuk** — engine lahir sebagai paket TS, bukan window. Ini mempercepat M-1 (§6) dan menghapus satu permission/capability entry.
+- **M14 + #M5**: karena window `sync` dihapus, Fase 2 sync di the cloud sync design §11 **berubah bentuk** — engine lahir sebagai paket TS, bukan window. Ini mempercepat M-1 (§6) dan menghapus satu permission/capability entry.
 - **M15 + M6**: AI masuk MVP berarti `apps/mobile` tidak sesempit yang terlihat; perkirakan UI chat + komponen kartu inline sebagai bagian M-2/M-4, bukan M-5.
 - **M15 + M11**: write tool di mobile memakai grant yang sama (`ai_settings.access`/`scopes`), tetapi penegakannya di layar HP adalah kartu inline — tidak ada percabangan logika, hanya percabangan presentasi.
 
@@ -201,7 +197,7 @@ Ketiga pertanyaan sebelumnya sudah dijawab dan di-fold ke #M13–#M15 di atas. R
 **Konsekuensi yang tidak bisa ditawar dari jawaban ini:**
 
 1. **`packages/sync` menjadi prasyarat mutlak.** Engine ini harus selesai dan dipakai desktop **sebelum** `apps/mobile` dibangun. Kalau tidak, mobile akan memaksa engine kedua.
-2. **`cloud-sync-ai-mcp.md` #3 dan §11 harus direvisi** (window `sync` → paket TS). Itu perubahan keputusan, bukan catatan implementasi.
+2. **the cloud sync design #3 dan §11 harus direvisi** (window `sync` → paket TS). Itu perubahan keputusan, bukan catatan implementasi.
 3. **`packages/core/state` harus mendahului `packages/sync`**, karena engine sync menulis lewat thunk yang sama dengan UI.
 4. **`ai_settings` device-local tetap device-local.** Grant AI di HP berbeda dari grant di desktop — jangan pernah menyinkronkan `ai_settings` sebagai efek samping sync, karena itu keputusan keamanan, bukan preferensi.
 
@@ -212,7 +208,7 @@ Ketiga pertanyaan sebelumnya sudah dijawab dan di-fold ke #M13–#M15 di atas. R
 | Fase | Isi | Hasil yang bisa diuji |
 |---|---|---|
 | **M-0 — Ekstraksi paket** *(bisa jalan sekarang, tanpa sync)* | `package.json` root dapat `workspaces`; buat `packages/core`, `packages/i18n`, `packages/db`; pindah file apa adanya; `db/` ekspor daftar migrasi sebagai data; perluas `check:all` + pola Vitest; tipe domain ke `core/domain/`; **mulai `core/state` (thunk murni, #M13)** | `bun run check`, `test`, `clippy` tetap hijau; desktop tidak berubah perilaku |
-| **M-1 — Sync Fase 0+2, engine jadi paket** *(prasyarat, dari `cloud-sync-ai-mcp.md`)* | `updated_at INTEGER` (termasuk rebuild `tasks`), tombstone, outbox; **engine TS di `packages/sync` (#M14) — bukan window `sync`**; desktop memakainya dari window `workspace` | Uji 2 device konsisten; window `sync` tidak ada lagi |
+| **M-1 — Sync Fase 0+2, engine jadi paket** *(prasyarat, dari the cloud sync design)* | `updated_at INTEGER` (termasuk rebuild `tasks`), tombstone, outbox; **engine TS di `packages/sync` (#M14) — bukan window `sync`**; desktop memakainya dari window `workspace` | Uji 2 device konsisten; window `sync` tidak ada lagi |
 | **M-2 — Skeleton mobile** | `apps/mobile` + Tauri v2 mobile init, `capabilities` mobile, bottom-nav, notes list dari `packages/db`, editor write lokal lewat thunk | App jalan di emulator, data lokal, tanpa akun |
 | **M-3 — Sync di mobile** | Engine `packages/sync` dijalankan di foreground; login (callback mobile) + pull/push; konflik LWW | Note dibuat di HP muncul di desktop |
 | **M-4 — Paritas inti** | Wiki link + backlink, search, folder/tag, tasks list/detail, version read-only, share-sheet import, **AI penuh (#M15)**: chat + kartu Allow/Decline + kartu pertanyaan inline | Paritas fungsional dengan MVP (#M6) |
@@ -239,13 +235,13 @@ Ketiga pertanyaan sebelumnya sudah dijawab dan di-fold ke #M13–#M15 di atas. R
 
 | Dokumen | Perubahan yang dibutuhkan |
 |---|---|
-| `cloud-sync-ai-mcp.md` §10 | Catatan "opsi `apps/*` ditolak" **direvisi sebagian**: `packages/*` diterima sekarang, `apps/desktop` ditunda (#M2); tambahkan `packages/sync` + `packages/core/state` ke daftar workspace. Tambahkan tautan ke dokumen ini. |
-| `cloud-sync-ai-mcp.md` §11 Fase 6 | "Mobile / web" **diganti** dengan fase nyata M-0..M-5 (§6) + gate #M5. Fase 2 juga berubah: engine sync lahir sebagai paket TS, bukan window. |
-| `cloud-sync-ai-mcp.md` **#3 (window `sync`)** | **DIREVISI (diputuskan #M14)**: engine pindah ke `packages/sync`; **window `sync` dihapus** — pembungkus host memakai window `workspace` (desktop) dan app foreground (mobile). Konsekuensi: `capabilities/default.json` tidak perlu glob label `sync`; butir §13 "role window baru: `sync`" **dibatalkan**. |
-| `cloud-sync-ai-mcp.md` §12 #5 | "Struktur repo: workspace di root (`api/`, `shared/`)" **diperluas** dengan `packages/*` (#M2). |
+| the cloud sync design §10 | Catatan "opsi `apps/*` ditolak" **direvisi sebagian**: `packages/*` diterima sekarang, `apps/desktop` ditunda (#M2); tambahkan `packages/sync` + `packages/core/state` ke daftar workspace. Tambahkan tautan ke dokumen ini. |
+| the cloud sync design §11 Fase 6 | "Mobile / web" **diganti** dengan fase nyata M-0..M-5 (§6) + gate #M5. Fase 2 juga berubah: engine sync lahir sebagai paket TS, bukan window. |
+| the cloud sync design **#3 (window `sync`)** | **DIREVISI (diputuskan #M14)**: engine pindah ke `packages/sync`; **window `sync` dihapus** — pembungkus host memakai window `workspace` (desktop) dan app foreground (mobile). Konsekuensi: `capabilities/default.json` tidak perlu glob label `sync`; butir §13 "role window baru: `sync`" **dibatalkan**. |
+| the cloud sync design §12 #5 | "Struktur repo: workspace di root (`api/`, `shared/`)" **diperluas** dengan `packages/*` (#M2). |
 | `mcp-local-free.md` | Tambahkan satu baris: MCP adalah **desktop-only**; mobile tidak menyediakan transport apa pun (#M7). |
-| `business-model.md` §2 | Kolom tier perlu menyatakan **mobile app sebagai Plus/Pro**, fitur mobile MVP tanpa MCP (#M7, #M6), tetapi **termasuk AI** (#M15). |
-| `collaboration.md` §8 | Tambahkan: mobile ikut mode CRDT untuk shared workspace; **websocket satu koneksi per device** (temuan #6 dokumen itu) kini dipegang **engine `packages/sync`**, bukan window `sync` — desktop memakai window `workspace`, mobile memakai app foreground (#M14). |
+| the business model §2 | Kolom tier perlu menyatakan **mobile app sebagai Plus/Pro**, fitur mobile MVP tanpa MCP (#M7, #M6), tetapi **termasuk AI** (#M15). |
+| the collaboration design §8 | Tambahkan: mobile ikut mode CRDT untuk shared workspace; **websocket satu koneksi per device** (temuan #6 dokumen itu) kini dipegang **engine `packages/sync`**, bukan window `sync` — desktop memakai window `workspace`, mobile memakai app foreground (#M14). |
 | `AGENTS.md` | Setelah M-0: dokumentasikan `packages/*` (termasuk larangan impor `$lib`/`$app`/`@tauri-apps`), `packages/sync` sebagai satu-satunya engine sync, `packages/core/state` sebagai rumah thunk murni, perluasan `check:all`, dan bahwa aturan "tidak ada server-only code" hanya berlaku untuk `src/`. |
 
 ---
@@ -259,6 +255,6 @@ Supaya tidak melebar, hal-hal ini **eksplisit di luar** desain ini:
 - MCP/remote MCP di mobile — #M7.
 - Kanban/Gantt/Graph di MVP mobile — #M6.
 - Tablet/desktop-mode layout khusus — ditinjau setelah MVP stabil.
-- Push notification infra — bergantung `collaboration.md` (post-C15).
+- Push notification infra — bergantung the collaboration design (post-C15).
 - **Rust background task untuk sync** — ditolak di #M14; sync berjalan di engine TS saat app hidup.
 - **Grant AI tersinkron antar device** — ditolak di #M15; `ai_settings` tetap device-local.

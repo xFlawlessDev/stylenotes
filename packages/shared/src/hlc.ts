@@ -1,6 +1,6 @@
 /**
  * Hybrid Logical Clock (HLC) — the ordering key for delta sync
- * (`cloud-sync-ai-mcp.md` §4.3).
+ * (cloud sync design §4.3).
  *
  * Pure and dependency-free by design: the desktop app and the cloud service
  * share this exact comparison, so a clock skew on one device can never beat a

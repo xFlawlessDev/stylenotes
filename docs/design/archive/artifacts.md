@@ -3,7 +3,7 @@
 > Status: **Final (implementasi lokal)** — 10 keputusan (#A1–#A10), 0 pertanyaan terbuka.
 > Tanggal: 2026-10-01
 > Scope: user bisa melampirkan **file apa pun** ke note, disimpan sebagai *artifact* lokal yang
-> terpusat, dan dipetakan 1:1 ke object storage (S3) saat cloud sync (`cloud-sync-ai-mcp.md`).
+> terpusat, dan dipetakan 1:1 ke object storage (S3) saat cloud sync (the cloud sync design).
 > Sebelumnya lampiran hanya **path absolut** di markdown (`![cat](C:/pics/cat.png)`) — rusak
 > saat file dipindah, dan tidak berarti di device lain.
 
