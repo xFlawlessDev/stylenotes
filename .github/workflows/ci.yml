@@ -48,6 +48,12 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Tauri's build script requires the `bundle.externalBin` file to exist
+      # (`stylenotes-mcp-<triple>`) or it aborts the build. Produce it exactly as
+      # `beforeBuildCommand` does, before anything compiles the app crate.
+      - name: Build the MCP sidecar
+        run: bun run mcp:sidecar
+
       - name: Rust format
         run: bun run fmt:check
 
