@@ -14,11 +14,93 @@ function createActionButton(action: string, label: string): HTMLButtonElement {
 	return button;
 }
 
-function appendActionBar(container: HTMLElement, actions: [string, string][]) {
-	const bar = document.createElement('div');
-	bar.className = 'preview-action-bar';
-	for (const [action, label] of actions) bar.append(createActionButton(action, label));
-	container.append(bar);
+/** Friendly display names for the languages a fence is most likely to carry. */
+const LANGUAGE_LABELS: Record<string, string> = {
+	text: 'Text',
+	txt: 'Text',
+	plaintext: 'Text',
+	plain: 'Text',
+	js: 'JavaScript',
+	javascript: 'JavaScript',
+	ts: 'TypeScript',
+	typescript: 'TypeScript',
+	jsx: 'JSX',
+	tsx: 'TSX',
+	sh: 'Shell',
+	bash: 'Shell',
+	zsh: 'Shell',
+	shell: 'Shell',
+	console: 'Shell',
+	ps: 'PowerShell',
+	ps1: 'PowerShell',
+	powershell: 'PowerShell',
+	py: 'Python',
+	python: 'Python',
+	yml: 'YAML',
+	yaml: 'YAML',
+	md: 'Markdown',
+	markdown: 'Markdown',
+	html: 'HTML',
+	css: 'CSS',
+	json: 'JSON',
+	sql: 'SQL',
+	xml: 'XML',
+	rs: 'Rust',
+	rust: 'Rust',
+	go: 'Go',
+	golang: 'Go',
+	rb: 'Ruby',
+	ruby: 'Ruby',
+	cs: 'C#',
+	csharp: 'C#',
+	cpp: 'C++',
+	'c++': 'C++',
+	kt: 'Kotlin',
+	kotlin: 'Kotlin',
+	java: 'Java',
+	php: 'PHP',
+	swift: 'Swift',
+	dart: 'Dart',
+	lua: 'Lua',
+	diff: 'Diff',
+	ini: 'INI',
+	toml: 'TOML',
+	vue: 'Vue',
+	svelte: 'Svelte',
+};
+
+/** Turns a fence info string into a label ("powershell" → "PowerShell"). */
+export function codeLanguageLabel(language: string): string {
+	const key = language.trim().toLowerCase();
+	if (!key) return '';
+	const known = LANGUAGE_LABELS[key];
+	if (known) return known;
+	return key
+		.split(/[-_]+/)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(' ');
+}
+
+function codeLanguage(code: Element): string {
+	for (const name of code.classList) {
+		if (name.startsWith('language-')) return name.slice('language-'.length);
+	}
+	return '';
+}
+
+/** The language label plus the copy control that sits above a code block. */
+function createCodeHeader(code: Element): HTMLElement {
+	const header = document.createElement('div');
+	header.className = 'preview-action-bar';
+	const language = codeLanguageLabel(codeLanguage(code));
+	if (language) {
+		const label = document.createElement('span');
+		label.className = 'code-block-language';
+		label.textContent = language;
+		header.append(label);
+	}
+	header.append(createActionButton('copy-code', t('editor.preview.copyCode')));
+	return header;
 }
 
 export function addCodeCopyButtons(html: string): string {
@@ -27,7 +109,7 @@ export function addCodeCopyButtons(html: string): string {
 	for (const pre of template.content.querySelectorAll('pre')) {
 		const code = pre.querySelector(':scope > code');
 		if (!code || code.classList.contains('language-mermaid')) continue;
-		appendActionBar(pre, [['copy-code', t('editor.preview.copyCode')]]);
+		pre.prepend(createCodeHeader(code));
 	}
 	return template.innerHTML;
 }

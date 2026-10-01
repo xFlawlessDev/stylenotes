@@ -987,9 +987,19 @@ html[data-motion='reduced'] *::after {
 	z-index: 1;
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	justify-content: flex-end;
 	gap: 0.25rem;
 	margin: 0 0 0.5rem;
+}
+
+.markdown-body .code-block-language {
+	margin-right: auto;
+	font-family: var(--font-label);
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-outline);
 }
 
 .markdown-body .preview-action {
