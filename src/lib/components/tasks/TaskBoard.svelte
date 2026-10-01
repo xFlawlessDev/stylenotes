@@ -260,7 +260,7 @@
 		onquery={(value) => (query = value)}
 	/>
 
-	<section class="glass-panel flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
+	<section class="rail-panel glass-panel flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5">
 		<div class="flex flex-col gap-2">
 			<div class="flex items-center gap-2">
 				<Button

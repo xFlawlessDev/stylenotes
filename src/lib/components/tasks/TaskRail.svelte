@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus, X } from '@lucide/svelte';
+	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus } from '@lucide/svelte';
 	import { Button, SearchInput } from '$lib/components/base';
 	import type { Folder } from '$lib/stores/notes';
 	import { TASK_STATUSES, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
 	import { t } from '$lib/i18n/index.svelte';
+	import RailShell from '$lib/components/workspace/RailShell.svelte';
 
 	let {
 		folders,
@@ -69,6 +70,11 @@
 		...folders.filter((folder) => folder.id !== 'all')
 	]);
 
+	const statusOptions = $derived([
+		{ id: 'all' as const, label: t('tasks.allTasks') },
+		...TASK_STATUSES.map((status) => ({ id: status, label: t('tasks.statusLabel.' + status) }))
+	]);
+
 	const statusIcons: Record<TaskStatus | 'all', typeof Circle> = {
 		all: ListTodo,
 		todo: Circle,
@@ -86,120 +92,103 @@
 	};
 </script>
 
-<aside
-	class="glass-panel flex w-[248px] shrink-0 flex-col gap-3 overflow-hidden rounded-2xl p-2.5 max-lg:fixed max-lg:inset-y-2.5 max-lg:left-2.5 max-lg:z-40 max-lg:max-h-[calc(100vh-1.25rem)] max-lg:shadow-2xl max-lg:transition-transform {open
-		? 'max-lg:translate-x-0'
-		: 'max-lg:-translate-x-[120%]'}"
+<RailShell
+	title={t('tasks.railTitle')}
+	subtitle={t('tasks.railCount', { count: tasks.length })}
+	icon={ListTodo}
+	closeLabel={t('tasks.closeFilters')}
+	{open}
+	{onclose}
 >
-	<div class="flex items-center gap-2.5 px-1 py-1">
-		<div
-			class="flex size-9 items-center justify-center rounded-xl bg-surface-container-high/70 text-primary ring-1 ring-inset ring-hairline"
-		>
-			<ListTodo size={18} />
-		</div>
-		<div class="flex min-w-0 flex-col">
-			<span class="text-headline-sm font-headline leading-tight text-on-surface">{t('tasks.railTitle')}</span>
-			<span class="text-label-sm font-label truncate text-outline">{t('tasks.railCount', { count: tasks.length })}</span>
-		</div>
+	{#snippet action()}
 		<Button
-			size="icon-sm"
-			class="ml-auto text-outline lg:hidden"
-			aria-label={t('tasks.closeFilters')}
-			onclick={onclose}
+			variant="tonal"
+			size="lg"
+			shape="tile"
+			block
+			class="h-10 justify-between px-3 active:scale-[0.99]"
+			onclick={() => {
+				oncreate();
+				onclose?.();
+			}}
 		>
-			<X size={16} />
+			<span class="flex items-center gap-2">
+				<Plus size={16} />
+				<span class="text-label-md font-label font-semibold">{t('common.newTask')}</span>
+			</span>
 		</Button>
-	</div>
+	{/snippet}
 
-	<Button
-		variant="tonal"
-		size="lg"
-		shape="tile"
-		block
-		class="h-10 justify-between px-3 active:scale-[0.99]"
-		onclick={() => {
-			oncreate();
-			onclose?.();
-		}}
-	>
-		<span class="flex items-center gap-2">
-			<Plus size={16} />
-			<span class="text-label-md font-label font-semibold">{t('common.newTask')}</span>
-		</span>
-	</Button>
+	{#snippet prelude()}
+		<SearchInput
+			value={query}
+			placeholder={t('tasks.searchPlaceholder')}
+			ariaLabel={t('tasks.searchLabel')}
+			onquery={onquery}
+		/>
+	{/snippet}
 
-	<SearchInput
-		value={query}
-		placeholder={t('tasks.searchPlaceholder')}
-		ariaLabel={t('tasks.searchLabel')}
-		onquery={onquery}
-	/>
-
-	<div class="scrollbar-none flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
-		<div class="flex flex-col gap-0.5">
-			<div class="mb-1 flex items-center justify-between px-1">
-				<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.status')}</p>
-				{#if activeStatus !== 'all'}
-					<span
-						class="rounded-full bg-secondary-container/40 px-1.5 py-px text-code-sm font-code text-secondary"
-						>{t('tasks.active')}</span
-					>
-				{/if}
-			</div>
-			{#each [{ id: 'all' as const, label: t('tasks.allTasks') }, ...TASK_STATUSES.map((status) => ({ id: status, label: t('tasks.statusLabel.' + status) }))] as item (item.id)}
-				{@const Icon = statusIcons[item.id]}
-				<Button
-					variant={activeStatus === item.id ? 'tonal' : 'ghost'}
-					size="md"
-					class="justify-between rounded-xl px-2.5 text-left text-label-md"
-					aria-pressed={activeStatus === item.id}
-					onclick={() => pickStatus(item.id)}
+	<!-- Status -->
+	<div class="flex flex-col gap-0.5 border-b border-hairline pb-3">
+		<div class="mb-1 flex items-center justify-between px-1">
+			<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.status')}</p>
+			{#if activeStatus !== 'all'}
+				<span
+					class="rounded-full bg-secondary-container/40 px-1.5 py-px text-code-sm font-code text-secondary"
+					>{t('tasks.active')}</span
 				>
-					<span class="flex items-center gap-2">
-						<Icon size={15} class={statusTone[item.id]} />
-						<span>{item.label}</span>
-					</span>
-					<span
-						class="rounded-md px-1.5 py-px font-code text-code-sm {activeStatus === item.id
-							? 'text-on-primary-container/80'
-							: 'text-outline'}">{counts.byStatus.get(item.id) ?? 0}</span
-					>
-				</Button>
-			{/each}
+			{/if}
 		</div>
+		{#each statusOptions as item (item.id)}
+			{@const Icon = statusIcons[item.id]}
+			<Button
+				variant={activeStatus === item.id ? 'tonal' : 'ghost'}
+				size="md"
+				class="justify-between rounded-xl px-2.5 text-left text-label-md"
+				aria-pressed={activeStatus === item.id}
+				onclick={() => pickStatus(item.id)}
+			>
+				<span class="flex items-center gap-2">
+					<Icon size={15} class={statusTone[item.id]} />
+					<span>{item.label}</span>
+				</span>
+				<span
+					class="rounded-md px-1.5 py-px font-code text-code-sm {activeStatus === item.id
+						? 'text-on-primary-container/80'
+						: 'text-outline'}">{counts.byStatus.get(item.id) ?? 0}</span
+				>
+			</Button>
+		{/each}
+	</div>
 
-		<div class="flex flex-col gap-0.5 border-t border-hairline pt-3">
-			<div class="mb-1 flex items-center justify-between px-1">
-				<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.folders')}</p>
-				{#if activeFolder !== 'all'}
+	<!-- Folders -->
+	<div class="flex flex-col gap-0.5">
+		<div class="mb-1 flex items-center justify-between px-1">
+			<p class="text-label-sm font-label tracking-wider text-outline uppercase">{t('tasks.folders')}</p>
+			{#if activeFolder !== 'all'}
+				<span
+					class="rounded-full bg-primary-container/30 px-1.5 py-px text-code-sm font-code text-primary"
+					>{t('tasks.active')}</span
+				>
+			{/if}
+		</div>
+		{#each folderOptions as option (option.id)}
+			<Button
+				variant={activeFolder === option.id ? 'tonal' : 'ghost'}
+				size="md"
+				class="justify-between rounded-xl px-2.5 text-left text-label-md"
+				aria-pressed={activeFolder === option.id}
+				onclick={() => pickFolder(option.id)}
+			>
+				<span class="truncate">{option.label}</span>
+				{#if option.id !== 'all'}
 					<span
-						class="rounded-full bg-primary-container/30 px-1.5 py-px text-code-sm font-code text-primary"
-						>{t('tasks.active')}</span
+						class="rounded-md px-1.5 py-px font-code text-code-sm {activeFolder === option.id
+							? 'text-primary/80'
+							: 'text-outline'}">{counts.byFolder.get(option.id) ?? 0}</span
 					>
 				{/if}
-			</div>
-			<div
-				class="scrollbar-none flex max-h-64 min-h-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pr-0.5"
-			>
-				{#each folderOptions as option (option.id)}
-					<Button
-						variant={activeFolder === option.id ? 'tonal' : 'ghost'}
-						size="md"
-						class="justify-between rounded-xl px-2.5 text-left text-label-md"
-						aria-pressed={activeFolder === option.id}
-						onclick={() => pickFolder(option.id)}
-					>
-						<span class="truncate">{option.label}</span>
-						{#if option.id !== 'all'}
-							<span
-								class="rounded-md px-1.5 py-px font-code text-code-sm {activeFolder === option.id
-									? 'text-primary/80'
-									: 'text-outline'}">{counts.byFolder.get(option.id) ?? 0}</span
-							>
-						{/if}
-					</Button>
-				{/each}
-			</div>
-		</div>
+			</Button>
+		{/each}
 	</div>
-</aside>
+</RailShell>

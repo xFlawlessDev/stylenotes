@@ -762,6 +762,29 @@ html[data-motion='reduced'] *::after {
 	}
 }
 
+/*
+	Side rails (`RailShell.svelte`, `NotesFeed`, `TaskBoard`).
+	A rail that overflows has to be scrollable rather than clipped, but the global
+	`::-webkit-scrollbar { display: none }` above hides the only affordance that
+	would say so; a Tauri window cannot be scrolled either, so hidden content is
+	simply unreachable. Inside a rail the bar comes back.
+*/
+.rail-panel,
+.rail-panel * {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-outline-variant) transparent;
+}
+
+.rail-panel *::-webkit-scrollbar {
+	display: block;
+	width: 6px;
+}
+
+.rail-panel *::-webkit-scrollbar-thumb {
+	border-radius: 9999px;
+	background-color: var(--color-outline-variant);
+}
+
 .markdown-body {
 	color: var(--color-on-surface-variant);
 	font-size: 15px;
