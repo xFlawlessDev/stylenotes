@@ -47,8 +47,10 @@ Prinsip pembentuk desain — semuanya konsekuensi dari arsitektur yang ada:
    Graph nyata tetap hanya berisi edge yang dibuat user atau diterima user.
    Ini mencegah "hairball" yang membuat graph otomatis tak bisa dipercaya.
 5. **Satu pintu tulis tetap berlaku (#D7, #D8).** Tool MCP baru (`semantic_search`,
-   `related_notes`, `list_themes`, `find_contradictions`) **read-only** dulu.
-   Accept/reject suggestion lewat store yang sudah ada, bukan jalur baru.
+   `related_notes`, `list_themes`) **read-only** dulu. Accept/reject suggestion
+   lewat store yang sudah ada, bukan jalur baru. `find_contradictions` **tidak**
+   diekspos ke MCP: verifikasi pasangan memanggil model app (`ai_stream`), jadi
+   agent eksternal bisa memakai app sebagai proxy yang menghabiskan key user.
 6. **Gagal dengan anggun saat offline/non-Tauri (#D17).** Tanpa model lokal dan
    tanpa provider, fitur ini **menyembunyikan diri** dan StyleNotes kembali ke
    substring search. Tidak ada error merah, tidak ada layar kosong.
@@ -72,7 +74,7 @@ Dibaca dari `src/lib/content/workspace-graph.ts`, `mcp-tools.ts`,
 | 2 | **Semua edge bersumber dari `[[wiki]]` + relasi task.** `workspace-graph.ts:85–110` hanya membaca `parseWikiReferences` dan `taskNoteIds`/dependencies. Tidak ada jalur untuk edge yang "ditemukan" mesin. | Butuh **jenis edge baru** (`semantic`, `related`, `contradicts`) dan sumber data baru (`graph_suggestions`). `GraphEdgeKind` harus diperluas tanpa memecah `counts`. |
 | 3 | **Search = substring.** `search_notes` memakai `matchesQuery` (`ai-read-helpers.ts`); tidak ada stemming, tidak ada ranking, tidak ada vektor. | Semantic recall adalah **tool baru**, bukan pengganti: `search_notes` tetap ada untuk pencarian eksak cepat. |
 | 4 | **MCP tool registry adalah sumber tunggal (#D9 dokumen lama).** `mcp-tools.ts` ↔ Rust `registry.rs` dijaga oleh `mcp-tools.test.ts`; descriptor punya `kind`/`scope`. | Tool baru **wajib** ditambahkan di kedua sisi + test drift, atau gagal senyap. Tidak perlu scope baru: keempat tool memory bersifat `notes`-scoped read (#D18). |
-| 5 | **`ai-tool-schema.ts` memisahkan `aiOnly` vs MCP.** `web_search`/`web_fetch`/`ask_user_question` hanya untuk asisten. `mcp-tools.test.ts` menegakkan pemisahan dua arah. | `semantic_search`/`related_notes` **boleh dibagi** ke MCP (aman, read-only). Contradiction **juga read-only** → bisa dibagi. Tidak ada tool tulis baru di Fase ini. |
+| 5 | **`ai-tool-schema.ts` memisahkan `aiOnly` vs MCP.** `web_search`/`web_fetch`/`ask_user_question` hanya untuk asisten. `mcp-tools.test.ts` menegakkan pemisahan dua arah. | `semantic_search`/`related_notes`/`list_themes` **dibagi** ke MCP (aman, read-only, lokal). `find_contradictions` **aiOnly** karena memanggil `ai_stream`, sama seperti `web_search`. Tidak ada tool tulis baru di Fase ini. |
 | 6 | **Snapshot MCP (`mcp-snapshot.ts`) dibangun dari note+task+dependency+workspace**, tanpa folder (`ai-context.ts:49` mengirim `folders: []`). | Embedding **tidak** boleh masuk snapshot (akan membengkakkan file JSON puluhan MB). Snapshot membawa **skor/daftar id** saja; skor dihitung di app sebelum snapshot ditulis, atau lewat tool handler khusus. Lihat #D15. |
 | 7 | **Rust sudah punya stack AI** (`src-tauri/src/ai/`: provider, cipher AES-256-GCM, `ai_stream` via Channel, `web.rs` untuk jaringan). | Embedding provider **menumpang** stack ini: satu command `ai_embed` baru, memakai `ProviderConfig` + kunci yang sudah didekripsi. Tidak ada klien HTTP kedua. |
 | 8 | **Kunci API terenkripsi at rest** (`enc:v1:`, `app_data_dir()/ai/secrets.key`). | Kunci embedding **wajib** memakai jalur yang sama. Ini alasan kuat memilih #D3 (hibrida) alih-alih "panggil dari frontend". |
@@ -466,6 +468,16 @@ menggelembungkan file dan memperlambat setiap tool call. Maka:
 - Tool semantic **dieksekusi di dalam app** (workspace window), yang membaca
   tabel `embeddings` langsung dan mengembalikan **daftar id + skor**, bukan
   vektor. Shim meneruskan hasil yang sudah jadi.
+- Bagaimana hasil "sudah jadi" itu sampai ke shim: shim menulis **job** ke
+  `mcp/jobs/<id>.json` persis seperti write, window `workspace` menjalankannya
+  lewat `executeToolCall` yang sama dengan chat, lalu menulis
+  `mcp/results/<id>.json`. Jadi tidak ada jalur baca kedua — hanya job bridge
+  yang sudah ada (#D2), dipakai dua arah. Timeout job semantic lebih longgar
+  (30 s) karena `semantic_search` meng-embed query lebih dulu.
+- `find_contradictions` **tidak ikut**: verifikasi pasangan memanggil
+  `ai_stream` milik app. Mengeksposnya berarti agent eksternal bisa memakai app
+  sebagai proxy model yang menghabiskan key user. Ia tetap tool asisten
+  (`aiOnly`) dan absen dari `mcp-tools.ts`/`registry.rs`.
 - Ini konsisten dengan #D2 dokumen lama ("tulis lewat app"); di sini "baca
   berat lewat app".
 
@@ -494,11 +506,13 @@ backfill awal, re-embed saat note berubah, siklus usulan. Guard:
 
 ### D18 — Registry dua sisi tetap dijaga test
 
-`semantic_search` dan `related_notes` masuk **kedua** registry
-(`mcp-tools.ts` + `ai-tool-schema.ts` + Rust `registry.rs`) dan
-`list_themes`/`find_contradictions` masuk sebagai read-only juga. Test yang
-sudah ada (`mcp-tools.test.ts`) **diperluas**: jumlah tool, scope, dan
-pemisahan `aiOnly` diverifikasi dua arah, persis seperti `web_*`.
+`semantic_search`, `related_notes` dan `list_themes` masuk **kedua** registry
+(`mcp-tools.ts` + `ai-tool-schema.ts` + Rust `registry.rs`) dan dieksekusi
+sebagai job lewat shim. `find_contradictions` **hanya** di `ai-tool-schema.ts`
+(`aiOnly`) karena memanggil `ai_stream`. Test yang sudah ada
+(`mcp-tools.test.ts`) **diperluas**: jumlah tool, scope, pemisahan `aiOnly`, dan
+pemastian tool pemanggil model tidak bocor ke MCP diverifikasi dua arah, persis
+seperti `web_*`.
 
 ---
 
@@ -590,13 +604,14 @@ Catatan:
 | Modul | Perubahan |
 |---|---|
 | `src/lib/content/workspace-graph.ts` | `GraphEdgeKind` += `'semantic' \| 'related' \| 'contradicts'`; `counts` diperluas; opsi baru `suggestions?: GraphSuggestion[]` supaya edge usulan bisa dirender berbeda (putus-putus). Edge nyata **tidak** berubah sumbernya. |
-| `src/lib/content/mcp-tools.ts` | +4 read tool: `semantic_search`, `related_notes`, `list_themes`, `find_contradictions` (#D18). |
-| `src/lib/content/ai-tool-schema.ts` | Definisi JSON Schema untuk 4 tool itu; semuanya non-`aiOnly` (aman dibagi), read-only. |
+| `src/lib/content/mcp-tools.ts` | +3 read tool: `semantic_search`, `related_notes`, `list_themes` (#D18, #D15). |
+| `src/lib/content/ai-tool-schema.ts` | Definisi JSON Schema untuk 4 tool semantic; tiga read-only non-`aiOnly` (aman dibagi), `find_contradictions` diberi `aiOnly` karena memanggil `ai_stream`. |
 | `src/lib/content/ai-tools.ts` | Handler membaca index lewat hook yang disuntikkan (`memory?`), tetap pure & teruji (#D15). |
 | `src/lib/content/ai-context.ts` | Menyuntikkan hook memory ke `ToolContext` bila tersedia. |
 | `src/lib/content/mcp-snapshot.ts` | **Tidak** berubah bentuknya; hanya `revision`/`today` seperti sekarang. Vektor tidak masuk (#D15). |
+| `src/lib/stores/mcp-host.svelte.ts` | Jalankan job semantic (`semantic_search`/`related_notes`/`list_themes`) lewat `loadToolContext` + `executeToolCall`, sama seperti chat. |
 | `src-tauri/src/lib.rs` | Migrasi 19–21; daftarkan command `ai_embed`, `memory_reindex`, `remote_mcp_*`; feature flag `local-embed`. |
-| `src-tauri/src/mcp/` | `registry.rs` += 4 tool; `http.rs` baru untuk transport remote (#D12). |
+| `src-tauri/src/mcp/` | `registry.rs` += 3 tool; `semantic.rs` merutekan job baca ke app (#D15); `http.rs` baru untuk transport remote (#D12). |
 | `src/lib/components/graph/*` | Drawer menampilkan usulan; legenda tema; kartu kontradiksi. Layout tidak dipaksa berubah. |
 | `src/lib/components/workspace/SettingsPanel.svelte` | Tambah nav `Memory` sendiri (#Q1, sudah diputuskan) + `Import`. |
 | i18n `en/`, `id/` | Section baru `memory`/`import`; English = schema. |
@@ -718,7 +733,7 @@ yang tertunda: pemicu ANN dicatat sebagai catatan, bukan tugas.
 | D12 | Remote MCP: HTTP, tiga mode eksposur (Local/LAN/Tunnel), Bearer, rotasi token, opt-in Plus/Pro |
 | D13 | Remote MCP Plus/Pro; memory tetap gratis (lokal/BYOK) |
 | D14 | Import markdown non-destruktif via `notesRepo.upsert` |
-| D15 | Vektor tidak pernah masuk snapshot MCP; tool dieksekusi di app |
+| D15 | Vektor tidak pernah masuk snapshot MCP; tool semantic dieksekusi di app lewat job bridge (kecuali yang memanggil model) |
 | D16 | Index jalan di satu window, batch, cancellable |
 | D17 | Degradasi berjenjang; fitur menambah, tidak menggantikan |
 | D18 | Registry dua sisi dijaga test, termasuk tool baru |

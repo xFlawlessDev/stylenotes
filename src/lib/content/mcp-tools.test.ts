@@ -59,12 +59,21 @@ describe('MCP tool registry', () => {
 	});
 
 	it('registers the semantic read tools with the same kind and scope', () => {
-		for (const name of ['semantic_search', 'related_notes', 'list_themes', 'find_contradictions']) {
+		for (const name of ['semantic_search', 'related_notes', 'list_themes']) {
 			const tool = findTool(name);
 			expect(tool, `${name} is missing from the registry`).toBeDefined();
 			expect(tool?.kind, name).toBe('read');
 			expect(tool?.scope, name).toBe('notes');
 		}
+	});
+
+	/**
+	 * `find_contradictions` calls the app's own model, so it must not be an MCP
+	 * tool: an external agent could otherwise use the app as a proxy that spends
+	 * the user's key. It lives only in the in-app assistant (`aiOnly`).
+	 */
+	it('keeps model-spending tools out of the MCP registry', () => {
+		expect(findTool('find_contradictions')).toBeUndefined();
 	});
 	it('requires confirmations on destructive tools', () => {
 		for (const name of ['delete_note', 'delete_task']) {

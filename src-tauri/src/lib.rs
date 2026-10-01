@@ -40,11 +40,11 @@ mod read_tasks;
 #[allow(dead_code)]
 #[path = "mcp/read_workspaces.rs"]
 mod read_workspaces;
+#[path = "mcp/registry.rs"]
+mod registry;
 #[allow(dead_code)]
 #[path = "mcp/semantic.rs"]
 mod semantic;
-#[path = "mcp/registry.rs"]
-mod registry;
 
 const DB_URL: &str = "sqlite:stylenotes.db";
 const WORKSPACE_LABEL: &str = "workspace";

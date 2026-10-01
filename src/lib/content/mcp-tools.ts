@@ -16,7 +16,6 @@ export const MCP_TOOLS: McpToolDescriptor[] = [
 	{ name: 'semantic_search', kind: 'read', scope: 'notes', description: 'Meaning-based search over notes and tasks. Prefer search_notes for exact terms or ids.' },
 	{ name: 'related_notes', kind: 'read', scope: 'notes', description: 'Notes and tasks most similar to one entity, by meaning.' },
 	{ name: 'list_themes', kind: 'read', scope: 'notes', description: 'The current topic clusters over the notes and tasks, with member ids.' },
-	{ name: 'find_contradictions', kind: 'read', scope: 'notes', description: 'Pairs of notes whose claims conflict, verified by the assistant.' },
 	{ name: 'list_tasks', kind: 'read', scope: 'tasks', description: 'List tasks with status, priority, workspace, folder, due and overdue filters.' },
 	{ name: 'get_task', kind: 'read', scope: 'tasks', description: 'One task with blockers, dependents and linked notes.' },
 	{ name: 'task_board', kind: 'read', scope: 'tasks', description: 'Kanban columns in position order with per-status counts.' },

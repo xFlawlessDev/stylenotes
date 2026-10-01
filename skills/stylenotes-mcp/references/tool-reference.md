@@ -1,13 +1,15 @@
 # Tool reference
 
-All 33 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
+All 32 StyleNotes MCP tools. Read tools answer from the app snapshot; write tools
 are executed by the running app. `workspace` is optional on every tool that
 takes it and falls back to `workspace-default`.
 
-Four read tools — `semantic_search`, `related_notes`, `list_themes` and
-`find_contradictions` — read the in-app memory index and are **not available over
-MCP** (local or remote): they return `semantic_app_only`. They are documented here
-for completeness; from an external client use `context` and `search_notes`.
+Three read tools — `semantic_search`, `related_notes` and `list_themes` — read
+the in-app memory index, which never enters the snapshot: the server forwards
+them to the app as a job, so they work over MCP (local and remote) with slightly
+more latency. `find_contradictions` is **not** an MCP tool — it calls the app's
+own model, so it is kept out of the registry to protect the user's key; run it in
+the in-app assistant.
 
 Entity ids may be given bare (`abc`) or prefixed (`<workspaceId>/abc`); responses
 label entities with `ref` in the prefixed form.
@@ -117,11 +119,12 @@ meaningful.
 
 Each hit carries `score` and `neighbours { backlinks, outlinks, depth }`.
 
-### `semantic_search` *(in-app only)*
+### `semantic_search`
 
 Meaning-based search over notes and tasks. Use it when the user asks for notes
 about an **idea** rather than a specific word or id; use `search_notes` for exact
-terms and codes.
+terms and codes. The server forwards it to the app, which embeds the query, so it
+takes a little longer than a snapshot read.
 
 | Argument | Type | Notes |
 |---|---|---|
@@ -130,10 +133,10 @@ terms and codes.
 | `limit` | number | default 10 |
 
 Returns `{ ok, total, results[] }`, each result
-`{ kind, id, ref, title, score }`. From an external client it returns
-`semantic_app_only`.
+`{ kind, id, ref, title, score }`. When the memory index is not built it returns a
+`tool_failed` error saying it is not ready — fall back to `search_notes`.
 
-### `related_notes` *(in-app only)*
+### `related_notes`
 
 Notes and tasks most similar in meaning to one entity — the connections the user
 may not have linked by hand.
@@ -147,7 +150,7 @@ may not have linked by hand.
 
 Returns the same `{ ok, total, results[] }` shape as `semantic_search`.
 
-### `list_themes` *(in-app only)*
+### `list_themes`
 
 The current topic clusters over the notes and tasks, each with a label and member
 ids. Answers "what am I writing about" or gives a broad question a starting map.
@@ -160,19 +163,11 @@ ids. Answers "what am I writing about" or gives a broad question a starting map.
 Returns `{ ok, total, themes[] }` where each theme is
 `{ label, members[] }` and each member is `{ kind, id, ref, title, score }`.
 
-### `find_contradictions` *(in-app only)*
+### `find_contradictions` *(not an MCP tool)*
 
 Pairs of notes whose claims conflict, verified by a model over the most similar
-pairs. Needs the assistant configured; when it is not, or nothing conflicts, the
-result is empty rather than an error.
-
-| Argument | Type | Notes |
-|---|---|---|
-| `workspace` | string | |
-| `limit` | number | default 10; max pairs to verify |
-
-Returns `{ ok, total, pairs[], note? }` where each pair is
-`{ reason, members[] }` and each member is `{ kind, id, ref, title, score }`.
+pairs. It calls the app's own model stream, so the server does **not** expose it
+over MCP — ask the user to run it in the in-app assistant.
 
 ### `list_tasks`
 

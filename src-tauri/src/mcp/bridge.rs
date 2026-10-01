@@ -268,6 +268,26 @@ fn now_millis() -> u64 {
         .unwrap_or(0)
 }
 
+/// A tiny request-id generator: enough entropy to keep concurrent clients from
+/// colliding, with no extra dependency.
+///
+/// Both the write path and the in-app semantic read path stamp a job with one;
+/// a millisecond, the process id and a process-local counter are enough because
+/// a collision only matters between concurrent jobs of one shim.
+pub fn new_request_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    format!("{millis:x}-{pid:x}-{counter:x}")
+}
+
 /// Builds the standard "app is not running" tool error (#D5).
 pub fn app_not_running() -> Value {
     protocol::tool_error(
@@ -288,6 +308,11 @@ pub fn disabled() -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn request_ids_are_unique_across_calls() {
+        assert_ne!(new_request_id(), new_request_id());
+    }
 
     #[test]
     fn grant_requires_write_and_scope() {

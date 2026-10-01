@@ -39,7 +39,7 @@ export type McpErrorCode =
 	| 'dependency_cycle'
 	| 'last_workspace'
 	| 'write_failed'
-	| 'semantic_app_only'
+	| 'tool_failed'
 	| 'timeout';
 
 export type McpScope = 'notes' | 'tasks' | 'dependency' | 'workspace';

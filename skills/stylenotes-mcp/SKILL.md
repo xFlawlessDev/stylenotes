@@ -10,7 +10,7 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes an MCP server in two forms over the same 33 tools — 18 read,
+StyleNotes exposes an MCP server in two forms over the same 32 tools — 17 read,
 15 write. A **local** endpoint speaks stdio through a thin shim; a **remote**
 endpoint speaks Streamable HTTP from the app itself. Either way every write goes
 through the same validation the UI uses, not straight to the database.
@@ -64,11 +64,13 @@ use; do not re-file, re-tag or rewrite a note that was not part of the request.
 7. **The journal is per day, not per note title.** `journal_today` returns the
    entry for the user's local today, creating it if needed. Do not search for a
    note whose title looks like a date, and do not create one by hand.
-8. **Some recall tools only run inside the app.** `semantic_search`, `related_notes`,
-   `list_themes` and `find_contradictions` answer from the memory index, which
-   lives in the app and never enters the snapshot. Over MCP — both the local and
-   remote endpoints — they return `semantic_app_only`; use `context` and
-   `search_notes` from an external client instead.
+8. **Most recall tools are local; one is app-only.** `semantic_search`,
+   `related_notes` and `list_themes` answer from the memory index, which lives in
+   the app and never enters the snapshot — the server forwards them to the app as
+   a job, so they work over both the local and remote endpoints. Allow a little
+   extra latency: a call embeds the query before ranking. `find_contradictions` is
+   the exception — it calls the app's own model, so it is **not** exposed over MCP;
+   ask the user to run it in the in-app assistant.
 
 See [references/tool-reference.md](references/tool-reference.md) for every tool's
 arguments and response shape, and
@@ -108,14 +110,15 @@ Pick the narrowest tool that answers the question:
 | "What does this task block?" | `get_task { id }` — `blocking`, `blockingTasks` |
 | "Longest chain to X" | `critical_path { toId }` |
 | "Everything connected to this note" | `graph_query { id, depth, kind }` |
-| "Notes about an idea, not a word" | `semantic_search { query }` *(in-app only)* |
-| "What else is like this note?" | `related_notes { id }` *(in-app only)* |
-| "What am I writing about?" | `list_themes` *(in-app only)* |
-| "Do my notes disagree?" | `find_contradictions` *(in-app only)* |
+| "Notes about an idea, not a word" | `semantic_search { query }` |
+| "What else is like this note?" | `related_notes { id }` |
+| "What am I writing about?" | `list_themes` |
+| "Do my notes disagree?" | *(in-app only)* — ask the user to use the assistant |
 
-The four *(in-app only)* tools read the memory index and return
-`semantic_app_only` over MCP; from an external client, use `context` for
-recall instead.
+`semantic_search`, `related_notes` and `list_themes` read the memory index; the
+server forwards them to the app as a job, so they work from an external client
+too (allow extra latency). `find_contradictions` is not exposed over MCP — it
+spends the user's model key, so keep it in the app.
 
 `get_note` and `get_task` return the entity fields at the **top level** of the
 response (not nested under `note` / `task`). `create_note` and `create_task`
@@ -202,9 +205,13 @@ These are the mistakes that make a correct server look broken:
   `workspace-default` and the last remaining workspace with `last_workspace`.
 - **Reading a stale snapshot as truth.** Check `appRunning` in the response
   metadata; when false, the data is the last known state and writes will fail.
-- **Treating `semantic_app_only` as a bug.** The four memory tools answer only
-  inside the app; over MCP they explain that and stop. Fall back to `context`
-  or `search_notes` — do not retry them, and do not report them as broken.
+- **Treating a semantic call as instant.** `semantic_search`, `related_notes`
+  and `list_themes` are forwarded to the app, which embeds the query before
+  ranking. They work, but expect a little more latency than a snapshot read; do
+  not retry a slow one as if it had failed.
+- **Calling `find_contradictions` over MCP.** It is not an MCP tool — it calls the
+  app's own model, so the server keeps it out of the registry to protect the
+  user's key. Ask the user to run it in the in-app assistant.
 - **Computing "today" from `generatedAt`.** That field is UTC. The snapshot's
   `today` is the user's local day; for anyone outside UTC the two differ for
   part of every day, and a date computed from `generatedAt` is off by one.
@@ -241,6 +248,6 @@ Trace a dependency chain:
 
 ## Reference
 
-- [references/tool-reference.md](references/tool-reference.md) — all 33 tools, arguments, response fields.
+- [references/tool-reference.md](references/tool-reference.md) — all 32 tools, arguments, response fields.
 - [references/errors.md](references/errors.md) — error codes, causes, and fixes.
 - [references/workflows.md](references/workflows.md) — longer end-to-end recipes, including second-brain recall and capture.

@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 
 use crate::bridge::Bridge;
 use crate::protocol;
+use crate::semantic;
 
 /// Resolves the workspace filter: explicit argument, or `None` for all.
 pub(crate) fn workspace_arg(args: &Value) -> Option<String> {
@@ -509,7 +510,10 @@ fn score_context(note: &Value, needle: &str, body: bool) -> i64 {
 ///
 /// `name` is guaranteed to be a registered read tool by the caller; an unknown
 /// name still answers with a clear `unknown_tool` error rather than panicking.
-pub fn dispatch(name: &str, bridge: &Bridge, args: &Value) -> Value {
+///
+/// Semantic reads are the exception: vectors never enter the snapshot, so they
+/// are handed to the app as a job (like a write) and executed there (#D15).
+pub fn dispatch(name: &str, bridge: &Bridge, args: &Value, instance: &str) -> Value {
     let workspace = workspace_arg(args);
     match name {
         "list_notes" => list_notes(bridge, args),
@@ -526,17 +530,14 @@ pub fn dispatch(name: &str, bridge: &Bridge, args: &Value) -> Value {
         "list_workspaces" => crate::read_workspaces::list_workspaces(bridge, args),
         "list_folders" => crate::read_workspaces::list_folders(bridge, args),
         "list_tags" => crate::read_workspaces::list_tags(bridge, args),
-        // Semantic tools execute inside the app (docs/design/constella-features.md
-        // #D15): vectors never enter the snapshot, so an external client gets a
-        // clear reason instead of an "unknown tool".
-        "semantic_search" | "related_notes" | "list_themes" | "find_contradictions" => fail(
-            "semantic_app_only",
-            "Semantic tools run inside StyleNotes. Use the in-app assistant, or ask the user to enable them.",
-        ),
-        other => fail(
-            "unknown_tool",
-            &format!("Unknown read tool `{other}`."),
-        ),
+        // Semantic reads execute inside the app (docs/design/constella-features.md
+        // #D15): vectors never enter the snapshot, so they are forwarded as a
+        // job. `find_contradictions` is not a registered MCP tool — it calls the
+        // app's model, so it stays `aiOnly` in the assistant.
+        other if semantic::LOCAL_TOOLS.contains(&other) => {
+            semantic::call(bridge, other, args, instance)
+        }
+        other => fail("unknown_tool", &format!("Unknown read tool `{other}`.")),
     }
 }
 

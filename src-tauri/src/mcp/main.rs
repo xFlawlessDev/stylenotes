@@ -12,6 +12,7 @@ mod read_graph;
 mod read_tasks;
 mod read_workspaces;
 mod registry;
+mod semantic;
 mod write;
 
 use std::io::{self, BufRead, Write};
@@ -177,7 +178,7 @@ fn tools_call(bridge: &Option<Bridge>, instance: &str, request: &Request) -> Val
 
     let grant = grant_from_app_info(app_running.as_ref());
     let result = match descriptor.kind {
-        ToolKind::Read => dispatch_read(bridge, name, &args),
+        ToolKind::Read => dispatch_read(bridge, name, &args, instance),
         ToolKind::Write => write::call(bridge, name, &args, &grant, instance),
     };
     protocol::success(id, result)
@@ -192,8 +193,8 @@ fn grant_from_app_info(info: Option<&bridge::AppInfo>) -> Grant {
     })
 }
 
-fn dispatch_read(bridge: &Bridge, name: &str, args: &Value) -> Value {
-    read::dispatch(name, bridge, args)
+fn dispatch_read(bridge: &Bridge, name: &str, args: &Value, instance: &str) -> Value {
+    read::dispatch(name, bridge, args, instance)
 }
 
 /// Protocol version this shim speaks; mirrors `mcp_host::MCP_PROTOCOL`.

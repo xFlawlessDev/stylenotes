@@ -6,9 +6,8 @@
 //! the call was in flight.
 
 use serde_json::Value;
-use uuid_like::new_request_id;
 
-use crate::bridge::{self, Bridge, Grant};
+use crate::bridge::{self, new_request_id, Bridge, Grant};
 use crate::protocol;
 use crate::registry::{self, ToolKind};
 
@@ -56,43 +55,12 @@ pub fn call(bridge: &Bridge, tool: &str, args: &Value, grant: &Grant, instance: 
         workspace,
         timeout_ms: crate::JOB_TIMEOUT_MS,
     };
-    match bridge.submit(submission) {
-        Ok(data) => protocol::tool_result(
-            serde_json::to_string_pretty(&data).unwrap_or_default(),
-            Some(data),
-        ),
-        Err((code, message)) => protocol::tool_error(&code, message),
-    }
-}
-
-/// A tiny request-id generator: enough entropy to keep concurrent clients from
-/// colliding, with no extra dependency.
-mod uuid_like {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    pub fn new_request_id() -> String {
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_millis())
-            .unwrap_or(0);
-        let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let pid = std::process::id();
-        format!("{millis:x}-{pid:x}-{counter:x}")
-    }
-
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    protocol::submission_result(bridge.submit(submission))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn ids_are_unique_across_calls() {
-        let first = uuid_like::new_request_id();
-        let second = uuid_like::new_request_id();
-        assert_ne!(first, second);
-    }
 
     #[test]
     fn grant_gate_rejects_readonly() {

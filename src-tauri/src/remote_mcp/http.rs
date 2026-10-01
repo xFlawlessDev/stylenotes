@@ -313,11 +313,17 @@ async fn dispatch<R: tauri::Runtime>(
     }
 }
 
-/// Answers a read tool from the app's snapshot, in-process (#D3).
+/// Answers a read tool.
 ///
-/// This reuses the shim's `read::dispatch` so the two servers can never drift:
-/// a read the stdio client can run, the remote client can run identically.
-fn forward_read<R: tauri::Runtime>(state: &RemoteState<R>, tool: &str, args: &Value) -> Value {
+/// Most reads are filtered from the snapshot in-process (#D3). Semantic reads
+/// cannot be — vectors never enter the snapshot — so `forward` routes them to
+/// `forward_semantic` first and this handles the rest.
+fn forward_read<R: tauri::Runtime>(
+    state: &RemoteState<R>,
+    tool: &str,
+    args: &Value,
+    instance: &str,
+) -> Value {
     let Some(root) = mcp_host::mcp_root(&state.app) else {
         return protocol::tool_error(
             "snapshot_unavailable",
@@ -325,7 +331,7 @@ fn forward_read<R: tauri::Runtime>(state: &RemoteState<R>, tool: &str, args: &Va
         );
     };
     let bridge = crate::bridge::Bridge::at(root);
-    crate::read::dispatch(tool, &bridge, args)
+    crate::read::dispatch(tool, &bridge, args, instance)
 }
 
 /// Answers one tool call.
@@ -344,8 +350,16 @@ async fn forward<R: tauri::Runtime>(
         return protocol::tool_error("unknown_tool", format!("Unknown tool `{tool}`."));
     };
 
+    let instance = format!("remote:{}:{}", state.mode.as_str(), peer);
+
     if descriptor.kind == registry::ToolKind::Read {
-        return forward_read(state, tool, args);
+        // Semantic reads cannot be filtered from a snapshot — vectors never
+        // enter it (#D15) — so they go down the same async job pipe a write
+        // uses, with a longer deadline for the embedder.
+        if crate::semantic::LOCAL_TOOLS.contains(&tool) {
+            return forward_semantic(state, tool, args, &instance, peer).await;
+        }
+        return forward_read(state, tool, args, &instance);
     }
 
     let id = format!("remote-{:x}-{}", peer.port(), now_millis());
@@ -367,7 +381,6 @@ async fn forward<R: tauri::Runtime>(
     }
 
     let deadline = now_millis() + JOB_TIMEOUT_MS;
-    let instance = format!("remote:{}:{}", state.mode.as_str(), peer);
     let job = json!({
         "id": id,
         "tool": tool,
@@ -381,7 +394,43 @@ async fn forward<R: tauri::Runtime>(
     if let Err(error) = write_job(&state.app, &id, &job) {
         return protocol::tool_error("write_failed", error);
     }
-    wait_for_result(&state.app, &id).await
+    wait_for_result(&state.app, &id, JOB_TIMEOUT_MS).await
+}
+
+/// Answers a semantic read by handing the app a job, like a write (#D15).
+///
+/// The app owns the embedder and the `embeddings` table, so the listener cannot
+/// answer these from the snapshot no matter how it filters. Reads need no
+/// write scope, so the job carries an empty read grant (#D6). The deadline is
+/// longer than a write's: a search embeds the query before ranking.
+async fn forward_semantic<R: tauri::Runtime>(
+    state: &RemoteState<R>,
+    tool: &str,
+    args: &Value,
+    instance: &str,
+    peer: SocketAddr,
+) -> Value {
+    let id = format!("remote-sem-{:x}-{}", peer.port(), now_millis());
+    let workspace = args
+        .get("workspace")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("workspace-default");
+    let timeout = crate::semantic::SEMANTIC_JOB_TIMEOUT_MS;
+    let job = json!({
+        "id": id,
+        "tool": tool,
+        "args": args,
+        "grant": { "access": "read", "scopes": [] },
+        "instance": instance,
+        "workspace": workspace,
+        "deadline": now_millis() + timeout,
+    });
+
+    if let Err(error) = write_job(&state.app, &id, &job) {
+        return protocol::tool_error("write_failed", error);
+    }
+    wait_for_result(&state.app, &id, timeout).await
 }
 
 fn write_job<R: tauri::Runtime>(
@@ -398,7 +447,11 @@ fn write_job<R: tauri::Runtime>(
     std::fs::rename(&tmp, &target).map_err(|error| error.to_string())
 }
 
-async fn wait_for_result<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Value {
+async fn wait_for_result<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    id: &str,
+    timeout_ms: u64,
+) -> Value {
     let results = match mcp_host::mcp_root(app) {
         Some(root) => root.join("results"),
         None => {
@@ -428,7 +481,7 @@ async fn wait_for_result<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str)
                 return protocol::tool_error(code, message);
             }
         }
-        if started.elapsed() >= Duration::from_millis(JOB_TIMEOUT_MS) {
+        if started.elapsed() >= Duration::from_millis(timeout_ms) {
             let _ = std::fs::remove_file(path);
             return protocol::tool_error("timeout", "the app did not answer in time");
         }

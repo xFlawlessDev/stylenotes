@@ -16,6 +16,8 @@ import { invoke, Channel } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { MCP_NOTE_BACKUPS, type McpGrant, type McpJob, type McpResult } from '$lib/content/mcp-types';
 import { buildMcpSnapshot } from '$lib/content/mcp-snapshot';
+import { executeToolCall } from '$lib/content/ai-tools';
+import { loadToolContext } from '$lib/content/ai-context';
 import {
 	completeTaskAction,
 	createNoteAction,
@@ -250,7 +252,16 @@ function localTaskEditPending(taskId: string): boolean {
 	return hasPendingEdit('task', taskId);
 }
 
+/** Semantic reads the shim forwards as jobs: local work, no model stream. */
+const SEMANTIC_TOOLS = new Set(['semantic_search', 'related_notes', 'list_themes']);
+
 async function runAction(job: McpJob): Promise<WriteOutcome> {
+	// Semantic reads never reach the snapshot (vectors are not in it), so the
+	// shim hands them here (#D15). The in-app assistant's own executor runs the
+	// call, so an MCP client and the chat cannot drift on shape or readiness.
+	if (SEMANTIC_TOOLS.has(job.tool)) {
+		return runSemanticAction(job);
+	}
 	const { context, notes } = await loadContext();
 	switch (job.tool) {
 		case 'create_note':
@@ -336,7 +347,32 @@ async function runAction(job: McpJob): Promise<WriteOutcome> {
 }
 
 function scopeOf(tool: string): 'read' | 'write' {
+	if (SEMANTIC_TOOLS.has(tool)) return 'read';
 	return tool.startsWith('list_') || tool.startsWith('get_') ? 'read' : 'write';
+}
+
+/**
+ * Runs a semantic read through the in-app assistant's own executor.
+ *
+ * `loadToolContext` supplies the memory hooks (the same ones the chat uses), so
+ * an MCP client sees identical results and the same "not ready" message when
+ * the index is empty (#D17).
+ */
+async function runSemanticAction(job: McpJob): Promise<WriteOutcome> {
+	try {
+		const ctx = await loadToolContext();
+		const result = await executeToolCall(ctx, job.tool, JSON.stringify(job.args), {
+			confirmed: false
+		});
+		if (result.ok) return { ok: true, data: result.data };
+		return { ok: false, error: 'tool_failed', message: result.error };
+	} catch (error) {
+		return {
+			ok: false,
+			error: 'tool_failed',
+			message: error instanceof Error ? error.message : 'The semantic tool failed.'
+		};
+	}
 }
 
 function summarize(data: unknown): string {

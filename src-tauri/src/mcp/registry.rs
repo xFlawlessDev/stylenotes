@@ -71,12 +71,6 @@ pub const TOOLS: &[ToolDescriptor] = &[
         description: "The current topic clusters over the notes and tasks, with member ids.",
     },
     ToolDescriptor {
-        name: "find_contradictions",
-        kind: ToolKind::Read,
-        scope: "notes",
-        description: "Pairs of notes whose claims conflict, verified by the assistant.",
-    },
-    ToolDescriptor {
         name: "list_tasks",
         kind: ToolKind::Read,
         scope: "tasks",
@@ -286,10 +280,6 @@ fn schema_for(name: &str) -> Value {
         }
         "list_themes" => {
             // Only `workspace`; clusters are global to the index.
-        }
-        "find_contradictions" => {
-            properties["limit"] =
-                json!({ "type": "integer", "description": "Max pairs to verify (default 10)." });
         }
         "create_note" => {
             properties["title"] = json!({ "type": "string" });

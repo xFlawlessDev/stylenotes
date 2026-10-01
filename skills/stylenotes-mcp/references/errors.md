@@ -12,7 +12,8 @@ human sentence in the text content. Match on the code, not the sentence.
 | `snapshot_truncated` | The vault is too large, so note bodies were dropped. | Narrow the query by `workspace` or `folder`. `get_note` is unavailable in this mode. |
 | `write_not_granted` | Write access or the matching scope is off. | State which scope is off (`notes`, `tasks`, `dependency`, `workspace`) and ask the user to enable it in Settings → MCP. |
 | `unknown_tool` | The tool name is not in the registry. | Check the name against [tool-reference.md](tool-reference.md). |
-| `semantic_app_only` | A memory tool (`semantic_search`, `related_notes`, `list_themes`, `find_contradictions`) was called over MCP. | These run only inside the app. Fall back to `context` or `search_notes`; do not retry. |
+| `unknown_tool` | The tool name is not in the registry — including `find_contradictions`, which the server deliberately does not expose (it spends the user's model key). | Check the name against [tool-reference.md](tool-reference.md). |
+| `tool_failed` | A forwarded semantic tool (`semantic_search`, `related_notes`, `list_themes`) ran in the app but could not answer — most often the memory index is not built. | Read the message. If the index is not ready, fall back to `search_notes` / `context`; do not treat it as a broken server. |
 | `bad_arguments` | A required argument is missing or invalid, or a destructive tool lacks `confirm: true`. | Fix the arguments; add `confirm: true` after the user agrees to the deletion. |
 | `unknown_workspace` | The `workspace` id does not exist. | Call `list_workspaces` and use a real id. |
 | `ambiguous_id` | A bare id matches more than one workspace. | Retry with the prefixed `ref` (`<workspaceId>/<id>`). |

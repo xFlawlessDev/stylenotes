@@ -135,23 +135,24 @@ the wrong folder. Repairing that is metadata work, so it is `update_note`, not
   theirs, and a tidy note with a title they would not have chosen is still a
   note they have to fix.
 
-## "Connect the dots" (in-app assistant)
+## "Connect the dots" (semantic recall)
 
-The memory tools (`semantic_search`, `related_notes`, `list_themes`,
-`find_contradictions`) run **inside the app**, not over MCP. From an external
-client they return `semantic_app_only`; use `context` instead. Inside the app:
+`semantic_search`, `related_notes` and `list_themes` are forwarded to the app,
+which owns the memory index, so they work from an external client over MCP:
 
 ```
 1. semantic_search { query }             -> hits by meaning, not exact words
 2. related_notes   { id: "<hit ref>" }   -> what that note is near
 3. list_themes     { }                   -> the clusters the vault currently forms
-4. find_contradictions { }               -> pairs whose claims disagree
 ```
 
 `list_themes` is for "what am I writing about"; `related_notes` for "what else is
-like this one"; `find_contradictions` for "do my notes disagree" — and it returns
-nothing when the assistant is not configured, so an empty result means "no
-verified conflict", not "no notes".
+like this one". Expect a little extra latency (the app embeds the query).
+
+`find_contradictions` is **not** available over MCP: it calls the app's own model,
+so the server keeps it out of the registry to protect the user's key. Ask the user
+to run it in the in-app assistant. It returns nothing when the assistant is not
+configured, so an empty result there means "no verified conflict", not "no notes".
 
 ## Create a workspace and seed it
 

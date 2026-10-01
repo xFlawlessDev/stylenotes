@@ -123,7 +123,11 @@ export const AI_TOOLS: AiToolSpec[] = [
 				workspace,
 				limit: { type: 'integer', description: 'Max pairs to verify (default 10).' }
 			}
-		}),
+		},
+		// Verifying a pair calls the app's own model stream, so this tool is for
+		// the in-app assistant only: exposing it over MCP would let an external
+		// agent spend the user's key as a proxy (same reason as `web_search`).
+		{ aiOnly: true }),
 	tool('get_note', 'Read note', 'notes', 'read',
 		'One note with its full body plus wiki backlinks and outlinks. Use an id from list_notes or search_notes; this does not accept a title.',
 		{

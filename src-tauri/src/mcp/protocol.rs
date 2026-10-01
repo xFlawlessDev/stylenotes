@@ -75,6 +75,21 @@ pub fn tool_error_with_data(code: &str, message: impl Into<String>, data: Value)
     value
 }
 
+/// Wraps a bridge submission outcome as a tool result.
+///
+/// Shared by the write path, the in-app semantic read path (#D15), and the
+/// remote listener, so a job answered in any of them looks identical to the
+/// model.
+pub fn submission_result(outcome: Result<Value, (String, String)>) -> Value {
+    match outcome {
+        Ok(data) => tool_result(
+            serde_json::to_string_pretty(&data).unwrap_or_default(),
+            Some(data),
+        ),
+        Err((code, message)) => tool_error(&code, message),
+    }
+}
+
 /// Capabilities advertised in `initialize`.
 pub fn capabilities() -> Value {
     json!({ "tools": { "listChanged": false } })
