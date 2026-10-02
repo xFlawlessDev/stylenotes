@@ -34,7 +34,10 @@ app's remote HTTP endpoint.
    you want the agent to have. Choose the local (stdio) server for a same-machine
    client, or the remote (HTTP) endpoint to reach it from elsewhere.
 2. Copy the client config from **Settings → MCP** for your client and transport,
-   or adapt [assets/mcp-client-config.json](assets/mcp-client-config.json).
+   or adapt [assets/mcp-client-config.json](assets/mcp-client-config.json) for the
+   local (stdio) server, or
+   [assets/mcp-client-config.remote.json](assets/mcp-client-config.remote.json)
+   for the remote (Streamable HTTP) endpoint.
 3. Drop this directory where your agent looks for skills. Typical locations:
    - Claude Code / OpenCode: `.agents/skills/` or `~/.agents/skills/`
    - Claude Desktop: `~/Library/Application Support/Claude/skills/` (macOS)
@@ -53,7 +56,8 @@ stylenotes-mcp/
 ├── scripts/
 │   └── validate-skill.mjs            # checks this skill against the spec
 └── assets/
-    └── mcp-client-config.json        # config template
+    ├── mcp-client-config.json        # local (stdio) config template
+    └── mcp-client-config.remote.json # remote (HTTP) config template
 ```
 
 ## Validate
