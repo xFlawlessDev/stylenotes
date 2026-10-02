@@ -20,6 +20,7 @@
 	import { handleExternalLink } from '$lib/content/external-links';
 	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
 	import { hydrateMermaid } from '$lib/content/mermaid-viewer';
+	import NoteFindOverlay from '$lib/components/note/NoteFindOverlay.svelte';
 	import { toggleChecklistItem } from '$lib/stores/notes';
 	import { settings, type EditorView } from '$lib/stores/settings.svelte';
 	import Textarea from '$lib/components/base/textarea.svelte';
@@ -68,6 +69,7 @@
 	let focusedOnce = false;
 	let suggestions = $state<WikiSuggestionSet | null>(null);
 	let activeIndex = $state(0);
+	let findOpen = $state(false);
 
 	/** Workspace-scoped pools, so the popover offers what a link can reach. */
 	const wikiContext = $derived({
@@ -391,7 +393,9 @@
 					variant="bare"
 					size="md"
 					placeholder={t('notes.editor.writePlaceholder')}
-					class="scrollbar-thin h-full w-full px-4 py-3 leading-relaxed text-on-surface-variant"
+					class="scrollbar-thin h-full w-full px-4 py-3 leading-relaxed text-on-surface-variant {findOpen
+						? 'find-textarea'
+						: ''}"
 				></Textarea>
 			{:else if view === 'split'}
 				<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
@@ -410,7 +414,9 @@
 						variant="bare"
 						size="sm"
 						placeholder={t('notes.editor.splitPlaceholder')}
-						class="scrollbar-thin h-full w-full overflow-y-auto px-3 py-3 leading-relaxed text-on-surface-variant"
+						class="scrollbar-thin h-full w-full overflow-y-auto px-3 py-3 leading-relaxed text-on-surface-variant {findOpen
+							? 'find-textarea'
+							: ''}"
 						onscroll={onEditorScroll}
 					></Textarea>
 					<PreviewSurface
@@ -447,6 +453,16 @@
 				index={activeIndex}
 				onselect={choose}
 				onhover={(position) => (activeIndex = position)}
+			/>
+
+			<NoteFindOverlay
+				{view}
+				text={draft}
+				{html}
+				textarea={textareaEl}
+				preview={previewEl}
+				bind:open={findOpen}
+				onopen={() => (suggestions = null)}
 			/>
 		</div>
 	{/snippet}

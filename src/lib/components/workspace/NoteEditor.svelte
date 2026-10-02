@@ -493,6 +493,7 @@
 				spellcheck={settings.spellcheck}
 				{suggestions}
 				{activeIndex}
+				find
 				{tocEntries}
 				{tocActive}
 				bind:textareaEl

@@ -23,6 +23,14 @@ export const editor = {
 		guide: 'Formatting guide',
 	},
 	status: { wordsChars: '{words} words · {chars} chars' },
+	find: {
+		placeholder: 'Find in note',
+		noResults: 'No results',
+		previous: 'Previous match',
+		next: 'Next match',
+		caseSensitive: 'Match case',
+		close: 'Close find',
+	},
 	header: {
 		saving: 'Saving…',
 		notSaved: 'Not saved',

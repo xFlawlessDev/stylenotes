@@ -25,6 +25,14 @@ export const editor: EditorMessages = {
 		guide: 'Panduan format',
 	},
 	status: { wordsChars: '{words} kata · {chars} karakter' },
+	find: {
+		placeholder: 'Cari di catatan',
+		noResults: 'Tidak ada hasil',
+		previous: 'Kecocokan sebelumnya',
+		next: 'Kecocokan berikutnya',
+		caseSensitive: 'Bedakan huruf besar/kecil',
+		close: 'Tutup pencarian',
+	},
 	header: {
 		saving: 'Menyimpan…',
 		notSaved: 'Belum tersimpan',

@@ -996,11 +996,17 @@ fn prevent_default() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     use tauri_plugin_prevent_default::Flags;
 
     tauri_plugin_prevent_default::Builder::new()
-        .with_flags(Flags::all().difference(Flags::DEV_TOOLS | Flags::RELOAD))
+        .with_flags(Flags::all().difference(Flags::DEV_TOOLS | Flags::RELOAD | Flags::FIND))
         .build()
 }
 
 #[cfg(not(debug_assertions))]
 fn prevent_default() -> tauri::plugin::TauriPlugin<tauri::Wry> {
-    tauri_plugin_prevent_default::init()
+    use tauri_plugin_prevent_default::Flags;
+
+    // FIND is left out so the app's own find-in-note (Ctrl/Cmd+F) can run; the
+    // webview still intercepts the event, so no native browser find opens.
+    tauri_plugin_prevent_default::Builder::new()
+        .with_flags(Flags::all().difference(Flags::FIND))
+        .build()
 }

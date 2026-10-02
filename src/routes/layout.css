@@ -843,6 +843,49 @@ html[data-motion='reduced'] *::after {
 	background-color: var(--color-outline-variant);
 }
 
+/*
+	Find-in-note highlights.
+
+	The preview uses the CSS Custom Highlight API, so the highlight is painted
+	through a pseudo-element rather than by wrapping DOM (which would fight the
+	sanitized/rendered markup). The textarea path paints `<mark>` in the mirror
+	overlay (`FindMirror.svelte`) with the same tokens.
+*/
+::highlight(stylenotes-find) {
+	background-color: color-mix(in oklab, var(--color-primary) 32%, transparent);
+	color: inherit;
+}
+
+::highlight(stylenotes-find-active) {
+	background-color: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+.find-mark {
+	background-color: color-mix(in oklab, var(--color-primary) 32%, transparent);
+	color: inherit;
+	border-radius: 2px;
+}
+
+.find-mark--active {
+	background-color: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+/*
+	The textarea's own glyphs are made transparent so the mirror behind it shows
+	through, while the caret and selection stay visible. This is the only way to
+	highlight every match in a textarea.
+*/
+textarea.find-textarea {
+	color: transparent;
+	caret-color: var(--color-on-surface);
+}
+
+textarea.find-textarea::selection {
+	background-color: color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
 .markdown-body {
 	color: var(--color-on-surface-variant);
 	font-size: 15px;

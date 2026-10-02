@@ -6,6 +6,7 @@
 	import type { TocEntry } from '$lib/content/preview-toc';
 	import type { WikiSuggestion, WikiSuggestionSet } from '$lib/content/wiki-autocomplete';
 	import { t } from '$lib/i18n/index.svelte';
+	import NoteFindOverlay from '$lib/components/note/NoteFindOverlay.svelte';
 
 	/**
 	 * The editing surface: write, split, or preview. Owns the textarea and
@@ -21,6 +22,7 @@
 		activeIndex,
 		tocEntries = [],
 		tocActive = -1,
+		find = false,
 		textareaEl = $bindable(),
 		previewEl = $bindable(),
 		oninput,
@@ -43,6 +45,8 @@
 		activeIndex: number;
 		tocEntries?: TocEntry[];
 		tocActive?: number;
+		/** Enables find-in-note (Ctrl/Cmd+F) for this surface. */
+		find?: boolean;
 		textareaEl?: HTMLTextAreaElement | null;
 		previewEl?: HTMLDivElement | undefined;
 		oninput: (value: string) => void;
@@ -59,6 +63,8 @@
 	} = $props();
 
 	const open = $derived(!!suggestions?.items.length);
+	/** Mirrors the overlay's open state so the textarea can go transparent. */
+	let findOn = $state(false);
 </script>
 
 <div class="relative grid min-h-0 flex-1 overflow-hidden">
@@ -75,7 +81,9 @@
 			variant="bare"
 			size="lg"
 			placeholder={t('notes.editor.writePlaceholder')}
-			class="scrollbar-thin h-full w-full px-6 py-4 text-on-surface-variant"
+			class="scrollbar-thin h-full w-full px-6 py-4 text-on-surface-variant {findOn
+				? 'find-textarea'
+				: ''}"
 		></Textarea>
 	{:else if view === 'split'}
 		<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
@@ -91,7 +99,9 @@
 				variant="bare"
 				size="md"
 				placeholder={t('notes.editor.splitPlaceholder')}
-				class="scrollbar-thin h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
+				class="scrollbar-thin h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant {findOn
+					? 'find-textarea'
+					: ''}"
 				onscroll={oneditorscroll}
 			></Textarea>
 			<PreviewSurface
@@ -130,4 +140,15 @@
 		onselect={onchoose}
 		onhover={onhover}
 	/>
+
+	{#if find}
+		<NoteFindOverlay
+			{view}
+			text={draft}
+			{html}
+			textarea={textareaEl ?? null}
+			preview={previewEl}
+			bind:open={findOn}
+		/>
+	{/if}
 </div>
