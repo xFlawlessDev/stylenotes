@@ -67,6 +67,7 @@
 	// Each status gets its own colour + silhouette so the timeline is scannable at a glance:
 	// hollow dashed = planned, solid pill = active, tinted outline = under review, muted short bar = done.
 	const BAR_STYLES: Record<TaskStatus, string> = {
+		backlog: 'h-5 rounded-lg border border-outline/40 bg-surface-container/15 text-outline hover:bg-surface-container/40',
 		todo: 'h-5 rounded-lg border border-dashed border-outline/60 bg-surface-container/25 text-on-surface-variant hover:bg-surface-container/60',
 		doing: 'h-6 rounded-full bg-secondary/80 text-on-secondary shadow-sm hover:bg-secondary',
 		review: 'h-6 rounded-lg border border-tertiary/60 bg-tertiary/25 text-tertiary hover:bg-tertiary/35',

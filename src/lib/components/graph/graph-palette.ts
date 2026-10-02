@@ -17,6 +17,7 @@ export const GRAPH_TOKENS = {
 	labelStroke: '--color-surface',
 	note: '--graph-note',
 	task: {
+		backlog: '--graph-task-backlog',
 		todo: '--graph-task-todo',
 		doing: '--graph-task-doing',
 		review: '--graph-task-review',
@@ -39,6 +40,7 @@ const FALLBACK: Record<string, number> = {
 	'--color-surface': 0x0e1116,
 	'--color-on-surface': 0xdce3ee,
 	'--graph-note': 0x6f9dff,
+	'--graph-task-backlog': 0x5a6478,
 	'--graph-task-todo': 0x8b98ab,
 	'--graph-task-doing': 0x4fd0d8,
 	'--graph-task-review': 0xf0a44b,

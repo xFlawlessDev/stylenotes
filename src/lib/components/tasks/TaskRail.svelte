@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus } from '@lucide/svelte';
+	import { Archive, Circle, CircleCheck, CircleDashed, Eye, ListTodo, Plus } from '@lucide/svelte';
 	import { Button, SearchInput } from '$lib/components/base';
 	import type { Folder } from '$lib/stores/notes';
 	import { TASK_STATUSES, taskStatus, type Task, type TaskStatus } from '$lib/stores/tasks';
@@ -77,6 +77,7 @@
 
 	const statusIcons: Record<TaskStatus | 'all', typeof Circle> = {
 		all: ListTodo,
+		backlog: Archive,
 		todo: Circle,
 		doing: CircleDashed,
 		review: Eye,
@@ -85,6 +86,7 @@
 
 	const statusTone: Record<TaskStatus | 'all', string> = {
 		all: 'text-primary',
+		backlog: 'text-outline/70',
 		todo: 'text-outline',
 		doing: 'text-secondary',
 		review: 'text-tertiary',

@@ -200,7 +200,7 @@ pub fn task_board(bridge: &Bridge, args: &Value) -> Value {
         Err(error) => return error,
     };
     let workspace = workspace_arg(args);
-    let statuses = ["todo", "doing", "review", "done"];
+    let statuses = ["backlog", "todo", "doing", "review", "done"];
     let mut columns = Vec::new();
     for status in statuses {
         let mut tasks: Vec<Value> = array_of(&snapshot, "tasks")

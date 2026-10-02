@@ -2,7 +2,7 @@
 	import { Network, Pause, Play, ScanSearch, Search, Sparkles } from '@lucide/svelte';
 	import type { Note } from '$lib/content/content';
 	import type { CustomFolder } from '$lib/stores/notes';
-	import { type Task, type TaskDependency, type TaskStatus } from '$lib/stores/tasks';
+	import { TASK_STATUSES, type Task, type TaskDependency } from '$lib/stores/tasks';
 	import { buildWorkspaceGraph, defaultEdgeKinds, type GraphEdgeKind, type GraphNode, type GraphSuggestion } from '$lib/content/workspace-graph';
 	import {
 		GRAPH_TOKENS,
@@ -143,7 +143,7 @@
 	 */
 	const nodeLegend = $derived.by((): { label: string; token: string }[] => [
 		{ label: t('graph.node.note'), token: GRAPH_TOKENS.note },
-		...(['todo', 'doing', 'review', 'done'] as TaskStatus[]).map((status) => ({
+		...TASK_STATUSES.map((status) => ({
 			label: t('tasks.statusLabel.' + status),
 			token: GRAPH_TOKENS.task[status],
 		})),

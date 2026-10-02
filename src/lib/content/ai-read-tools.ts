@@ -27,6 +27,7 @@ import {
 	taskSummary,
 	tasksOf
 } from '$lib/content/ai-read-helpers';
+import { TASK_STATUSES } from '$lib/stores/tasks';
 import { rankNotes, rankTasks } from '$lib/content/search-rank';
 import type { AnsweredQuestion, QuestionItem } from '$lib/content/ai-questions';
 
@@ -315,7 +316,7 @@ function getTask(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 
 function taskBoard(ctx: ToolContext, args: Record<string, unknown>): ToolResult {
 	const workspace = str(args, 'workspace');
-	const columns = ['todo', 'doing', 'review', 'done'].map((status) => {
+	const columns = TASK_STATUSES.map((status) => {
 		const tasks = tasksOf(ctx.snapshot, workspace)
 			.filter((task) => task.status === status)
 			.sort((a, b) => a.position - b.position);

@@ -35,6 +35,7 @@ describe('graph palette', () => {
 		refreshGraphPalette();
 		const colors = [
 			graphNodeColor({ kind: 'note' }),
+			graphNodeColor({ kind: 'task', status: 'backlog' }),
 			graphNodeColor({ kind: 'task', status: 'todo' }),
 			graphNodeColor({ kind: 'task', status: 'doing' }),
 			graphNodeColor({ kind: 'task', status: 'review' }),

@@ -91,7 +91,7 @@ export const AI_TOOLS: AiToolSpec[] = [
 			properties: {
 				query: { type: 'string', description: 'Text to search for.' },
 				workspace,
-				status: { type: 'string', enum: ['todo', 'doing', 'review', 'done'] },
+				status: { type: 'string', enum: ['backlog', 'todo', 'doing', 'review', 'done'] },
 				priority: { type: 'string', enum: ['low', 'medium', 'high'] },
 				folder: { type: 'string' },
 				dueBefore: { type: 'string', description: 'YYYY-MM-DD; only tasks due strictly before this day.' },
@@ -173,7 +173,7 @@ export const AI_TOOLS: AiToolSpec[] = [
 			type: 'object',
 			properties: {
 				workspace,
-				status: { type: 'string', enum: ['todo', 'doing', 'review', 'done'] },
+				status: { type: 'string', enum: ['backlog', 'todo', 'doing', 'review', 'done'] },
 				priority: { type: 'string', enum: ['low', 'medium', 'high'] },
 				folder: { type: 'string' },
 				dueBefore: { type: 'string', description: 'YYYY-MM-DD; only tasks due strictly before this day.' },
@@ -311,7 +311,7 @@ export const AI_TOOLS: AiToolSpec[] = [
 			type: 'object',
 			properties: {
 				title: { type: 'string' },
-				status: { type: 'string', enum: ['todo', 'doing', 'review', 'done'] },
+				status: { type: 'string', enum: ['backlog', 'todo', 'doing', 'review', 'done'] },
 				priority: { type: 'string', enum: ['low', 'medium', 'high'] },
 				folder: { type: 'string' },
 				dueAt: { type: 'string', description: 'ISO date.' },

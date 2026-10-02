@@ -1,6 +1,6 @@
 import type { Note } from '$lib/content/content';
 
-export const TASK_STATUSES = ['todo', 'doing', 'review', 'done'] as const;
+export const TASK_STATUSES = ['backlog', 'todo', 'doing', 'review', 'done'] as const;
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -96,6 +96,7 @@ export type TaskFormData = {
 };
 
 export const statusMeta: Record<TaskStatus, { label: string; tone: string; dot: string }> = {
+	backlog: { label: 'Backlog', tone: 'text-outline', dot: 'bg-outline/40' },
 	todo: { label: 'To do', tone: 'text-on-surface-variant', dot: 'bg-outline/70' },
 	doing: { label: 'In progress', tone: 'text-secondary', dot: 'bg-secondary' },
 	review: { label: 'In review', tone: 'text-tertiary', dot: 'bg-tertiary' },
@@ -171,7 +172,7 @@ export function taskPriority(task: Task): TaskPriority {
 }
 
 export function tasksByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
-	const groups: Record<TaskStatus, Task[]> = { todo: [], doing: [], review: [], done: [] };
+	const groups: Record<TaskStatus, Task[]> = { backlog: [], todo: [], doing: [], review: [], done: [] };
 	for (const task of tasks) {
 		groups[taskStatus(task)].push(task);
 	}

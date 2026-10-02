@@ -30,6 +30,7 @@ export const tasks = {
 	splitNotice: 'Split — showing {name}',
 	anotherWorkspace: 'another workspace',
 	statusLabel: {
+		backlog: 'Backlog',
 		todo: 'To do',
 		doing: 'In progress',
 		review: 'In review',

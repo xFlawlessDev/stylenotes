@@ -40,6 +40,7 @@
 	const workspace = $derived(workspaceLookup()(task.workspaceId));
 
 	const statusDot: Record<TaskStatus, string> = {
+		backlog: 'bg-outline/50',
 		todo: 'bg-outline',
 		doing: 'bg-secondary',
 		review: 'bg-tertiary',

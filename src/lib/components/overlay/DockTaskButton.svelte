@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Circle, CircleCheck, CircleDashed, Eye } from '@lucide/svelte';
+	import { Archive, Circle, CircleCheck, CircleDashed, Eye } from '@lucide/svelte';
 	import { Button } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
 	import { dockItemBar, type DockEdge } from '$lib/dock';
@@ -30,6 +30,7 @@
 	} = $props();
 
 	const statusIcons: Record<TaskStatus, typeof Circle> = {
+		backlog: Archive,
 		todo: Circle,
 		doing: CircleDashed,
 		review: Eye,

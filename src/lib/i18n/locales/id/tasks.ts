@@ -32,6 +32,7 @@ export const tasks: TasksMessages = {
 	splitNotice: 'Terbagi — menampilkan {name}',
 	anotherWorkspace: 'ruang kerja lain',
 	statusLabel: {
+		backlog: 'Backlog',
 		todo: 'Akan dikerjakan',
 		doing: 'Sedang dikerjakan',
 		review: 'Ditinjau',

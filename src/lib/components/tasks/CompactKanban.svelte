@@ -55,7 +55,7 @@
 
 <section class="@container flex min-h-0 flex-1 flex-col" use:kanban>
 	<div
-		class="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-1.5 @[360px]:grid-cols-2 @[680px]:grid-cols-4"
+		class="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-1.5 @[360px]:grid-cols-2 @[560px]:grid-cols-3 @[760px]:grid-cols-5"
 	>
 		{#each TASK_STATUSES as status (status)}
 			{@const column = groups[status]}

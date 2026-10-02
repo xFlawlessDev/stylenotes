@@ -125,6 +125,7 @@
 	/* Graph palette: hue-separated so node statuses stay distinguishable.
 	   Lightness adapts per mode; hue is intentionally independent of accent. */
 	--graph-note: #6f9dff;
+	--graph-task-backlog: #5a6478;
 	--graph-task-todo: #8b98ab;
 	--graph-task-doing: #4fd0d8;
 	--graph-task-review: #f0a44b;
@@ -214,6 +215,7 @@ html.light {
 
 	/* Graph palette, darkened for light surfaces (same hues as dark mode). */
 	--graph-note: #3f6fdb;
+	--graph-task-backlog: #4c5566;
 	--graph-task-todo: #6b7788;
 	--graph-task-doing: #158fa0;
 	--graph-task-review: #b9741a;
@@ -484,6 +486,7 @@ html[data-motion='reduced'] *::after {
 
 	/* Graph palette utilities */
 	--color-graph-note: var(--graph-note);
+	--color-graph-task-backlog: var(--graph-task-backlog);
 	--color-graph-task-todo: var(--graph-task-todo);
 	--color-graph-task-doing: var(--graph-task-doing);
 	--color-graph-task-review: var(--graph-task-review);
