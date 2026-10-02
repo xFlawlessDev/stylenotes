@@ -83,6 +83,33 @@ export type TrashedAttachment = {
 	size: number;
 };
 
+/** One reference resolved to a local path, as `attachment_resolve` reports it. */
+export type ResolvedAttachment = {
+	reference: string;
+	path: string | null;
+	exists: boolean;
+};
+
+/**
+ * Resolves store references to their local paths **and** whether each blob is
+ * present. The catalog manager uses `exists` to hide a row whose blob was moved
+ * to Trash on another device; the render path uses the paths.
+ *
+ * Returns `null` when the store itself cannot be reached, so a caller can tell
+ * "nothing on disk" apart from "could not ask" and avoid hiding every row on a
+ * transient failure.
+ */
+export async function resolveAttachments(
+	references: string[]
+): Promise<ResolvedAttachment[] | null> {
+	if (!isTauri || references.length === 0) return [];
+	try {
+		return await invoke<ResolvedAttachment[]>('attachment_resolve', { references });
+	} catch {
+		return null;
+	}
+}
+
 /**
  * Moves a blob to Trash. The note's reference is left intact: delete is a store
  * action, so a mistake stays recoverable until the user empties the trash.

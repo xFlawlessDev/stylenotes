@@ -1,97 +1,89 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		FileText,
-		Film,
-		Image as ImageIcon,
-		Music,
-		RotateCcw,
-		Trash2,
-		X,
-	} from '@lucide/svelte';
-	import { Button } from '$lib/components/base';
+	import { FileText, Trash2 } from '@lucide/svelte';
+	import { Button, EmptyState, SearchInput, Select } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
-	import { formatBytes, catalogRows, totalBytes, kindForTarget } from '$lib/content/attachment-manager';
+	import {
+		catalogRows,
+		filterCatalogRows,
+		formatBytes,
+		totalBytes,
+		type AttachmentCatalogRow,
+		type AttachmentKindFilter
+	} from '$lib/content/attachment-manager';
+	import { attachmentMarkdown } from '$lib/content/attachments';
 	import {
 		attachmentStore,
-		emptyTrash,
 		primeAttachments,
-		purgeTrashed,
 		refreshAttachments,
 		removeAttachment,
-		restoreTrashed,
 		trashOrphans
 	} from '$lib/stores/attachments.svelte';
+	import AttachmentFileRow from '$lib/components/workspace/AttachmentFileRow.svelte';
+	import AttachmentTrashDialog from '$lib/components/workspace/AttachmentTrashDialog.svelte';
 
 	/**
 	 * Attachment manager (docs/design/artifacts.md).
 	 *
 	 * The store is content-addressed, so this is where the user sees what is
-	 * actually on disk: total size, orphaned blobs no note points at, and the
-	 * recoverable Trash. Nothing is deleted outright — a blob only leaves the
-	 * store when the user empties the trash.
+	 * actually on disk: total size, orphaned blobs no note points at, and a door
+	 * to the recoverable Trash. Nothing is deleted outright — a blob only leaves
+	 * the store when the user empties the trash. As the store grows, the list is
+	 * narrowed by kind and by search instead of scrolling.
 	 */
 	let noting = $state<string | null>(null);
+	let query = $state('');
+	let kind = $state<AttachmentKindFilter>('all');
+	let trashOpen = $state(false);
+	/** Id whose markdown was just copied, so its button can confirm. */
+	let copiedId = $state<string | null>(null);
 
 	onMount(() => void primeAttachments());
 
 	const rows = $derived(catalogRows(attachmentStore.catalog));
 	const referencesById = $derived(new Map(rows.map((row) => [row.id, row.reference])));
+	const orphanSet = $derived(new Set(attachmentStore.orphans));
 	const orphanCount = $derived(attachmentStore.orphans.length);
 	const total = $derived(totalBytes(attachmentStore.catalog));
-	const trashed = $derived(attachmentStore.trash);
-	const trashedBytes = $derived(trashed.reduce((sum, item) => sum + (item.size || 0), 0));
+	const filtered = $derived(filterCatalogRows(rows, { kind, query, orphans: orphanSet }));
+	const trashCount = $derived(attachmentStore.trash.length);
+	const filtering = $derived(Boolean(query.trim()) || kind !== 'all');
 
-	function iconFor(ext: string) {
-		const kind = kindForTarget(ext ? `x.${ext}` : 'x');
-		if (kind === 'image') return ImageIcon;
-		if (kind === 'video') return Film;
-		if (kind === 'audio') return Music;
-		return FileText;
-	}
+	const kindOptions = $derived(
+		(['all', 'image', 'video', 'audio', 'pdf', 'file', 'orphan'] as AttachmentKindFilter[]).map(
+			(value) => ({
+				value,
+				label:
+					value === 'all'
+						? t('settings.attachment.filterAll')
+						: value === 'orphan'
+							? t('settings.attachment.filterOrphans', { count: orphanCount })
+							: t(`settings.attachment.kind.${value}`)
+			})
+		)
+	);
 
-	function labelFor(ext: string): string {
-		const kind = kindForTarget(ext ? `x.${ext}` : 'x');
-		return t(`settings.attachment.kind.${kind}`);
-	}
-
-	function dateLabel(value: number): string {
+	async function use(row: AttachmentCatalogRow) {
 		try {
-			return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+			await navigator.clipboard.writeText(attachmentMarkdown(row.reference, row.label));
+			copiedId = row.id;
+			setTimeout(() => {
+				if (copiedId === row.id) copiedId = null;
+			}, 1500);
 		} catch {
-			return '';
+			/* clipboard denied: nothing copied, so do not claim success */
 		}
 	}
 
-	async function trashOne(id: string) {
-		const reference = referencesById.get(id);
-		if (!reference) return;
-		noting = id;
-		await removeAttachment(id, reference);
+	async function trashOne(row: AttachmentCatalogRow) {
+		noting = row.id;
+		await removeAttachment(row.id, row.reference);
 		noting = null;
 	}
 
 	async function trashAllOrphans() {
 		noting = '*';
 		await trashOrphans(referencesById);
-		noting = null;
-	}
-
-	async function restore(id: string) {
-		noting = id;
-		await restoreTrashed(id);
-		noting = null;
-	}
-
-	async function purge(id: string) {
-		noting = id;
-		await purgeTrashed(id);
-		noting = null;
-	}
-
-	async function clearTrash() {
-		noting = '*';
-		await emptyTrash();
 		noting = null;
 	}
 </script>
@@ -139,115 +131,66 @@
 		</div>
 	{/if}
 
-	{#if rows.length === 0 && !attachmentStore.loading}
-		<span class="text-label-sm font-label text-outline">{t('settings.attachment.empty')}</span>
+	{#if rows.length > 0}
+		<div class="flex items-center gap-2">
+			<SearchInput
+				bind:value={query}
+				class="min-w-0 flex-1"
+				placeholder={t('settings.attachment.searchPlaceholder')}
+				ariaLabel={t('settings.attachment.searchPlaceholder')}
+			/>
+			<Select
+				bind:value={kind}
+				options={kindOptions}
+				label={t('settings.attachment.filterLabel')}
+				variant="chip"
+				size="sm"
+				class="shrink-0"
+			/>
+		</div>
+	{/if}
+
+	{#if rows.length === 0}
+		{#if !attachmentStore.loading}
+			<span class="text-label-sm font-label text-outline">{t('settings.attachment.empty')}</span>
+		{/if}
+	{:else if filtered.length === 0}
+		<EmptyState icon={FileText} title={t('settings.attachment.noMatch')} />
 	{:else}
 		<div class="flex max-h-72 flex-col gap-1 overflow-y-auto">
-			{#each rows as row (row.id)}
-				{@const Icon = iconFor(row.ext)}
-				{#if attachmentStore.orphans.includes(row.id)}
-					<div
-						class="flex items-center gap-3 rounded-xl p-2.5 ring-1 ring-inset ring-tertiary/40"
-					>
-						<div
-							class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-tertiary-container text-on-tertiary-container"
-						>
-							<Icon size={15} />
-						</div>
-						<div class="flex min-w-0 flex-1 flex-col">
-							<span class="truncate text-body-sm font-body text-on-surface">{row.label}</span>
-							<span class="text-label-sm font-label text-tertiary">
-								{labelFor(row.ext)} · {formatBytes(row.size)} · {t('settings.attachment.orphanTag')}
-							</span>
-						</div>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={t('settings.attachment.trash')}
-							disabled={noting !== null}
-							onclick={() => void trashOne(row.id)}
-						>
-							<Trash2 size={15} />
-						</Button>
-					</div>
-				{:else}
-					<div class="flex items-center gap-3 rounded-xl p-2.5">
-						<div
-							class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant"
-						>
-							<Icon size={15} />
-						</div>
-						<div class="flex min-w-0 flex-1 flex-col">
-							<span class="truncate text-body-sm font-body text-on-surface">{row.label}</span>
-							<span class="text-label-sm font-label text-outline">
-								{labelFor(row.ext)} · {formatBytes(row.size)}
-							</span>
-						</div>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={t('settings.attachment.trash')}
-							disabled={noting !== null}
-							onclick={() => void trashOne(row.id)}
-						>
-							<Trash2 size={15} />
-						</Button>
-					</div>
-				{/if}
+			{#each filtered as row (row.id)}
+				<AttachmentFileRow
+					{row}
+					orphan={orphanSet.has(row.id)}
+					busy={noting !== null}
+					copied={copiedId === row.id}
+					onuse={(target) => void use(target)}
+					ontrash={(target) => void trashOne(target)}
+				/>
 			{/each}
 		</div>
 	{/if}
 
-	<div class="mt-1 flex flex-col gap-2">
-		<div class="flex items-center justify-between gap-3">
-			<span class="text-label-sm font-label tracking-wider text-outline uppercase">
-				{t('settings.attachment.trashTitle', { size: formatBytes(trashedBytes) })}
-			</span>
-			{#if trashed.length > 0}
-				<Button variant="ghost" size="sm" disabled={noting !== null} onclick={() => void clearTrash()}>
-					{t('settings.attachment.emptyTrash')}
-				</Button>
-			{/if}
-		</div>
+	{#if filtering && filtered.length > 0}
+		<span class="text-label-sm font-label text-outline">
+			{t('settings.attachment.showing', { shown: filtered.length, total: rows.length })}
+		</span>
+	{/if}
 
-		{#if trashed.length === 0}
-			<span class="text-label-sm font-label text-outline">{t('settings.attachment.trashEmpty')}</span>
-		{:else}
-			<div class="flex max-h-56 flex-col gap-1 overflow-y-auto">
-				{#each trashed as item (item.id)}
-					<div class="flex items-center gap-3 rounded-xl p-2.5">
-						<div class="flex min-w-0 flex-1 flex-col">
-							<span class="truncate font-code text-label-sm text-on-surface">
-								{item.id.slice(0, 12)}{item.ext ? `.${item.ext}` : ''}
-							</span>
-							<span class="text-label-sm font-label text-outline">
-								{dateLabel(item.deletedAt)} · {formatBytes(item.size)}
-							</span>
-						</div>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={t('settings.attachment.restore')}
-							disabled={noting !== null}
-							onclick={() => void restore(item.id)}
-						>
-							<RotateCcw size={15} />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={t('settings.attachment.purge')}
-							disabled={noting !== null}
-							onclick={() => void purge(item.id)}
-						>
-							<X size={15} />
-						</Button>
-					</div>
-				{/each}
-			</div>
-		{/if}
-		<p class="text-label-sm font-label leading-relaxed text-outline">
-			{t('settings.attachment.note', { days: 30 })}
-		</p>
+	<div class="mt-1 flex items-center justify-between gap-3">
+		<div class="flex flex-col">
+			<span class="text-label-sm font-label tracking-wider text-outline uppercase">
+				{t('settings.attachment.trashTitle')}
+			</span>
+			<span class="text-label-sm font-label text-outline">
+				{trashCount > 0 ? t('settings.attachment.trashCount', { count: trashCount }) : t('settings.attachment.trashEmpty')}
+			</span>
+		</div>
+		<Button variant="secondary" size="sm" onclick={() => (trashOpen = true)}>
+			<Trash2 size={14} />
+			{t('settings.attachment.openTrash')}
+		</Button>
 	</div>
 </div>
+
+<AttachmentTrashDialog bind:open={trashOpen} />

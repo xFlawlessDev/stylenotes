@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
 	catalogRows,
+	filterCatalogRows,
+	filterTrashRows,
 	formatBytes,
 	orphanIds,
 	referenceId,
@@ -76,5 +78,60 @@ describe('referenceId', () => {
 		expect(referenceId(`stylenotes-attachment://${'a'.repeat(64)}.png`)).toBe('a'.repeat(64));
 		expect(referenceId('https://x.test/a.png')).toBeNull();
 		expect(referenceId('/a/b.png')).toBeNull();
+	});
+});
+
+describe('filterCatalogRows', () => {
+	const image = record({ id: 'i'.repeat(64), ext: 'png', name: 'shot.png' });
+	const doc = record({ id: 'd'.repeat(64), ext: 'pdf', name: 'report.pdf' });
+
+	it('keeps every row with no filter', () => {
+		const rows = catalogRows([image, doc]);
+		expect(filterCatalogRows(rows)).toHaveLength(2);
+	});
+
+	it('matches a kind filter', () => {
+		const rows = catalogRows([image, doc]);
+		expect(filterCatalogRows(rows, { kind: 'image' }).map((row) => row.id)).toEqual([
+			'i'.repeat(64),
+		]);
+	});
+
+	it('matches a search over the label and the id', () => {
+		const rows = catalogRows([image, doc]);
+		expect(filterCatalogRows(rows, { query: 'report' }).map((row) => row.id)).toEqual([
+			'd'.repeat(64),
+		]);
+		expect(filterCatalogRows(rows, { query: 'i'.repeat(10) })).toHaveLength(1);
+	});
+
+	it('combines a query with a kind, and combines both with orphans', () => {
+		const rows = catalogRows([image, doc]);
+		expect(filterCatalogRows(rows, { kind: 'pdf', query: 'report' })).toHaveLength(1);
+		expect(filterCatalogRows(rows, { query: 'report', kind: 'image' })).toHaveLength(0);
+		expect(
+			filterCatalogRows(rows, { kind: 'orphan', orphans: new Set(['i'.repeat(64)]) }).map(
+				(row) => row.id
+			)
+		).toEqual(['i'.repeat(64)]);
+	});
+});
+
+describe('filterTrashRows', () => {
+	const items = [
+		{ id: 'a'.repeat(64), ext: 'png', deletedAt: 2, size: 1 },
+		{ id: 'b'.repeat(64), ext: 'pdf', deletedAt: 1, size: 1 },
+	];
+
+	it('returns every row with no query', () => {
+		expect(filterTrashRows(items)).toHaveLength(2);
+	});
+
+	it('filters by name fragment and by kind', () => {
+		expect(filterTrashRows(items, { query: 'b'.repeat(6) })).toHaveLength(1);
+		expect(filterTrashRows(items, { kind: 'pdf' }).map((item) => item.id)).toEqual([
+			'b'.repeat(64),
+		]);
+		expect(filterTrashRows(items, { kind: 'pdf', query: 'a'.repeat(6) })).toHaveLength(0);
 	});
 });

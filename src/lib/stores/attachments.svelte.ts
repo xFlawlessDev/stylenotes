@@ -14,15 +14,17 @@
 import { browser } from '$app/environment';
 import { isTauri } from '$lib/windows';
 import { attachmentsRepo, notesRepo, type AttachmentRecord } from '$lib/db';
+import { attachmentReference } from '$lib/content/attachments';
 import {
 	deleteAttachment,
 	listTrashedAttachments,
 	purgeAttachment,
 	purgeExpiredTrash,
+	resolveAttachments,
 	restoreAttachment,
 	type TrashedAttachment
 } from '$lib/content/attachment-actions';
-import { orphanIds, referencedIds } from '$lib/content/attachment-manager';
+import { orphanIds, referencedIds, referenceId } from '$lib/content/attachment-manager';
 
 /** Trashed blobs older than this are purged on first load of the manager. */
 export const TRASH_RETENTION_DAYS = 30;
@@ -68,7 +70,25 @@ export async function refreshAttachments(): Promise<void> {
 			listTrashedAttachments(),
 			notesRepo.list().catch(() => [])
 		]);
-		catalog = records;
+		// The catalog is an index, not the truth (docs/design/artifacts.md #A6): a
+		// blob moved to Trash (or deleted on another device) still has its row, so
+		// showing it would resurrect a file the user just removed. Keep only blobs
+		// that are actually on disk. When the store cannot be reached we keep every
+		// row rather than hiding the whole catalog on a transient failure.
+		const resolved = await resolveAttachments(
+			records.map((record) => attachmentReference(record.id, record.ext))
+		);
+		if (resolved) {
+			const present = new Set(
+				resolved
+					.filter((item) => item.exists)
+					.map((item) => referenceId(item.reference))
+					.filter((id): id is string => Boolean(id))
+			);
+			catalog = records.filter((record) => present.has(record.id));
+		} else {
+			catalog = records;
+		}
 		trash = trashed;
 		referenced = referencedIds(notes.map((note) => note.body));
 	} catch {
@@ -154,6 +174,10 @@ export async function emptyTrash(): Promise<number> {
 	busy = '*';
 	try {
 		const removed = await purgeExpiredTrash(0);
+		// The catalog is a derived index; `refreshAttachments` filters it against
+		// disk, so a row for a purged blob simply stops showing instead of being
+		// deleted here (a purge of a stale trash copy must never drop a live blob's
+		// row — the same content can exist in both places).
 		await refreshAttachments();
 		return removed;
 	} finally {

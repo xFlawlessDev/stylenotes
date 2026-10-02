@@ -25,6 +25,21 @@ export type CatalogRow = {
 	lastSeenAt: number;
 };
 
+/** A catalog row enriched for the manager: display label, reference, and kind. */
+export type AttachmentCatalogRow = CatalogRow & {
+	label: string;
+	reference: string;
+	kind: AttachmentKind;
+};
+
+/** Trashed blob as the manager lists it (mirrors `TrashedAttachment`). */
+export type TrashRow = {
+	id: string;
+	ext: string;
+	deletedAt: number;
+	size: number;
+};
+
 function displayName(record: AttachmentRecord): string {
 	const name = record.name?.trim();
 	if (name) return fileNameFromPath(name);
@@ -36,22 +51,78 @@ function displayName(record: AttachmentRecord): string {
  * Rows for the manager: newest first, each with a display name and size, plus a
  * stable reference the user can drop back into a note.
  */
-export function catalogRows(records: AttachmentRecord[]): Array<CatalogRow & { label: string; reference: string; kind: AttachmentKind }> {
-	return [...records]
-		.sort((a, b) => b.createdAt - a.createdAt)
-		.map((record) => ({
-			id: record.id,
-			ext: record.ext,
-			name: record.name,
-			size: record.size,
-			relPath: record.relPath,
-			createdAt: record.createdAt,
-			lastSeenAt: record.lastSeenAt,
-			label: displayName(record),
-			reference: `stylenotes-attachment://${record.id}${record.ext ? `.${record.ext}` : ''}`,
-			kind: attachmentKind(record.ext)
-		}));
+export function catalogRows(records: AttachmentRecord[]): AttachmentCatalogRow[] {
+	return [...records].sort((a, b) => b.createdAt - a.createdAt).map(catalogRow);
 }
+
+/** The catalog's label, reference and kind for one id, without re-sorting. */
+export function catalogRow(record: AttachmentRecord): AttachmentCatalogRow {
+	return {
+		id: record.id,
+		ext: record.ext,
+		name: record.name,
+		size: record.size,
+		relPath: record.relPath,
+		createdAt: record.createdAt,
+		lastSeenAt: record.lastSeenAt,
+		label: displayName(record),
+		reference: `stylenotes-attachment://${record.id}${record.ext ? `.${record.ext}` : ''}`,
+		kind: attachmentKind(record.ext)
+	};
+}
+
+/** What the manager's file list can be filtered by. */
+export type AttachmentKindFilter = AttachmentKind | 'all' | 'orphan';
+
+/** Case-insensitive match over a row's name and id (the visible label). */
+export function matchesAttachmentQuery(row: { label: string; id: string }, query: string): boolean {
+	const needle = query.trim().toLowerCase();
+	if (!needle) return true;
+	return row.label.toLowerCase().includes(needle) || row.id.toLowerCase().includes(needle);
+}
+
+/**
+ * Rows passing a kind filter and a search query, in catalog order. `orphan`
+ * keeps rows no note references; the other kinds match the file type, so the
+ * manager can answer "show me only the images" without a second scan.
+ */
+export function filterCatalogRows(
+	rows: AttachmentCatalogRow[],
+	options: { kind?: AttachmentKindFilter; query?: string; orphans?: ReadonlySet<string> } = {}
+): AttachmentCatalogRow[] {
+	const { kind = 'all', query = '', orphans } = options;
+	return rows.filter((row) => {
+		if (kind === 'orphan' && !orphans?.has(row.id)) return false;
+		if (kind !== 'all' && kind !== 'orphan' && row.kind !== kind) return false;
+		return matchesAttachmentQuery(row, query);
+	});
+}
+
+/** Trash rows passing a kind filter and search query, in the order given. */
+export function filterTrashRows<T extends { id: string; ext: string }>(
+	rows: T[],
+	options: { kind?: AttachmentKindFilter; query?: string } = {}
+): T[] {
+	const { kind = 'all', query = '' } = options;
+	const needle = query.trim().toLowerCase();
+	return rows.filter((row) => {
+		if (kind !== 'all' && kind !== 'orphan' && attachmentKind(row.ext) !== kind) return false;
+		if (!needle) return true;
+		const name = `${row.id}${row.ext ? `.${row.ext}` : ''}`.toLowerCase();
+		return name.includes(needle);
+	});
+}
+
+/** Kind choices offered by the manager's filter bar, in display order. */
+export const ATTACHMENT_KIND_FILTERS: AttachmentKindFilter[] = [
+	'all',
+	'image',
+	'video',
+	'audio',
+	'pdf',
+	'file',
+	'orphan'
+];
 
 /**
  * Catalog ids that no note body references — safe to move to Trash. A record
