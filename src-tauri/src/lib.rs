@@ -14,6 +14,7 @@ mod mcp_host;
 mod mcp_watch;
 mod quit;
 mod remote_mcp;
+mod vault;
 
 // The stdio shim's read side, compiled into the app as well so the remote HTTP
 // listener can answer reads from the snapshot exactly like the shim does (#D2,
@@ -811,6 +812,40 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        // Vault folder (docs/design/vault-mirror.md). SQLite stays the source of
+        // truth; the folder is a projection of it. `workspaces.vault_mode` is
+        // 'off' by default, so every existing workspace keeps today's behaviour.
+        //
+        // `vault_links` is a derived index (like `embeddings`): it records what
+        // was last written to or read from each file, so our own writes can be
+        // told apart from an outside edit (`content_hash`) and so a deleted file
+        // becomes a recoverable tombstone instead of a silent loss. It can be
+        // dropped and rebuilt by scanning the folder at any time.
+        Migration {
+            version: 25,
+            description: "create_vault_binding_and_links",
+            sql: "
+                ALTER TABLE workspaces ADD COLUMN vault_mode TEXT NOT NULL DEFAULT 'off';
+                ALTER TABLE workspaces ADD COLUMN vault_path TEXT;
+                ALTER TABLE workspaces ADD COLUMN type TEXT NOT NULL DEFAULT 'app';
+
+                CREATE TABLE IF NOT EXISTS vault_links (
+                    workspace_id TEXT NOT NULL,
+                    rel_path     TEXT NOT NULL,
+                    entity_kind  TEXT NOT NULL DEFAULT 'note',
+                    entity_id    TEXT,
+                    content_hash TEXT NOT NULL DEFAULT '',
+                    file_mtime   INTEGER,
+                    synced_at    INTEGER NOT NULL,
+                    state        TEXT NOT NULL DEFAULT 'ok',
+                    PRIMARY KEY (workspace_id, rel_path)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_vault_links_entity
+                    ON vault_links (workspace_id, entity_id);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -872,7 +907,13 @@ pub fn run() {
             remote_mcp::commands::remote_mcp_start,
             remote_mcp::commands::remote_mcp_stop,
             remote_mcp::commands::remote_mcp_status,
-            remote_mcp::commands::remote_mcp_rotate
+            remote_mcp::commands::remote_mcp_rotate,
+            vault::commands::vault_export_files,
+            vault::commands::vault_copy_file,
+            vault::commands::vault_read_files,
+            vault::commands::vault_scan,
+            vault::commands::vault_validate_root,
+            vault::commands::vault_import_attachment
         ])
         .setup(|app| {
             // Lays down `mcp/`, clears stale jobs, and writes the first

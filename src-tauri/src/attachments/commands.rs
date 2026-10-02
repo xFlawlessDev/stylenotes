@@ -124,7 +124,19 @@ pub fn attachment_import_bytes(
     name: String,
     bytes: Vec<u8>,
 ) -> Result<StoredAttachment, String> {
-    let root = data_root(&app)?;
+    import_bytes(&app, &name, bytes)
+}
+
+/// Stores raw bytes under the content-addressed store.
+///
+/// Shared by the clipboard-paste command and the vault importer, so both agree
+/// on layout and deduplication.
+pub fn import_bytes<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    name: &str,
+    bytes: Vec<u8>,
+) -> Result<StoredAttachment, String> {
+    let root = data_root(app)?;
     let label = if name.trim().is_empty() {
         "pasted-file"
     } else {

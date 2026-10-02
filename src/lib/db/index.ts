@@ -21,3 +21,5 @@ export type { ClusterRecord } from './clusters';
 export { settingsRepo } from './settings';
 export { tasksRepo, dependenciesRepo } from './tasks';
 export { workspacesRepo } from './workspaces';
+export { vaultRepo } from './vault';
+export type { VaultBinding, VaultFile, VaultLink, VaultMode, VaultWorkspaceType } from './vault';

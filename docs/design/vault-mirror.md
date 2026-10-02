@@ -1,6 +1,9 @@
 # System Design — Vault Folder (file-over-app, SQLite tetap sumber kebenaran)
 
-> Status: **Design decided — 22 keputusan (#V1–#V22), 0 pertanyaan terbuka.**
+> Status: **F0 + impor folder (F1) diimplementasikan** (2026-10-02). Keputusan #V1–#V22 tetap berlaku;
+> yang sudah ada di kode: migrasi 25, `src-tauri/src/vault/`, `content/vault-format.ts`,
+> `content/vault-plan.ts`, `content/vault-reconcile.ts`, `db/vault.ts`, `stores/vault.svelte.ts`,
+> `VaultSettings.svelte`. Watcher otomatis & mode dua-arah (F2–F3) masih desain. Lihat §10–§11.
 > Tanggal: 2026-10-02
 > Scope: user bisa memilih sebuah **folder workspace** sebagai cermin (mirror) data —
 > note, folder, tag, task — dalam bentuk `.md` + `attachments/`, dan memilih apakah
@@ -868,3 +871,121 @@ flowchart LR
     S1 -. "subfolder note, BUKAN workspace kedua" .-> X[NO]
     VA -. "tidak boleh tumpang tindih" .-> VB2["NO: tidak boleh bersarang"]
 ```
+
+---
+
+## 10. Catatan implementasi F0 (2026-10-02)
+
+F0 (export mirror satu arah) sudah ada di kode. Bagian ini mencatat **apa yang
+sebenarnya dibangun** dan **di mana ia menyimpang** dari rencana di atas. Semua
+keputusan #V1–#V22 tetap berlaku; yang tercatat di sini hanya detail.
+
+### 10.1 Berkas
+
+| Berkas | Isi |
+|---|---|
+| `src-tauri/src/vault/mod.rs` | Murni: `safe_rel_path` (anti-traversal), `rel_key`, `hash_bytes`, `write_atomic` (part → sync_all → rename, replace di Windows), `is_skipped_rel`. 6 tes. |
+| `src-tauri/src/vault/commands.rs` | I/O: `vault_export_files`, `vault_copy_file`, `vault_read_files`, `vault_scan`, `vault_validate_root`. 3 tes. |
+| `src-tauri/src/lib.rs` | Migrasi **25** (`vault_links`, kolom `vault_mode`/`vault_path`/`type` di `workspaces`); command terdaftar di `generate_handler!`. |
+| `src/lib/content/vault-format.ts` | Murni: `vaultSegment` (reserved name, trailing dot/space, NFC), `vaultFolderSegment`, `vaultRelPath`, `renderVaultNote`, `parseVaultNote`. |
+| `src/lib/content/vault-plan.ts` | Murni: `planExport` (nama bentrok → sufiks), `attachmentRelPath`. |
+| `src/lib/content/vault-format.test.ts` | 20 tes untuk kedua modul murni di atas. |
+| `src/lib/db/vault.ts` | Repo binding + `vault_links` (return `boolean`/jumlah gagal). |
+| `src/lib/stores/vault.svelte.ts` | Orkestrasi: hydrate, pilih folder, mode, `exportVault`. |
+| `src/lib/components/workspace/VaultSettings.svelte` | Section **Vault** di Settings. |
+| i18n | `locales/{en,id}/settings.ts`: `nav.vault` + `settings.vault.*`. |
+
+### 10.2 Penyimpangan dari rencana
+
+- **Dua command export, bukan satu.** `vault_export_files` menulis note (frontend
+  yang merender isinya, karena hanya TS yang punya parser markdown penuh), dan
+  `vault_copy_file` menyalin blob attachment dari store. Memilih satu command
+  besar berarti menyerahkan rendering markdown ke Rust, yang akan menduplikasi
+  format di dua bahasa.
+- **Tidak ada command pemilih folder Rust.** Dialog tetap di frontend
+  (`plugin-dialog`); validasi folder (`vault_validate_root`) yang di Rust. Ini
+  menghindari izin baru sementara pengecekan overlap (#V20) tetap di sisi yang
+  bisa `canonicalize` dengan benar. (Rencana #V13 menyebut `vault_choose_folder`
+  sebagai command; hasil akhirnya setara, hanya letak dialognya.)
+- **`write_atomic` menghapus target di Windows sebelum rename** alih-alih
+  memanggil `MoveFileExW`. Alasan: menghindari FFI `windows` baru; jendela
+  non-atomiknya diterima dan dikompensasi `content_hash` (#V7), persis seperti
+  yang diizinkan #V22.
+- **`vault_links` belum dipakai untuk loop suppression.** Di F0 hanya satu arah,
+  jadi tidak ada loop; kolom `content_hash` sudah diisi dan siap dipakai di F2.
+- **Task belum ikut diekspor.** Task adalah F-lanjutan; F0 memproyeksikan note.
+
+### 10.3 Yang belum (F1–F3)
+
+- F1: watcher rekursif (`notify`) + `vault_wait_change`; **impor folder → DB sudah ada** (§11).
+- F2: loop suppression otomatis, antrean konflik, `entity_versions` (impor manual sudah menyimpan versi).
+- F3: mode `vault` dua arah di UI (kini hanya `off`/`mirror`), status/konflik UI.
+
+### 10.4 Verifikasi
+
+- `bun run check` — 0 error.
+- `bun run fmt:check` — bersih.
+- `bun run clippy` (`-D warnings`, `--all-features`) — bersih.
+- `cargo test --no-default-features vault` — 9/9 lulus.
+- `vitest` `vault-format.test.ts` — 20/20 lulus.
+
+---
+
+## 11. Catatan implementasi F1 (impor folder → app)
+
+Bagian kedua yang sudah ada: membaca folder kembali ke app, **secara eksplisit dan
+aman**. Ini bukan watcher (itu F1 penuh yang menunggu); ini reconcile yang
+dijalankan saat user memintanya, memakai blok yang sama dengan watcher nanti.
+
+### 11.1 Alur
+
+```
+Settings → Vault → “Read from folder”
+  → vault_scan(root, recursive)            (Rust, hash tiap berkas)
+  → planSync(files, notes, vault_links)    (murni, teruji)
+      skip: hash sama (#V7) · marker konflik · conflicted copy · berkas kosong
+      create: berkas tanpa id → note baru, lalu id ditulis balik ke berkas
+      update: id dikenal → note diperbarui; versi lama → entity_versions
+      attachment: blob di attachments/ belum ada → dipanggil ke store (dedup hash)
+      orphanLink: berkas hilang → dilaporkan, TIDAK menghapus note
+  → persistNote(...) untuk tiap note        (satu pintu tulis yang sama dengan editor)
+  → vaultRepo.putMany(link)                  (content_hash baru dicatat)
+```
+
+### 11.2 Keputusan yang diambil saat menulis kode
+
+- **Impor bersifat aditif.** Tidak ada jalur yang menghapus note. Berkas yang
+  hilang hanya jadi `orphanLink` di laporan, sesuai #V8/#V18.
+- **Menimpa selalu menyimpan versi.** Sebelum sebuah note ditimpa dari berkas,
+  `captureVersion(..., 'vault')` menyimpan versi app, jadi perubahan luar bisa
+  di-undo dari Record History. `VersionReason` bertambah `'vault'`.
+- **Berkas kosong tidak mengosongkan note.** Kalau berkas yang pernah kita tulis
+  sekarang kosong/terpotong, ia di-skip (`empty`) alih-alih menghapus isi note —
+  pilihan aman yang konservatif.
+- **`vault_import_attachment` membaca hanya `attachments/`.** Path divalidasi dan
+  dibatasi ke subtree itu, jadi `rel_path` yang dibuat jahat tidak bisa menarik
+  berkas sembarang ke store. Byte-nya masuk lewat `import_bytes` yang sama dengan
+  paste clipboard, jadi layout & dedup identik.
+- **`orphanTolerant` untuk `type='folder'`.** Satu folder fisik bisa dibuka lebih
+  dari satu workspace, jadi link yang note-nya tidak ada di workspace *ini* tidak
+  dilaporkan sebagai orphan (#V21).
+- **Bukan watcher.** Belum ada `notify`; reconcile dipicu tombol. Saat watcher
+  ditambahkan, ia memanggil fungsi yang sama, sehingga tidak ada logika ganda.
+
+### 11.3 Berkas F1
+
+| Berkas | Isi |
+|---|---|
+| `src/lib/content/vault-reconcile.ts` | Murni: `planSync`, deteksi konflik (`hasConflictMarkers`, `isConflictedCopy`), `isAttachmentPath`. |
+| `src/lib/content/vault-reconcile.test.ts` | 13 tes. |
+| `src-tauri/src/vault/commands.rs` | `vault_import_attachment`; `VaultFile.content_hash`. |
+| `src-tauri/src/attachments/commands.rs` | `import_bytes` diekstrak supaya vault dan clipboard-paste berbagi store. |
+| `src/lib/stores/vault.svelte.ts` | `reconcileVault()`. |
+| `src/lib/components/workspace/VaultSettings.svelte` | Tombol **Read from folder** + ringkasan. |
+| `src/lib/content/version-types.ts` | `VersionReason` bertambah `'vault'`. |
+
+### 11.4 Verifikasi F1
+
+- `cargo test --no-default-features --lib` — **178/178** lulus.
+- `vitest vault-reconcile.test.ts` — 13/13 lulus.
+- `bun run clippy` (`-D warnings`, `--all-features`) — bersih; `fmt:check` bersih.

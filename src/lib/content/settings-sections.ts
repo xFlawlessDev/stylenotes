@@ -16,5 +16,6 @@ export type SettingsSection =
 	| 'memory'
 	| 'journal'
 	| 'attachments'
+	| 'vault'
 	| 'data'
 	| 'about';
