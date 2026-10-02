@@ -157,13 +157,16 @@ async function copyAttachments(references: string[], root: string): Promise<numb
  */
 export async function exportVault(): Promise<VaultStats | null> {
 	if (!browser || !isTauri || !vaultStore.path || vaultStore.mode === 'off') return null;
+	// A `type = 'folder'` workspace is read-only by design: the app must not
+	// stamp its frontmatter onto files the user already owns (#V21).
+	if (vaultStore.type === 'folder') return null;
 	if (vaultStore.status === 'exporting') return null;
 	vaultStore.status = 'exporting';
 	vaultStore.error = null;
 	try {
 		const root = vaultStore.path;
 		const notes = await listNotes(workspaceStore.activeId);
-		const plan = planExport(notes, { writeId: vaultStore.type !== 'folder' });
+		const plan = planExport(notes);
 
 		let results: RustWriteResult[] = [];
 		try {
@@ -228,7 +231,10 @@ export function currentVaultBinding(): VaultBinding {
  * orphan link, never an automatic removal (#V8); the caller decides.
  */
 export async function reconcileVault(): Promise<VaultSyncResult | null> {
-	if (!browser || !isTauri || !vaultStore.path || vaultStore.mode === 'off') return null;
+	if (!browser || !isTauri || !vaultStore.path) return null;
+	// A normal workspace needs a mode; a read-only folder workspace reads even
+	// with the mode at `off`, since reading is all it is allowed to do (#V21).
+	if (vaultStore.mode === 'off' && vaultStore.type !== 'folder') return null;
 	if (vaultStore.status === 'exporting') return null;
 	vaultStore.status = 'exporting';
 	vaultStore.error = null;
@@ -343,6 +349,59 @@ export async function reconcileVault(): Promise<VaultSyncResult | null> {
 		vaultStore.error = cause instanceof Error ? cause.message : String(cause);
 		vaultStore.status = 'error';
 		return null;
+	}
+}
+
+/** The number of milliseconds between automatic two-way syncs. */
+export const VAULT_SYNC_INTERVAL_MS = 20_000;
+
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+let syncRunning = false;
+
+/**
+ * Runs one automatic cycle: read the folder, then write it back.
+ *
+ * Read-then-write, never the other way round, so an outside edit is imported
+ * before the app re-exports. `exportVault` then skips unchanged files by hash, so
+ * the write step does not change `mtime` and the next read sees nothing new —
+ * the loop terminates (#V7). Also exports the `id` the app stamped onto a file it
+ * created, so a rename is an update from then on (#V4).
+ */
+async function runVaultCycle(): Promise<void> {
+	if (syncRunning) return;
+	syncRunning = true;
+	try {
+		await reconcileVault();
+		await exportVault();
+	} finally {
+		syncRunning = false;
+	}
+}
+
+/**
+ * Starts automatic two-way sync for a workspace in `vault` mode.
+ *
+ * A poll rather than a filesystem watcher: `notify` (the recursive watcher of
+ * #V19) is still to come, and the sweep already handles files made while the app
+ * was closed (#V18). It runs only in the always-alive `workspace` window (#V5),
+ * only when the mode is `vault`, and does nothing while an export is in flight.
+ */
+export function startVaultSync(): void {
+	if (!browser || !isTauri) return;
+	void hydrateVault().then(() => {
+		if (vaultStore.mode !== 'vault') return;
+		if (syncTimer) clearInterval(syncTimer);
+		syncTimer = setInterval(() => {
+			if (vaultStore.mode === 'vault' && vaultStore.path) void runVaultCycle();
+		}, VAULT_SYNC_INTERVAL_MS);
+	});
+}
+
+/** Stops the automatic sync, e.g. when the window tears down. */
+export function stopVaultSync(): void {
+	if (syncTimer) {
+		clearInterval(syncTimer);
+		syncTimer = null;
 	}
 }
 

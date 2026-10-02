@@ -1,9 +1,9 @@
 # System Design — Vault Folder (file-over-app, SQLite tetap sumber kebenaran)
 
-> Status: **F0 + impor folder (F1) diimplementasikan** (2026-10-02). Keputusan #V1–#V22 tetap berlaku;
+> Status: **F0 + impor folder + auto-sync (mode `vault`) diimplementasikan** (2026-10-02). Keputusan #V1–#V22 tetap berlaku;
 > yang sudah ada di kode: migrasi 25, `src-tauri/src/vault/`, `content/vault-format.ts`,
 > `content/vault-plan.ts`, `content/vault-reconcile.ts`, `db/vault.ts`, `stores/vault.svelte.ts`,
-> `VaultSettings.svelte`. Watcher otomatis & mode dua-arah (F2–F3) masih desain. Lihat §10–§11.
+> `VaultSettings.svelte`. Watcher `notify` & dialog konflik (F2) masih desain. Lihat §10–§11.
 > Tanggal: 2026-10-02
 > Scope: user bisa memilih sebuah **folder workspace** sebagai cermin (mirror) data —
 > note, folder, tag, task — dalam bentuk `.md` + `attachments/`, dan memilih apakah
@@ -989,3 +989,53 @@ Settings → Vault → “Read from folder”
 - `cargo test --no-default-features --lib` — **178/178** lulus.
 - `vitest vault-reconcile.test.ts` — 13/13 lulus.
 - `bun run clippy` (`-D warnings`, `--all-features`) — bersih; `fmt:check` bersih.
+
+### 11.5 Auto-sync (mode `vault`)
+
+Mode `vault` kini hidup di UI dan menjalankan siklus otomatis:
+
+```
+startVaultSync()  (workspace window, dari workspace-session)
+  → tiap VAULT_SYNC_INTERVAL_MS (20 s), kalau mode='vault' dan folder ada
+  → reconcileVault()   // baca dulu
+  → exportVault()      // baru tulis; berkas tak berubah di-skip oleh hash
+```
+
+Alasan **baca-dulu-baru-tulis**, dan alasan loop berhenti:
+
+1. `reconcileVault` mengimpor editan luar (tulis ke DB) dan menulis `content_hash`
+   baru ke `vault_links`.
+2. `exportVault` merender ulang dari DB; berkas yang sudah sama persis di-skip di
+   Rust, jadi `mtime` tidak berubah.
+3. Kalau urutannya dibalik, export akan menimpa editan luar sebelum sempat dibaca.
+
+**Ini poll, bukan watcher.** `notify` (#V19) belum ada; poll sudah menutup kasus
+#V18 (berkas dibuat saat app tertutup) karena sweep memang membaca keadaan nyata.
+Saat watcher ditambahkan, ia memanggil `runVaultCycle` yang sama.
+
+### 11.6 Yang belum benar-benar F2
+
+- **Belum ada dialog konflik.** `updated_at` tidak lagi dianggap bukti konflik
+  (klok perangkat bisa berbeda); aturan F2 yang dipilih adalah membandingkan base
+  `vault_links.content_hash` dengan editan app. Selama itu belum ada, menimpa dari
+  berkas selalu menyimpan versi app (`reason: 'vault'`), jadi tidak ada kehilangan
+  data — hanya belum ada pratinjau diff dan tombol Keep app / Keep file / Keep both.
+- **Watcher otomatis** masih digantikan poll.
+- **Task** belum diproyeksikan; hanya note.
+
+### 11.7 Mode `folder` benar-benar read-only
+
+#V21 menjanjikan app tidak menempelkan metadata ke folder yang sudah ada. Itu
+ditegakkan di kode, bukan hanya di UI:
+
+- `exportVault` **keluar lebih awal** saat `type = 'folder'`, jadi tidak ada berkas
+  user yang ditimpa frontmatter app.
+- `reconcileVault` mengizinkan baca saat `type = 'folder'` bahkan dengan mode `off`,
+  karena membaca adalah satu-satunya hal yang boleh dilakukannya.
+- `vault_scan` sudah melewati `attachments/` dan berkas non-`.md`; reconcile hanya
+  menyentuh berkas markdown.
+- Tombol **Export now** disembunyikan di UI untuk mode ini.
+
+Catatan: note yang dibuathersi dari folder `type='folder'` tetap mendapat `id`
+internal, tetapi `id` itu tidak pernah ditulis balik ke berkas — cukup untuk
+stabil dalam database, tanpa mengotori berkas.

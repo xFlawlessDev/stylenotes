@@ -26,6 +26,7 @@ import {
 import { DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
 import { hydrateMemory, reindexEntity, startMemorySync } from '$lib/stores/memory.svelte';
 import { resumeRemoteMcp } from '$lib/stores/remote-mcp.svelte';
+import { startVaultSync, stopVaultSync } from '$lib/stores/vault.svelte';
 
 /** The slice of workspace state the session hydration and listeners write to. */
 export type WorkspaceSessionState = {
@@ -77,6 +78,9 @@ export function startWorkspaceSession(
 
 		void startWorkspaceSync();
 		void startMemorySync().catch(() => undefined);
+		// Bring back automatic two-way vault sync for a `vault` workspace; a no-op
+		// for any other mode (docs/design/vault-mirror.md).
+		startVaultSync();
 
 		let unlisten: (() => void) | undefined;
 		let unlistenNotes: (() => void) | undefined;
@@ -141,6 +145,7 @@ export function startWorkspaceSession(
 		}
 		return () => {
 			disposed = true;
+			stopVaultSync();
 			unlisten?.();
 			unlistenNotes?.();
 			unlistenDependencies?.();

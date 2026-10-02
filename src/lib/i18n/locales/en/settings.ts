@@ -108,7 +108,7 @@ export const settings = {
 		mirror: 'Mirror to folder',
 		mirrorHint: 'StyleNotes writes a copy to the folder. Editing the folder does not change your notes yet.',
 		vault: 'Two-way',
-		vaultHint: 'Reads changes made in the folder, and asks you before any conflict is resolved.',
+		vaultHint: 'Reads changes made in the folder on a timer and writes them back. A note is kept in history before it is overwritten.',
 		folderType: 'Folder mode',
 		folderTypeApp: 'StyleNotes workspace',
 		folderTypeFolder: 'Use folder as-is',

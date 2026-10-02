@@ -9,6 +9,8 @@
 		hydrateVault,
 		reconcileVault,
 		setVaultMode,
+		startVaultSync,
+		stopVaultSync,
 		vaultStore,
 		type VaultSyncResult
 	} from '$lib/stores/vault.svelte';
@@ -30,7 +32,8 @@
 
 	const modeItems = $derived<SegmentItem[]>([
 		{ id: 'off', label: t('settings.vault.off') },
-		{ id: 'mirror', label: t('settings.vault.mirror') }
+		{ id: 'mirror', label: t('settings.vault.mirror') },
+		{ id: 'vault', label: t('settings.vault.vault') }
 	]);
 
 	const typeItems = $derived<SegmentItem[]>([
@@ -70,8 +73,11 @@
 	async function changeMode(mode: string) {
 		if (busy) return;
 		busy = true;
-		const ok = await setVaultMode(mode as 'off' | 'mirror');
+		const ok = await setVaultMode(mode as 'off' | 'mirror' | 'vault');
 		if (!ok) error = 'saveFailed';
+		// The automatic cycle only runs in `vault` mode; (re)start or stop it now.
+		if (mode === 'vault') startVaultSync();
+		else stopVaultSync();
 		busy = false;
 	}
 
@@ -104,6 +110,8 @@
 		<span class="text-label-sm font-label text-outline">
 			{#if vaultStore.mode === 'off'}
 				{t('settings.vault.offHint')}
+			{:else if vaultStore.mode === 'vault'}
+				{t('settings.vault.vaultHint')}
 			{:else}
 				{t('settings.vault.mirrorHint')}
 			{/if}
@@ -145,10 +153,12 @@
 					{vaultStore.path ? t('settings.vault.change') : t('settings.vault.choose')}
 				</Button>
 				{#if vaultStore.path}
-					<Button variant="primary" size="md" disabled={busy} onclick={runExport}>
-						<Download size={14} />
-						{busy ? t('settings.vault.exporting') : t('settings.vault.exportNow')}
-					</Button>
+					{#if vaultStore.type !== 'folder'}
+						<Button variant="primary" size="md" disabled={busy} onclick={runExport}>
+							<Download size={14} />
+							{busy ? t('settings.vault.exporting') : t('settings.vault.exportNow')}
+						</Button>
+					{/if}
 					<Button variant="secondary" size="md" disabled={busy} onclick={runSync}>
 						<RefreshCw size={14} />
 						{busy ? t('settings.vault.syncing') : t('settings.vault.syncNow')}

@@ -107,7 +107,7 @@ export const settings: SettingsMessages = {
 		mirror: 'Salin ke folder',
 		mirrorHint: 'StyleNotes menulis salinan ke folder. Mengubah folder belum mengubah catatanmu.',
 		vault: 'Dua arah',
-		vaultHint: 'Membaca perubahan yang dibuat di folder, dan bertanya dulu sebelum menyelesaikan konflik.',
+		vaultHint: 'Membaca perubahan di folder secara berkala dan menulisnya balik. Catatan disimpan ke riwayat sebelum ditimpa.',
 		folderType: 'Mode folder',
 		folderTypeApp: 'Workspace StyleNotes',
 		folderTypeFolder: 'Pakai folder apa adanya',

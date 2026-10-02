@@ -61,3 +61,8 @@ All notable changes to StyleNotes are documented in this file. Versions follow S
   copies", and truncated/empty known files are skipped, and attachments under
   `attachments/` are pulled into the store. Pure `content/vault-reconcile.ts`
   (`planSync`, 13 tests) plus `vault_import_attachment` in Rust.
+- **Vault auto-sync (two-way).** A workspace can use mode **Two-way**: a 20-second
+  cycle reads outside edits then writes them back (`startVaultSync`, wired into the
+  workspace session). Read-then-write, with unchanged files skipped by hash, so the
+  cycle terminates. A note is stored in Record History before the folder overwrites
+  it. This is a poll; the `notify` watcher and the conflict dialog are still to come.
