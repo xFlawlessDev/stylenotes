@@ -44,6 +44,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - **SSR is off** (`+layout.ts` exports `ssr = false`); adapter-static with `index.html` fallback. Do not add server-only code/load functions.
 - **Fixed dev port 1420** with `strictPort`; Vite ignores `src-tauri/**`.
 - **Windows start invisible** (`visible: false`) and are revealed client-side: `revealCurrentWindow()` for the declared windows, `revealAndFocusCurrentWindow()` for note/task windows (they reveal themselves once the record is loaded). Don't remove that.
+- **CI/CD is GitHub Actions.** `.github/workflows/ci.yml` runs the gate (`check`, `check:shared`, `test`, `fmt:check`, `clippy`) on every push to `main` and every PR. `.github/workflows/release.yml` runs on a `v*` tag: `tauri-action` builds installers on Windows, macOS (arm64 + Intel), and Linux and publishes the GitHub Release. The tag comes from `bun run release`; the workflow never edits the version. Builds are unsigned (no signing secrets configured).
 
 ## MCP (in-app server)
 

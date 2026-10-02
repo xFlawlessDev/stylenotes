@@ -80,6 +80,15 @@ bun run release            # bump all files, update CHANGELOG.md, commit, tag vX
 git push --follow-tags      # publish the commit and tag when ready
 ```
 
+Pushing the tag starts the **Release** workflow (`.github/workflows/release.yml`). It builds the installers on Windows, macOS (arm64 + Intel), and Linux with [`tauri-action`](https://github.com/tauri-apps/tauri-action) and publishes the GitHub Release for the tag:
+
+```bash
+git push origin main        # the release commit
+git push origin v0.1.0      # the tag — this is what triggers the build
+```
+
+The build is **unsigned** for now (no signing certificates are configured): macOS shows a Gatekeeper warning and Windows a SmartScreen prompt on first launch. Re-running a failed job rebuilds only that platform and attaches to the same Release.
+
 Things worth knowing:
 
 - **First release:** `bun run release -- --first-release` tags the current version as-is without bumping.
