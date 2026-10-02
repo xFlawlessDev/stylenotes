@@ -2,15 +2,14 @@
 
 An [Agent Skill](https://agentskills.io/specification) for using the StyleNotes
 MCP server. It works with any MCP-capable agent (Claude Code / Desktop, Cursor,
-Codex, Zed, …) that can reach the server — locally over stdio, or through the
-app's remote HTTP endpoint.
+Codex, Zed, …) that can reach the app's remote HTTP endpoint.
 
 ## What it gives an agent
 
 - **What the app is for** — StyleNotes is the user's second brain, a local-first
   home for their thinking and their commitments, where a workspace is a vault — so
   an agent recalls from their notes instead of answering from its own memory.
-- **Which tool for which question** — a short routing table instead of 32
+- **Which tool for which question** — a short routing table instead of 34
   undifferentiated tools.
 - **Which body write to use** — patch in place, add to the end, or rewrite;
   the cheapest one that fits, so a one-word fix does not cost a full note.
@@ -31,13 +30,10 @@ app's remote HTTP endpoint.
 ## Install
 
 1. Enable MCP in StyleNotes: **Settings → MCP**, turn it on, and grant the scopes
-   you want the agent to have. Choose the local (stdio) server for a same-machine
-   client, or the remote (HTTP) endpoint to reach it from elsewhere.
-2. Copy the client config from **Settings → MCP** for your client and transport,
-   or adapt [assets/mcp-client-config.json](assets/mcp-client-config.json) for the
-   local (stdio) server, or
-   [assets/mcp-client-config.remote.json](assets/mcp-client-config.remote.json)
-   for the remote (Streamable HTTP) endpoint.
+   you want the agent to have. Turn on **Remote access** below it and copy the
+   endpoint URL and access token.
+2. Open the connection guide in **Settings → MCP** for a ready-to-paste config,
+   or adapt [assets/mcp-client-config.json](assets/mcp-client-config.json).
 3. Drop this directory where your agent looks for skills. Typical locations:
    - Claude Code / OpenCode: `.agents/skills/` or `~/.agents/skills/`
    - Claude Desktop: `~/Library/Application Support/Claude/skills/` (macOS)
@@ -50,14 +46,13 @@ app's remote HTTP endpoint.
 stylenotes-mcp/
 ├── SKILL.md                          # entry point: model, workflow, traps
 ├── references/
-│   ├── tool-reference.md             # all 32 tools, args, response fields
+│   ├── tool-reference.md             # all 34 tools, args, response fields
 │   ├── errors.md                     # error codes -> cause -> fix
 │   └── workflows.md                  # longer end-to-end recipes
 ├── scripts/
 │   └── validate-skill.mjs            # checks this skill against the spec
 └── assets/
-    ├── mcp-client-config.json        # local (stdio) config template
-    └── mcp-client-config.remote.json # remote (HTTP) config template
+    └── mcp-client-config.json        # remote (HTTP) config template
 ```
 
 ## Validate
@@ -72,6 +67,6 @@ links, and the 500-line budget. Add it to CI to catch drift.
 ## Notes
 
 - The skill only describes the client contract. It does not ship the server; the
-  binary and the file bridge live in the StyleNotes app.
+  server and the file bridge live in the StyleNotes app.
 - Read-only is the default. Writes need both a grant in Settings and the
   matching scope; the skill explains how to ask the user for it.

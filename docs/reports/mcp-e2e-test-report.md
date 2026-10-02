@@ -1,5 +1,11 @@
 # Uji E2E MCP Lokal — Laporan
 
+> **Superseded (2026-10-03).** The stdio shim (`stylenotes-mcp`) and its test
+> drivers (`scripts/mcp-e2e.ps1`, `mcp-scenario.ps1`, `mcp-guard-check.ps1`) were
+> removed when the MCP server moved in-process behind the remote HTTP endpoint.
+> The bug findings below remain historically accurate but the run instructions
+> no longer apply.
+
 > Tanggal: 2026-09-29
 > Lingkup: 24 tool MCP (11 read, 13 write) lewat jalur nyata — shim `stdio` → job file → host di window `workspace` → store/repo → SQLite → snapshot.
 > Perangkat: Windows, `bun run tauri dev`, aplikasi berjalan dengan grant `write` untuk scope `notes`, `tasks`, `dependency`, `workspace`.

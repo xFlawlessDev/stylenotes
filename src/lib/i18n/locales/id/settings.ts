@@ -298,9 +298,7 @@ export const settings: SettingsMessages = {
 		offHint: 'Agen AI tidak dapat menjangkau catatanmu',
 		enableLabel: 'Aktifkan server MCP lokal',
 		byline:
-			'Menjalankan server lokal hanya di perangkat ini — tanpa port, tanpa akun, tanpa internet. Agen menjangkaunya lewat konfigurasi di bawah.',
-		binaryMissing:
-			'Biner server tidak ditemukan. Pasang ulang StyleNotes, lalu buka kembali halaman ini.',
+			'Menjalankan server MCP di dalam app — tanpa akun, tanpa internet. Agen menjangkaunya lewat endpoint jarak jauh di bawah.',
 		access: 'Akses',
 		allowWrites: 'Izinkan menulis',
 		whatMayChange: 'Apa yang boleh diubah agen',
@@ -314,20 +312,26 @@ export const settings: SettingsMessages = {
 		recordActivity: 'Catat aktivitas',
 		recordActivityHint: 'Catat setiap panggilan alat di bawah',
 		connectClient: 'Hubungkan klien',
+		connectButton: 'Buka panduan koneksi',
+		connectTitle: 'Hubungkan klien',
+		connectDialogHint:
+			'Tempel salah satu blok ini ke klien MCP-mu, mulai ulang, lalu klien bisa memakai alat yang terdaftar di bawah.',
+		connectHint:
+			'Panduan koneksi menyusun konfigurasi siap-tempel untuk Claude Desktop, Cursor, atau klien MCP apa pun yang mendukung transport HTTP.',
+		connectEnableHint:
+			'Akses jarak jauh nonaktif. Nyalakan di bawah dan salin tokennya, atau snippet hanya berisi placeholder.',
+		connectTokenMissing:
+			'Belum ada token yang ditampilkan. Rotasi token di bawah dan segera salin — snippet memakai placeholder sampai saat itu.',
+		gotIt: 'Mengerti',
 		copied: 'Tersalin',
 		copyConfig: 'Salin konfigurasi',
-		connectHint:
-			'Tempel blok ke konfigurasi tiap klien, mulai ulang kliennya, lalu klien bisa memakai {count} alat yang terdaftar di bawah.',
 		confirmTitle: 'Izinkan agen menulis?',
 		confirmDescription:
 			'Agen akan dapat mengubah catatan dan tugasmu memakai alat yang kamu aktifkan berikutnya. Ini nonaktif secara bawaan dan bisa dimatikan lagi kapan saja.',
 		confirmLabel: 'Izinkan & aktifkan menulis',
-		configHintCursor: 'Di Cursor: Settings → MCP → Add new MCP server, lalu tempel blok ini.',
-		configHintClaude:
-			'Di Claude Desktop: Settings → Developer → Edit Config, lalu tempel blok ini.',
 		clientsTitle: 'Klien',
 		clientsEmpty:
-			'Belum ada klien yang terhubung. Tempel konfigurasi di bawah ke Claude Desktop atau Cursor, lalu mulai ulang — kliennya akan muncul di sini.',
+			'Belum ada klien yang terhubung. Buka panduan koneksi, tempel konfigurasi ke klien MCP-mu, lalu mulai ulang — kliennya akan muncul di sini.',
 		forgetClient: 'Lupakan {name}',
 		recentCalls: 'Panggilan terbaru',
 		clearLog: 'Bersihkan log?',

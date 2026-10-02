@@ -1,5 +1,13 @@
 # System Design — Local MCP Server (Free Tier) & Settings
 
+> **Superseded in part (2026-10-03).** The stdio sidecar (`stylenotes-mcp` binary,
+> `bundle.externalBin`, `mcp:sidecar`) was removed; the MCP server now runs
+> in-process behind the remote Streamable HTTP listener
+> (`src-tauri/src/remote_mcp/`, #D12). The shared read modules in
+> `src-tauri/src/mcp/` and the file bridge still apply; #D1/#D11/#D15 (stdio,
+> no-auth, capability) and the `[[bin]]`/`externalBin` build notes below are
+> historical.
+>
 > Status: **Design decided — 16 keputusan tercatat (#D1–#D16), 0 pertanyaan terbuka** (lihat §11 untuk riwayat 8 pertanyaan + jawabannya, §5a untuk full flow 7 use case).
 > Tanggal: 2026-09-27
 > Scope: **Local MCP (stdio) untuk user Free**, plus halaman Settings yang mengaturnya.

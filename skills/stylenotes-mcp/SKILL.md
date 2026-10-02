@@ -2,7 +2,7 @@
 name: stylenotes-mcp
 description: Query and edit a StyleNotes workspace through its MCP server — the user's personal knowledge base for notes and tasks. Search and read notes, follow the wiki links between them, trace task dependencies, and create or update notes, tasks and workspaces. Use when the user mentions StyleNotes, a StyleNotes vault or workspace, notes or tasks backed by StyleNotes, wiki links between notes, blocked tasks or a dependency chain, or asks to read or change data in StyleNotes. Also use when the user treats StyleNotes as their second brain — a lasting home for their thinking and their commitments — and wants a question answered from what they wrote, two ideas connected, a sprawling topic mapped, or a new thought captured, linked and filed back where they will find it again. Do not use for generic markdown notes unrelated to StyleNotes.
 license: MIT
-compatibility: Requires a running StyleNotes desktop app with MCP enabled in Settings. Connect through stdio on the same machine, or through the app's remote HTTP endpoint; both expose the same tools.
+compatibility: Requires a running StyleNotes desktop app with MCP enabled in Settings, and its remote HTTP endpoint turned on. It exposes the same tools to every client.
 metadata:
   author: stylenotes
   version: "1.0"
@@ -10,10 +10,9 @@ metadata:
 
 # StyleNotes MCP
 
-StyleNotes exposes an MCP server in two forms over the same 34 tools — 19 read,
-15 write. A **local** endpoint speaks stdio through a thin shim; a **remote**
-endpoint speaks Streamable HTTP from the app itself. Either way every write goes
-through the same validation the UI uses, not straight to the database.
+StyleNotes exposes an MCP server over 34 tools — 19 read, 15 write — through a
+Streamable HTTP endpoint in the app itself. Every write goes through the same
+validation the UI uses, not straight to the database.
 
 This skill tells you which tool to reach for, the order to call them in, and the
 traps that make results look wrong when you ignore them.
@@ -67,8 +66,7 @@ use; do not re-file, re-tag or rewrite a note that was not part of the request.
 8. **Most recall tools are local; one is app-only.** `semantic_search`,
    `related_notes` and `list_themes` answer from the memory index, which lives in
    the app and never enters the snapshot — the server forwards them to the app as
-   a job, so they work over both the local and remote endpoints. Allow a little
-   extra latency: a call embeds the query before ranking. `find_contradictions` is
+   a job. Allow a little extra latency: a call embeds the query before ranking. `find_contradictions` is
    the exception — it calls the app's own model, so it is **not** exposed over MCP;
    ask the user to run it in the in-app assistant.
 

@@ -4,7 +4,7 @@ Desain di folder ini diarsipkan dari `docs/design/` (2026-10-01). Isinya tetap b
 
 | Dokumen | Fitur | Bukti utama |
 |---|---|---|
-| `mcp-local-free.md` | Local MCP stdio + Settings | migrasi 11, `src-tauri/src/mcp/`, `mcp_host.rs`, `mcp-host.svelte.ts`, `McpSettings.svelte`; laporan `docs/reports/mcp-e2e-test-report.md` |
+| `mcp-local-free.md` | Local MCP stdio + Settings (stdio shim now removed; served in-app over HTTP) | migrasi 11, `src-tauri/src/mcp/` (read modules), `mcp_host.rs`, `mcp-host.svelte.ts`, `McpSettings.svelte` |
 | `artifacts.md` | Attachment / artifact store | migrasi 24, `src-tauri/src/attachments/`, `content/attachment-*.ts`, `stores/attachments.svelte.ts`, `AttachmentSettings.svelte` |
 | `journal.md` | Journal (daily notes) + `journal_today` | migrasi 18, `content/journal.ts`, `stores/journal.svelte.ts`, `JournalSettings.svelte` |
 | `constella-features.md` | Semantic memory, auto-link, clustering, contradiction, remote MCP, import markdown | migrasi 19–21, `src-tauri/src/{embed,remote_mcp}/`, `content/{semantic,clusters,contradictions,embeddings,markdown-import}.ts`, `stores/memory.svelte.ts` |

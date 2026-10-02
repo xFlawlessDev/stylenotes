@@ -26,6 +26,12 @@ All notable changes to StyleNotes are documented in this file. Versions follow S
 
 ### Changed
 
+- **MCP is now a single in-app HTTP server.** The stdio sidecar
+  (`stylenotes-mcp` binary, `bundle.externalBin`, `bun run mcp:sidecar`) and its
+  E2E drivers are removed. The server runs in-process behind the remote
+  Streamable HTTP listener (`src-tauri/src/remote_mcp/`, migration 22/23); the
+  **Connect a client** guide is now a dedicated dialog that builds a Bearer-token
+  HTTP config, so there is no local binary path to get wrong in a release build.
 - `package.json` and `src-tauri/Cargo.toml` now declare `AGPL-3.0-only`.
 - Root `package.json` is a bun workspace (`packages/*`); `bun run check:all`
   typechecks `packages/shared` and Vitest covers `packages/**`.

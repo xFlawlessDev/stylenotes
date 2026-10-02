@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.arifpebryan.stylenotes",
   "build": {
-    "beforeDevCommand": "bun run setup:onnx && bun run mcp:sidecar && bun run dev",
+    "beforeDevCommand": "bun run setup:onnx && bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run setup:onnx && bun run mcp:sidecar && bun run build",
+    "beforeBuildCommand": "bun run setup:onnx && bun run build",
     "frontendDist": "../build"
   },
   "app": {
@@ -75,7 +75,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": ["stylenotes-mcp"],
     "shortDescription": "A calm, private notebook for your ideas",
     "longDescription": "StyleNotes is a calm, private notebook for your ideas, lists, and drafts. Keep everything organized in folders, find any note in seconds, and export your writing whenever you want. Your notes stay on your device - no account and no internet needed.",
     "icon": [

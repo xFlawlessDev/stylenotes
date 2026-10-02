@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Copy, ShieldCheck, ShieldAlert, PlugZap, TriangleAlert } from '@lucide/svelte';
+	import { PlugZap, ShieldCheck, ShieldAlert, Plug } from '@lucide/svelte';
 	import { Button, ChoiceTile, Field, Select, Switch } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
-	import { MCP_SCOPES, toolsByKind } from '$lib/content/mcp-tools';
-	import { buildMcpConfig, defaultInstanceId, MCP_CONFIG_TARGETS, type McpConfigTarget } from '$lib/content/mcp-config';
+	import { MCP_SCOPES } from '$lib/content/mcp-tools';
 	import type { McpAccess, McpScope } from '$lib/content/mcp-types';
 	import {
 		hydrateMcp,
 		mcpStore,
 		mcpScopeEnabled,
-		refreshMcpAppInfo,
 		setMcpEnabled,
 		toggleMcpScope,
 		updateMcpSettings,
@@ -19,17 +17,14 @@
 	import ConfirmDialog from '$lib/components/dialogs/ConfirmDialog.svelte';
 	import McpClientList from './McpClientList.svelte';
 	import McpAuditLog from './McpAuditLog.svelte';
+	import McpConnectDialog from './McpConnectDialog.svelte';
 	import RemoteMcpSettings from './RemoteMcpSettings.svelte';
 
 	let confirmOpen = $state(false);
-	let copied = $state<McpConfigTarget | null>(null);
+	let connectOpen = $state(false);
 
-	const instanceId = defaultInstanceId('stylenotes');
-	const binaryPath = $derived(mcpStore.appInfo?.binaryPath ?? '');
-	const toolCount = $derived(toolsByKind('write').length + toolsByKind('read').length);
 	const access = $derived(mcpStore.settings.access);
 	const writeEnabled = $derived(access === 'write');
-	const binaryMissing = $derived(mcpStore.appInfo !== null && !binaryPath);
 
 	const workspaceOptions = $derived([
 		{ value: '', label: t('settings.mcp.allWorkspaces') },
@@ -44,18 +39,8 @@
 		t('settings.mcp.danger', { notes: DANGER_MARK, path: DANGER_MARK }).split(DANGER_MARK)
 	);
 
-	const config = $derived.by(() =>
-		Object.fromEntries(
-			MCP_CONFIG_TARGETS.map((target) => [
-				target.id,
-				buildMcpConfig(target.id, { binaryPath, instanceId }),
-			])
-		) as Record<McpConfigTarget, string>
-	);
-
 	onMount(() => {
 		void hydrateMcp();
-		void refreshMcpAppInfo();
 	});
 
 	async function pickAccess(next: McpAccess) {
@@ -70,16 +55,6 @@
 		confirmOpen = false;
 		// Opening write starts with every scope off: the user opts in explicitly.
 		await updateMcpSettings({ access: 'write' });
-	}
-
-	async function copyConfig(target: McpConfigTarget) {
-		try {
-			await navigator.clipboard.writeText(config[target]);
-			copied = target;
-			setTimeout(() => (copied = null), 1500);
-		} catch {
-			/* clipboard denied: the snippet is visible for manual copy */
-		}
 	}
 </script>
 
@@ -120,15 +95,6 @@
 		<p class="text-label-sm font-label leading-relaxed text-outline">
 			{t('settings.mcp.byline')}
 		</p>
-
-		{#if binaryMissing}
-			<div class="flex items-start gap-2 rounded-2xl bg-error-container/30 p-3">
-				<TriangleAlert size={15} class="mt-0.5 shrink-0 text-error" />
-				<span class="text-body-sm font-body text-on-error-container">
-					{t('settings.mcp.binaryMissing')}
-				</span>
-			</div>
-		{/if}
 	</div>
 
 	{#if mcpStore.enabled}
@@ -212,25 +178,11 @@
 			<span class="text-label-sm font-label tracking-wider text-outline uppercase"
 				>{t('settings.mcp.connectClient')}</span
 			>
-			{#each MCP_CONFIG_TARGETS as target (target.id)}
-				<div class="flex flex-col gap-1.5 rounded-2xl bg-surface-container-lowest/30 p-2.5">
-					<div class="flex items-center justify-between gap-2">
-						<span class="text-body-md font-body text-on-surface">{target.label}</span>
-						<Button variant="secondary" size="xs" shape="pill" onclick={() => void copyConfig(target.id)}>
-							<Copy size={13} />
-							{copied === target.id ? t('settings.mcp.copied') : t('settings.mcp.copyConfig')}
-						</Button>
-					</div>
-					<pre class="glass-well max-h-40 overflow-auto rounded-xl p-2.5 font-code text-code-sm text-on-surface-variant">{config[target.id]}</pre>
-					<span class="text-label-sm font-label text-outline"
-						>{target.id === 'cursor'
-							? t('settings.mcp.configHintCursor')
-							: t('settings.mcp.configHintClaude')}</span
-					>
-				</div>
-			{/each}
+			<Button variant="secondary" size="sm" shape="pill" onclick={() => (connectOpen = true)}>
+				<Plug size={14} /> {t('settings.mcp.connectButton')}
+			</Button>
 			<span class="text-label-sm font-label leading-relaxed text-outline">
-				{t('settings.mcp.connectHint', { count: toolCount })}
+				{t('settings.mcp.connectHint')}
 			</span>
 		</div>
 
@@ -240,6 +192,8 @@
 		<McpAuditLog />
 	{/if}
 </div>
+
+<McpConnectDialog bind:open={connectOpen} />
 
 <ConfirmDialog
 	open={confirmOpen}

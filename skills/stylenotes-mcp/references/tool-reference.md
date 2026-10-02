@@ -6,7 +6,7 @@ takes it and falls back to `workspace-default`.
 
 Three read tools — `semantic_search`, `related_notes` and `list_themes` — read
 the in-app memory index, which never enters the snapshot: the server forwards
-them to the app as a job, so they work over MCP (local and remote) with slightly
+them to the app as a job, so they work over MCP with slightly
 more latency. `find_contradictions` is **not** an MCP tool — it calls the app's
 own model, so it is kept out of the registry to protect the user's key; run it in
 the in-app assistant.

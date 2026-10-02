@@ -7,7 +7,7 @@ human sentence in the text content. Match on the code, not the sentence.
 |---|---|---|
 | `app_not_running` | The StyleNotes desktop app is closed. | Ask the user to open StyleNotes, then retry. Reads returned the last snapshot and may be stale. |
 | `mcp_disabled` | The MCP server is switched off. | Ask the user to enable MCP in Settings → MCP. |
-| `protocol_mismatch` | App and shim speak different bridge versions. | Ask the user to update or restart StyleNotes. |
+| `protocol_mismatch` | App and bridge speak different versions. | Ask the user to update or restart StyleNotes. |
 | `snapshot_unavailable` | No snapshot has been written yet. | The app is still starting. Wait a moment and retry. |
 | `snapshot_truncated` | The vault is too large, so note bodies were dropped. | Narrow the query by `workspace` or `folder`. `get_note` is unavailable in this mode. |
 | `write_not_granted` | Write access or the matching scope is off. | State which scope is off (`notes`, `tasks`, `dependency`, `workspace`) and ask the user to enable it in Settings → MCP. |

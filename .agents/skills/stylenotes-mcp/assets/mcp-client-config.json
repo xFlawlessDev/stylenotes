@@ -1,9 +1,12 @@
 {
-  "_comment": "Local (stdio) server block. Paste it into your MCP client config and replace the command path with the one shown in StyleNotes Settings -> MCP (Copy config). The --instance id names this client in the audit log. To reach the app from another machine, use the remote HTTP endpoint shown in Settings -> MCP instead; it needs the endpoint URL and your access token.",
+  "_comment": "Remote (Streamable HTTP) server block. Enable it in StyleNotes under Settings -> MCP -> Remote access, pick an exposure tier (This device for the same machine, Local network for another machine), then copy the endpoint URL and the access token shown there into this block. Replace http://127.0.0.1:7317/mcp with the LAN address when the client is on another machine. The token is shown once; rotate it in Settings if it leaks. A client that only speaks stdio can bridge with: npx -y mcp-remote http://127.0.0.1:7317/mcp --header \"Authorization: Bearer <token>\".",
   "mcpServers": {
     "stylenotes": {
-      "command": "/path/to/stylenotes-mcp",
-      "args": ["--instance", "my-client-00000000"]
+      "type": "http",
+      "url": "http://127.0.0.1:7317/mcp",
+      "headers": {
+        "Authorization": "Bearer <access-token>"
+      }
     }
   }
 }

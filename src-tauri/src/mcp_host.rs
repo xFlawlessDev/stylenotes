@@ -6,11 +6,11 @@
 //!    never guess where `stylenotes.db` lives (#D14);
 //! 2. `mcp/app-info.json`, written at startup and refreshed on demand;
 //! 3. the paths the frontend host needs (`mcp/snapshot.json`, `mcp/jobs`,
-//!    `mcp/results`, `mcp/backups`) plus the installed shim binary.
+//!    `mcp/results`, `mcp/backups`).
 //!
 //! The snapshot and the job queue are driven by the always-alive `workspace`
-//! window (`mcp-host.svelte.ts`); the shim is spawned by the MCP client itself,
-//! so no long-lived child process lives here.
+//! window (`mcp-host.svelte.ts`); the remote HTTP listener forwards calls
+//! through the same bridge, so no long-lived child process lives here.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -126,27 +126,7 @@ fn path_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
 
-/// Resolves and caches the installed `stylenotes-mcp` binary.
-///
-/// In development the binary lives beside the app binary (`target/debug`). In a
-/// bundle Tauri places `externalBin` next to the main executable, so the same
-/// lookup works for both.
-pub fn shim_binary() -> Option<String> {
-    let name = if cfg!(windows) {
-        "stylenotes-mcp.exe"
-    } else {
-        "stylenotes-mcp"
-    };
-    let current = std::env::current_exe().ok()?;
-    let dir = current.parent()?;
-    let candidate = dir.join(name);
-    if candidate.exists() {
-        return Some(path_string(&candidate));
-    }
-    None
-}
-
-/// Writes `mcp/app-info.json` atomically, so a shim reading it never sees a
+/// Writes `mcp/app-info.json` atomically, so a reader never sees a
 /// half-written file.
 pub fn write_app_info<R: Runtime>(app: &AppHandle<R>, info: &AppInfo) -> Result<(), String> {
     let root = mcp_root(app).ok_or("app data directory unavailable")?;

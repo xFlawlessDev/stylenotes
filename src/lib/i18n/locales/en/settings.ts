@@ -299,9 +299,7 @@ export const settings = {
 		offHint: 'AI agents cannot reach your notes',
 		enableLabel: 'Enable local MCP server',
 		byline:
-			'Runs a local server on this device only — no port, no account, no internet. Agents reach it through the config below.',
-		binaryMissing:
-			'The server binary was not found. Reinstall StyleNotes, then reopen this page.',
+			'Runs a local MCP server inside the app — no account, no internet. Agents reach it over the remote endpoint below.',
 		access: 'Access',
 		allowWrites: 'Allow writes',
 		whatMayChange: 'What agents may change',
@@ -315,19 +313,26 @@ export const settings = {
 		recordActivity: 'Record activity',
 		recordActivityHint: 'Log every tool call below',
 		connectClient: 'Connect a client',
+		connectButton: 'Open connection guide',
+		connectTitle: 'Connect a client',
+		connectDialogHint:
+			'Paste one of these blocks into your MCP client, restart it, then it can use the tools listed below.',
+		connectHint:
+			'The connection guide builds a ready-to-paste config for Claude Desktop, Cursor, or any MCP client that speaks the HTTP transport.',
+		connectEnableHint:
+			'Remote access is off. Turn it on below and copy the token, or the snippet will only carry a placeholder.',
+		connectTokenMissing:
+			'No token is shown right now. Rotate the token below and copy it immediately — the snippet uses a placeholder until then.',
+		gotIt: 'Got it',
 		copied: 'Copied',
 		copyConfig: 'Copy config',
-		connectHint: 'Paste the block into each client\u2019s config, restart the client, and it can use the {count} tools listed below.',
 		confirmTitle: 'Allow agents to write?',
 		confirmDescription:
 			'An agent will be able to change your notes and tasks using the tools you enable next. This is off by default and can be turned back off at any time.',
 		confirmLabel: 'Allow & enable writes',
-		configHintCursor: 'In Cursor: Settings → MCP → Add new MCP server, then paste this block.',
-		configHintClaude:
-			'In Claude Desktop: Settings → Developer → Edit Config, then paste this block.',
 		clientsTitle: 'Clients',
 		clientsEmpty:
-			'No client has connected yet. Paste the config below into Claude Desktop or Cursor, then restart it — the client appears here.',
+			'No client has connected yet. Open the connection guide, paste the config into your MCP client, then restart it — the client appears here.',
 		forgetClient: 'Forget {name}',
 		recentCalls: 'Recent calls',
 		clearLog: 'Clear log?',

@@ -1,41 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { buildMcpConfig, configLocationHint, defaultInstanceId } from '$lib/content/mcp-config';
+import { buildMcpConfig, configLocationHint } from '$lib/content/mcp-config';
 
 describe('buildMcpConfig', () => {
-	it('uses an absolute binary path and an instance id', () => {
+	it('builds a streamable HTTP server with a Bearer header', () => {
 		const config = JSON.parse(
 			buildMcpConfig('claude', {
-				binaryPath: 'C:\\Program Files\\StyleNotes\\stylenotes-mcp.exe',
-				instanceId: 'abc123',
+				url: 'http://192.168.1.10:7317/mcp',
+				token: 'abc123',
 			})
 		);
 		const server = config.mcpServers.stylenotes;
-		expect(server.command).toBe('C:\\Program Files\\StyleNotes\\stylenotes-mcp.exe');
-		expect(server.args).toEqual(['--instance', 'claude-abc123']);
+		expect(server.type).toBe('http');
+		expect(server.url).toBe('http://192.168.1.10:7317/mcp');
+		expect(server.headers.Authorization).toBe('Bearer abc123');
 	});
 
-	it('prefixes the instance with the target so clients are distinguishable', () => {
-		const cursor = JSON.parse(buildMcpConfig('cursor', { binaryPath: '/usr/bin/stylenotes-mcp', instanceId: 'x9' }));
-		expect(cursor.mcpServers.stylenotes.args).toEqual(['--instance', 'cursor-x9']);
+	it('falls back to the loopback endpoint and a token placeholder', () => {
+		const config = JSON.parse(buildMcpConfig('cursor', { url: '', token: '' }));
+		const server = config.mcpServers.stylenotes;
+		expect(server.url).toBe('http://127.0.0.1:7317/mcp');
+		expect(server.headers.Authorization).toBe('Bearer <access-token>');
 	});
 
-	it('falls back to the bare command when the path is unknown', () => {
-		const config = JSON.parse(buildMcpConfig('claude', { binaryPath: '', instanceId: 'z' }));
-		expect(config.mcpServers.stylenotes.command).toBe('stylenotes-mcp');
+	it('produces the same shape for every client', () => {
+		const input = { url: 'http://127.0.0.1:7317/mcp', token: 't' };
+		expect(buildMcpConfig('claude', input)).toBe(buildMcpConfig('cursor', input));
 	});
 
 	it('describes where each client keeps its config', () => {
 		expect(configLocationHint('claude')).toContain('claude_desktop_config');
 		expect(configLocationHint('cursor')).toContain('mcp.json');
-	});
-});
-
-describe('defaultInstanceId', () => {
-	it('slugs a seed value', () => {
-		expect(defaultInstanceId('My Machine 01')).toBe('mymach');
-	});
-
-	it('never returns an empty id', () => {
-		expect(defaultInstanceId('!!!').length).toBeGreaterThan(0);
 	});
 });

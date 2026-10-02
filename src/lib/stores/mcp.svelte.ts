@@ -57,8 +57,6 @@ export type McpAppInfo = {
 	enabled: boolean;
 	snapshotRev: number;
 	generatedAt: string | null;
-	/** Absolute path of the installed `stylenotes-mcp` binary, when resolvable. */
-	binaryPath: string | null;
 };
 
 let hydrated = false;
