@@ -1,5 +1,5 @@
 /**
- * Catalog of stored attachment blobs (`attachments` table, migration 24) and
+ * Catalog of stored attachment blobs (`attachments` table) and
  * the local half of the artifact design (docs/design/artifacts.md).
  *
  * The catalog is an **index**, not the truth: the blob on disk is identified by

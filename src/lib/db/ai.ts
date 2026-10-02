@@ -179,7 +179,7 @@ function toMessage(row: AiMessageRow): AiMessageRecord {
 /**
  * Ensures the single settings row exists.
  *
- * Migrations 14 and 17 add `access`/`scopes` and the search columns via
+ * Migrations add `access`/`scopes` and the search columns via
  * `ALTER TABLE`. On SQLite builds where those migrations did not apply, the
  * columns would be missing and every `saveSettings` (which always names them)
  * would throw — the grant silently reverting with no explanation. So the row is
