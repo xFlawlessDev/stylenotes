@@ -3,6 +3,9 @@
 	import type { TocEntry } from '$lib/content/preview-toc';
 	import TocPanel from '$lib/components/note/TocPanel.svelte';
 	import TocToggle from '$lib/components/note/TocToggle.svelte';
+	import { Skeleton } from '$lib/components/base';
+	import { cn } from '$lib/utils.js';
+	import { t } from '$lib/i18n/index.svelte';
 
 	/**
 	 * The rendered preview as a scroll surface, shared by the workspace editor and
@@ -18,6 +21,7 @@
 		paneClass = 'px-5 py-4',
 		scrollClass = 'scrollbar-none',
 		placeholder,
+		loading = false,
 		previewEl = $bindable(),
 		onscroll,
 		onclick,
@@ -31,6 +35,8 @@
 		/** Scrollbar treatment for the preview pane; defaults to hidden. */
 		scrollClass?: string;
 		placeholder: string;
+		/** Renders placeholder text lines instead of the body, while it renders. */
+		loading?: boolean;
 		previewEl?: HTMLDivElement | undefined;
 		onscroll?: () => void;
 		onclick: (event: MouseEvent) => void;
@@ -50,7 +56,22 @@
 		{onscroll}
 		onclick={onclick}
 	>
-		{#if html}
+		{#if loading}
+			<div
+				class={cn('flex flex-col gap-3', bodyClass)}
+				role="status"
+				aria-busy="true"
+				aria-label={t('common.loading')}
+			>
+				<Skeleton class="h-6 w-3/5" />
+				<Skeleton class="h-3 w-full" />
+				<Skeleton class="h-3 w-11/12" />
+				<Skeleton class="h-3 w-4/5" />
+				<Skeleton class="mt-1 h-5 w-2/5" />
+				<Skeleton class="h-3 w-full" />
+				<Skeleton class="h-3 w-10/12" />
+			</div>
+		{:else if html}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="markdown-body {bodyClass}" use:hydrateMermaid>{@html html}</div>
 		{:else}

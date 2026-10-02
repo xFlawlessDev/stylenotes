@@ -6,10 +6,7 @@
 	import { continueList, indentLines } from '$lib/content/markdown-lines';
 	import { transform } from '$lib/content/markdown-commands';
 	import { shortcutCommand } from '$lib/content/markdown-shortcuts';
-	import {
-		clickedCheckboxIndex,
-		enableTaskCheckboxes,
-	} from '$lib/content/markdown-preview';
+	import { clickedCheckboxIndex } from '$lib/content/markdown-preview';
 	import { settings, updateSettings, type EditorView } from '$lib/stores/settings.svelte';
 	import type { Folder } from '$lib/stores/notes';
 	import { toggleChecklistItem } from '$lib/stores/notes';
@@ -19,8 +16,6 @@
 	import type { EntityVersion } from '$lib/content/version-types';
 	import { insertAttachment, attachmentLinkTarget } from '$lib/content/attachments';
 	import { pickAttachments, openAttachment } from '$lib/content/attachment-actions';
-	import { renderNoteHtml } from '$lib/content/note-actions';
-	import { annotatePreviewLines } from '$lib/content/preview-lines';
 	import { replaceLineRange, startPreviewLineEdit } from '$lib/content/preview-line-editor';
 	import { outlineFor, scrollPreviewToHeading, trackPreviewHeadings } from '$lib/content/preview-toc-sync';
 	import type { TocEntry } from '$lib/content/preview-toc';
@@ -28,7 +23,7 @@
 	import type { Task } from '$lib/stores/tasks';
 	import { handlePreviewAction } from '$lib/content/preview-actions';
 	import { handleExternalLink } from '$lib/content/external-links';
-	import { renderNotePreviewHtml } from '$lib/content/mermaid-preview';
+	import { createNotePreviewRenderer } from '$lib/stores/note-preview.svelte';
 	import { Button, EmptyState } from '$lib/components/base';
 	import NoteHeader from '$lib/components/note/NoteHeader.svelte';
 	import NoteEditorBar from '$lib/components/note/NoteEditorBar.svelte';
@@ -89,7 +84,6 @@
 
 	let title = $state('');
 	let draft = $state('');
-	let html = $state('');
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let previewEl = $state<HTMLDivElement>();
 	let guideOpen = $state(false);
@@ -182,6 +176,21 @@
 			.filter((folder) => folder.id !== 'all' && folder.id !== note?.folder)
 			.map((folder) => ({ value: folder.id, label: folder.label }))
 	);
+	/**
+	 * The open note's rendered preview HTML and "still rendering" flag. Keyed on
+	 * the note id, so editing the body in place never re-shows the skeleton, but
+	 * switching notes does until the new body is ready.
+	 */
+	const preview = createNotePreviewRenderer(() => ({
+		note,
+		notes,
+		tasks,
+		customFolders,
+		inlineEdit: settings.previewInlineEdit,
+		view,
+	}));
+	/** Skeletons only when a preview pane is shown, not in Write-only mode. */
+	const previewLoading = $derived(preview.rendering && view !== 'write');
 
 	function moveToFolder(folder: string) {
 		if (!note || folder === note.folder) return;
@@ -211,38 +220,10 @@
 		});
 	});
 
-	$effect(() => {
-		const source = note?.body ?? '';
-		let cancelled = false;
-
-		if (!source) {
-			html = '';
-			return;
-		}
-
-		const wiki = note ? { source: note, notes, tasks, folders: customFolders } : undefined;
-		void renderNoteHtml(source, wiki).then(renderNotePreviewHtml)
-			.then((rendered) => {
-				if (cancelled) return;
-				const enabled = enableTaskCheckboxes(rendered);
-				html =
-					settings.previewInlineEdit && view === 'preview'
-						? annotatePreviewLines(enabled, source)
-						: enabled;
-			})
-			.catch(() => {
-				if (!cancelled) html = '';
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	});
-
 	/** Outline of the rendered preview, with the reading position from its scroll. */
 	$effect(() => {
 		const root = previewEl;
-		tocEntries = root ? outlineFor(root, html) : [];
+		tocEntries = root ? outlineFor(root, preview.html) : [];
 		tocActive = -1;
 		if (!root) return;
 		return trackPreviewHeadings(root, (index) => {
@@ -452,6 +433,7 @@
 				{view}
 				{fullPreview}
 				{archived}
+				loading={previewLoading}
 				onview={changeView}
 				ontogglepin={() => onupdate(note.id, { pinned: !note.pinned })}
 				ontoggledock={() => onupdate(note.id, { overlay: !note.overlay })}
@@ -489,7 +471,7 @@
 			<NoteEditorBody
 				{view}
 				{draft}
-				{html}
+				html={preview.html}
 				spellcheck={settings.spellcheck}
 				{suggestions}
 				{activeIndex}
@@ -498,6 +480,7 @@
 				{tocActive}
 				bind:textareaEl
 				bind:previewEl
+				loading={previewLoading}
 				oninput={(value) => {
 					commitBody(value);
 					refreshSuggestions();

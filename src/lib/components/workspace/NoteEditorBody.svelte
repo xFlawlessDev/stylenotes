@@ -23,6 +23,7 @@
 		tocEntries = [],
 		tocActive = -1,
 		find = false,
+		loading = false,
 		textareaEl = $bindable(),
 		previewEl = $bindable(),
 		oninput,
@@ -47,6 +48,8 @@
 		tocActive?: number;
 		/** Enables find-in-note (Ctrl/Cmd+F) for this surface. */
 		find?: boolean;
+		/** Shows the preview skeleton while the rendered body is still loading. */
+		loading?: boolean;
 		textareaEl?: HTMLTextAreaElement | null;
 		previewEl?: HTMLDivElement | undefined;
 		oninput: (value: string) => void;
@@ -111,6 +114,7 @@
 				placeholder={t('notes.editor.previewHere')}
 				paneClass="px-5 py-4"
 				scrollClass="scrollbar-thin"
+				{loading}
 				bind:previewEl
 				onscroll={onpreviewscroll}
 				onclick={onpreviewclick}
@@ -126,6 +130,7 @@
 			paneClass="px-6 py-4"
 			scrollClass="scrollbar-thin"
 			placeholder={t('notes.editor.emptyPreview')}
+			{loading}
 			bind:previewEl
 			onclick={onpreviewclick}
 			{ontocselect}

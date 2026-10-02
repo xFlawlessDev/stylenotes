@@ -12,6 +12,7 @@ import Field from './field.svelte';
 import Input, { type InputProps, type InputSize, type InputVariant } from './input.svelte';
 import SearchInput from './search-input.svelte';
 import SegmentedControl, { type SegmentItem } from './segmented-control.svelte';
+import Skeleton from './skeleton.svelte';
 import Select, {
 	type SelectOption,
 	type SelectSize,
@@ -36,6 +37,7 @@ export {
 	Input,
 	SearchInput,
 	SegmentedControl,
+	Skeleton,
 	Select,
 	selectTriggerVariants,
 	Slider,
