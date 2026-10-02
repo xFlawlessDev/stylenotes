@@ -225,7 +225,7 @@ fn bridge_error(message: impl std::fmt::Display) -> (String, String) {
 }
 
 /// Tauri identifier from `tauri.conf.json`, the app data folder name.
-pub const APP_IDENTIFIER: &str = "com.arifpebryan.stylenotes";
+pub const APP_IDENTIFIER: &str = "com.evofast.stylenotes";
 
 /// The bridge directory under the platform's app data root.
 ///

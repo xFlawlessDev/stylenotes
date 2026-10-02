@@ -334,7 +334,7 @@ mcp/
   "appRunning": true,
   "appPid": 12345,
   "appVersion": "0.1.0",
-  "dbPath": "C:\\Users\\...\\AppData\\Roaming\\com.arifpebryan.stylenotes\\stylenotes.db",
+  "dbPath": "C:\\Users\\...\\AppData\\Roaming\\com.evofast.stylenotes\\stylenotes.db",
   "enabled": true,
   "snapshotRev": 128,
   "generatedAt": "2026-09-27T10:00:00.000Z"

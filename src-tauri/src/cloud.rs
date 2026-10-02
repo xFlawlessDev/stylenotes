@@ -14,7 +14,7 @@ use keyring::Entry;
 
 /// Service name under which the token is filed. Versioned so a future,
 /// incompatible scheme can coexist during a migration.
-const SERVICE: &str = "com.arifpebryan.stylenotes.cloud";
+const SERVICE: &str = "com.evofast.stylenotes.cloud";
 const ACCOUNT: &str = "session";
 
 fn entry() -> Result<Entry, String> {
