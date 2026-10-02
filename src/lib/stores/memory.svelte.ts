@@ -26,11 +26,13 @@ import {
 } from '$lib/content/embeddings';
 import {
 	MEMORY_DEFAULT_CLUSTERS,
+	MEMORY_DEFAULT_ONNX_EMBEDDER,
 	MEMORY_DEFAULT_THRESHOLD,
 	MEMORY_EMBED_BATCH,
 	MEMORY_HASHING_EMBEDDER,
 	MEMORY_META_KEYS,
 	MEMORY_PROVIDER_PREFIX,
+	onnxIsAsymmetric,
 	type EmbedderDescriptor,
 	type MemoryStatus
 } from '$lib/content/memory-types';
@@ -59,6 +61,12 @@ export const memoryStore = $state<{
 	threshold: number;
 	/** Target cluster count, used in Phase 2. */
 	clusterCount: number;
+	/**
+	 * Whether the index earns its keep by itself: backfill an empty index,
+	 * re-embed on change, and sweep on a timer. Default on; the switch in
+	 * Settings is the opt-out for a metered provider embedder.
+	 */
+	autoIndex: boolean;
 	indexed: number;
 	pending: number;
 	indexing: boolean;
@@ -68,11 +76,17 @@ export const memoryStore = $state<{
 	suggestions: GraphSuggestion[];
 	/** Current theme clusters (#D9). */
 	themes: ClusterRecord[];
-	/** Whether the local ONNX model can run and is downloaded. */
+	/** Whether the local ONNX runtime is usable and the selected model is here. */
 	modelAvailable: boolean;
 	modelDownloaded: boolean;
 	modelRuntimeFound: boolean;
 	modelDetail: string;
+	/**
+	 * Whether each local model's files are already on disk, keyed by embedder id.
+	 * Refreshed when the selection or download changes, so the "Download" button
+	 * reflects the model the user is looking at rather than only the default.
+	 */
+	modelsDownloaded: Record<string, boolean>;
 	/** True while the model is downloading. */
 	downloading: boolean;
 	/** 0–100, or null when the server did not report a total. */
@@ -86,11 +100,13 @@ export const memoryStore = $state<{
 	selected: null,
 	threshold: MEMORY_DEFAULT_THRESHOLD,
 	clusterCount: MEMORY_DEFAULT_CLUSTERS,
+	autoIndex: true,
 	indexed: 0,
 	modelAvailable: false,
 	modelDownloaded: false,
 	modelRuntimeFound: false,
 	modelDetail: '',
+	modelsDownloaded: {},
 	downloading: false,
 	downloadPercent: null,
 	downloadWritten: 0,
@@ -124,9 +140,20 @@ export function memoryReady(): boolean {
 	// ready; the caller is told why by `modelDetail`. The baseline and provider
 	// have no such gate.
 	if (memoryStore.selected.startsWith('onnx:')) {
-		return memoryStore.modelAvailable && memoryStore.modelDownloaded;
+		return memoryStore.modelAvailable && modelDownloaded(memoryStore.selected);
 	}
 	return true;
+}
+
+/**
+ * Whether a specific local model's files are on disk.
+ *
+ * Prefers the per-model map Rust reports; falls back to the selected-model flag
+ * so the current model still reads correctly before the map is populated.
+ */
+export function modelDownloaded(id: string): boolean {
+	if (id in memoryStore.modelsDownloaded) return memoryStore.modelsDownloaded[id];
+	return id === memoryStore.selected ? memoryStore.modelDownloaded : false;
 }
 
 /** A snapshot of the status block for Settings. */
@@ -155,12 +182,18 @@ export async function hydrateMemory(): Promise<void> {
 	if (!hydrated) {
 		hydrated = true;
 		await loadSelectableEmbedders();
-		await refreshModelStatus();
 		memoryStore.selected = await metaRepo.get(MEMORY_META_KEYS.embedder).catch(() => null);
+		// Resolve per-model download state after the selection is known, so the
+		// selected model's `modelDownloaded` flag is correct on first paint.
+		await refreshModelStatus();
 		memoryStore.threshold = normalizeThreshold(
 			await metaRepo.get(MEMORY_META_KEYS.threshold).catch(() => null),
 			MEMORY_DEFAULT_THRESHOLD
 		);
+		// Only an explicit `'0'` turns autonomy off; a missing key is the
+		// default-on state for an existing vault.
+		memoryStore.autoIndex =
+			(await metaRepo.get(MEMORY_META_KEYS.autoIndex).catch(() => null)) !== '0';
 		const clusters = await metaRepo.get(MEMORY_META_KEYS.clusterCount).catch(() => null);
 		const parsed = clusters ? Number.parseInt(clusters, 10) : NaN;
 		if (Number.isFinite(parsed) && parsed > 1) memoryStore.clusterCount = parsed;
@@ -174,9 +207,9 @@ export async function hydrateMemory(): Promise<void> {
 /** Loads the embedder list from Rust, falling back to the offline baseline. */
 async function loadSelectableEmbedders(): Promise<void> {
 	if (!isTauri) {
-		// Browser dev has no ONNX and no provider: offer only the baseline, so
-		// the UI is still exercisable (#D17).
-		memoryStore.embedders = [MEMORY_HASHING_EMBEDDER];
+		// Browser dev has no ONNX and no provider: offer the baseline and the
+		// recommended local model, so the dropdown shape is exercisable (#D17).
+		memoryStore.embedders = [MEMORY_DEFAULT_ONNX_EMBEDDER, MEMORY_HASHING_EMBEDDER];
 		return;
 	}
 	try {
@@ -186,42 +219,73 @@ async function loadSelectableEmbedders(): Promise<void> {
 	}
 }
 
-/** Refreshes whether the local model can run and is already downloaded. */
-export async function refreshModelStatus(): Promise<void> {
-	if (!browser || !isTauri) return;
-	try {
-		const status = await invoke<{
-			available: boolean;
-			runtimeFound: boolean;
-			modelDownloaded: boolean;
-			downloadBytes: number;
-			detail: string;
-		}>('memory_model_status');
-		memoryStore.modelAvailable = status.available;
-		memoryStore.modelRuntimeFound = status.runtimeFound;
-		memoryStore.modelDownloaded = status.modelDownloaded;
-		memoryStore.modelDetail = status.detail;
-	} catch {
-		memoryStore.modelAvailable = false;
-	}
+/** Every `onnx:` model the build offers, for per-model status and downloads. */
+function localEmbedders(): EmbedderDescriptor[] {
+	return memoryStore.embedders.filter((embedder) => embedder.id.startsWith('onnx:'));
 }
 
 /**
- * Downloads the local embedding model. Returns true when it is ready.
- *
- * A no-op when the model is already cached; the Rust side checks first.
+ * Refreshes whether the local runtime is usable and which models are already
+ * downloaded. The runtime flag is shared (one dylib install), but the model
+ * flag is per model, so Settings can enable each download button correctly.
  */
-export async function downloadModel(): Promise<boolean> {
+export async function refreshModelStatus(): Promise<void> {
+	if (!browser || !isTauri) return;
+	const locals = localEmbedders();
+	try {
+		const statuses = await Promise.all(
+			locals.map((embedder) =>
+				invoke<{
+					available: boolean;
+					runtimeFound: boolean;
+					modelDownloaded: boolean;
+					downloadBytes: number;
+					detail: string;
+				}>('memory_model_status', { embedder: embedder.id }).catch(() => null)
+			)
+		);
+		const downloaded: Record<string, boolean> = {};
+		locals.forEach((embedder, index) => {
+			const status = statuses[index];
+			downloaded[embedder.id] = status?.modelDownloaded ?? false;
+		});
+		memoryStore.modelsDownloaded = downloaded;
+
+		const first = statuses.find((status) => status !== null) ?? null;
+		if (first) {
+			memoryStore.modelAvailable = first.available;
+			memoryStore.modelRuntimeFound = first.runtimeFound;
+			memoryStore.modelDetail = first.detail;
+		} else {
+			memoryStore.modelAvailable = false;
+		}
+	} catch {
+		memoryStore.modelAvailable = false;
+	}
+	// The selected model's own flag drives the single-model checks in the UI.
+	memoryStore.modelDownloaded = memoryStore.selected
+		? modelDownloaded(memoryStore.selected)
+		: false;
+}
+
+/**
+ * Downloads one local embedding model. Returns true when it is ready.
+ *
+ * A no-op when the model is already cached; the Rust side checks first. Defaults
+ * to the selected local model so the Settings button needs no argument.
+ */
+export async function downloadModel(id?: string): Promise<boolean> {
 	if (!browser || !isTauri || memoryStore.downloading) return false;
+	const target = id ?? memoryStore.selected ?? MEMORY_DEFAULT_ONNX_EMBEDDER.id;
 	memoryStore.downloading = true;
 	memoryStore.lastError = null;
 	memoryStore.downloadPercent = null;
 	memoryStore.downloadWritten = 0;
 	memoryStore.downloadTotal = null;
 	try {
-		await invoke<string>('memory_download_model');
+		await invoke<string>('memory_download_model', { embedder: target });
 		await refreshModelStatus();
-		return memoryStore.modelDownloaded;
+		return modelDownloaded(target);
 	} catch (error) {
 		memoryStore.lastError = error instanceof Error ? error.message : String(error);
 		return false;
@@ -232,7 +296,7 @@ export async function downloadModel(): Promise<boolean> {
 }
 
 /** Recomputes indexed/pending counts for the selected embedder. */
-async function refreshCounts(): Promise<void> {
+export async function refreshCounts(): Promise<void> {
 	const id = embedderId();
 	if (!id) {
 		memoryStore.indexed = 0;
@@ -297,6 +361,8 @@ export async function setEmbedder(id: string | null): Promise<boolean> {
 		memoryStore.lastError = 'Could not save the embedder choice';
 		return false;
 	}
+	// The selected model's download flag and detail depend on the selection.
+	await refreshModelStatus();
 	await refreshCounts();
 	notifyChanged();
 	return true;
@@ -311,6 +377,23 @@ export async function setThreshold(value: number): Promise<boolean> {
 		return true;
 	} catch {
 		memoryStore.lastError = 'Could not save the similarity threshold';
+		return false;
+	}
+}
+
+/**
+ * Turns background index maintenance on or off. Persisted device-locally and
+ * broadcast so the writer window starts or stops its timers at once; the
+ * switch is the metered-provider escape hatch (#D16).
+ */
+export async function setAutoIndex(value: boolean): Promise<boolean> {
+	memoryStore.autoIndex = value;
+	try {
+		await metaRepo.set(MEMORY_META_KEYS.autoIndex, value ? '1' : '0');
+		notifyChanged();
+		return true;
+	} catch {
+		memoryStore.lastError = 'Could not save the auto re-index preference';
 		return false;
 	}
 }
@@ -341,7 +424,7 @@ async function loadSources(): Promise<Source[]> {
 }
 
 /** Calls `ai_embed`, resolving the provider key only when one is selected. */
-async function embedBatch(texts: string[]): Promise<number[][]> {
+async function embedBatch(texts: string[], asQuery = false): Promise<number[][]> {
 	const id = embedderId();
 	if (!id) throw new Error('no embedder selected');
 
@@ -351,6 +434,10 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 
 	const embedder = selectedEmbedder();
 	const request: Record<string, unknown> = { embedder: id, texts };
+	// Only an asymmetric model (E5) changes its vector for a query; sending the
+	// flag otherwise would be a no-op, but keeping it conditional preserves that
+	// fact in one place.
+	if (asQuery && onnxIsAsymmetric(id)) request.asQuery = true;
 	if (id.startsWith(MEMORY_PROVIDER_PREFIX) && embedder) {
 		const { providerConfig } = await import('$lib/stores/ai-settings.svelte');
 		const config = await providerConfig();
@@ -537,7 +624,7 @@ export async function semanticSearch(
 ): Promise<{ entityKind: 'note' | 'task'; entityId: string; score: number }[]> {
 	if (!browser || !memoryReady() || !query.trim()) return [];
 	try {
-		const [vector] = await embedBatch([query]);
+		const [vector] = await embedBatch([query], true);
 		const items = await loadedVectors();
 		return rankBySimilarity(vector, items, {
 			minScore: options.minScore ?? 0,

@@ -36,6 +36,10 @@ export type EmbedderDescriptor = {
 	offline: boolean;
 	/** For `onnx`: approximate download size in bytes, for the "Download" button. */
 	downloadBytes?: number;
+	/** For `onnx`: the best default for its size; Settings marks it. */
+	recommended?: boolean;
+	/** For `onnx`: covers many languages, at the cost of a larger download. */
+	multilingual?: boolean;
 };
 
 /**
@@ -82,10 +86,30 @@ export const MEMORY_META_KEYS = {
 	clusterCount: 'meta:memory/cluster-count',
 	/** Set once the "semantic memory is off" nudge has been raised. */
 	nudge: 'meta:memory/nudge',
+	/**
+	 * `'1'`/`'0'` — whether the index maintains itself in the background
+	 * (re-embed on change, backfill, sweep). Missing means on.
+	 */
+	autoIndex: 'meta:memory/auto-index',
 } as const;
 
 /** Default cosine floor above which a pair becomes an auto-link suggestion. */
 export const MEMORY_DEFAULT_THRESHOLD = 0.72;
+
+/** How often the background sweep rechecks the index for missed writes. */
+export const MEMORY_AUTONOMY_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * How long a backfill trigger (startup, a task edit, a sweep, or a bulk note
+ * replace) settles before the pass runs, so a cluster of triggers becomes one.
+ */
+export const MEMORY_AUTONOMY_BACKFILL_DELAY_MS = 8 * 1000;
+
+/**
+ * How long changed note ids collect before the background re-embeds them, so a
+ * fast burst of writes becomes one pass instead of one pass per save.
+ */
+export const MEMORY_AUTONOMY_REINDEX_DELAY_MS = 1200;
 
 /** Default number of clusters requested from `clusters.ts`. */
 export const MEMORY_DEFAULT_CLUSTERS = 6;
@@ -110,6 +134,32 @@ export const MEMORY_HASHING_EMBEDDER: EmbedderDescriptor = {
 	dim: 384,
 	offline: true,
 };
+
+/**
+ * The local model Settings offers by default in browser dev, where `invoke`
+ * cannot report the catalogue. It mirrors the recommended entry in the Rust
+ * catalogue (`embed/models.rs`), including the quantized file the download
+ * picks — the label is a proper name so it stays untranslated.
+ */
+export const MEMORY_DEFAULT_ONNX_EMBEDDER: EmbedderDescriptor = {
+	id: 'onnx:bge-small-en-v1.5',
+	kind: 'onnx',
+	label: 'BGE small v1.5',
+	dim: 384,
+	offline: true,
+	downloadBytes: 35 * 1024 * 1024,
+	recommended: true
+};
+
+/**
+ * For a stored `onnx:…` id: whether the model wants the `query:`/`passage:`
+ * distinction. Only the E5 family does; embedding a query as a passage is a
+ * different point in the space, so this has to be correct or search silently
+ * degrades. Keyed by the ids the Rust catalogue uses.
+ */
+export function onnxIsAsymmetric(id: string): boolean {
+	return id === 'onnx:multilingual-e5-small';
+}
 
 /** Provider embedding models offered in Settings; the user may type another. */
 export const MEMORY_PROVIDER_MODELS: { id: string; label: string; dim: number }[] = [

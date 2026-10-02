@@ -24,7 +24,8 @@ import {
 	type WorkspacesChangedPayload,
 } from '$lib/workspace-sync.svelte';
 import { DEPENDENCIES_CHANGED, refreshDependencies } from '$lib/stores/dependencies.svelte';
-import { hydrateMemory, reindexEntity, startMemorySync } from '$lib/stores/memory.svelte';
+import { hydrateMemory, startMemorySync } from '$lib/stores/memory.svelte';
+import { startMemoryAutonomy, stopMemoryAutonomy } from '$lib/stores/memory-autonomy';
 import { resumeRemoteMcp } from '$lib/stores/remote-mcp.svelte';
 import { startVaultSync, stopVaultSync } from '$lib/stores/vault.svelte';
 
@@ -78,6 +79,9 @@ export function startWorkspaceSession(
 
 		void startWorkspaceSync();
 		void startMemorySync().catch(() => undefined);
+		// Background upkeep: re-embed on change, backfill, and sweep (#D16). A
+		// no-op outside the workspace window and when memory is off.
+		void startMemoryAutonomy().catch(() => undefined);
 		// Bring back automatic two-way vault sync for a `vault` workspace; a no-op
 		// for any other mode (docs/design/vault-mirror.md).
 		startVaultSync();
@@ -125,12 +129,6 @@ export function startWorkspaceSession(
 					if (!next.some((note) => note.id === state.selectedId)) {
 						state.selectedId = next[0]?.id ?? '';
 					}
-					// Keep the semantic index fresh for notes this window did not
-					// write (#D16). A no-op when nothing changed, thanks to the
-					// content hash, and silently skipped when memory is off.
-					for (const noteId of event.payload?.changedIds ?? []) {
-						void reindexEntity('note', noteId).catch(() => undefined);
-					}
 				});
 			}).then((fn) => {
 				if (disposed) fn();
@@ -146,6 +144,7 @@ export function startWorkspaceSession(
 		return () => {
 			disposed = true;
 			stopVaultSync();
+			stopMemoryAutonomy();
 			unlisten?.();
 			unlistenNotes?.();
 			unlistenDependencies?.();

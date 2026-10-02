@@ -1,42 +1,21 @@
-//! Local ONNX sentence embedder with mean pooling.
+//! Local ONNX sentence embedder with mean or CLS pooling.
 //!
 //! Mirrors `OnnxCrossEncoder`'s shape (tokenize -> run -> post-process), but
 //! pools the token embeddings into one vector per text instead of scoring a
 //! pair. The model is a sentence-transformers export on the HF Hub; the ONNX
 //! Runtime dylib is discovered next to the executable.
+//!
+//! The model's recipe — the quantized file, its pooling mode, and any query or
+//! passage prefix — lives in `embed::models`; this type only applies it.
 
 use std::path::PathBuf;
 
 use super::cache::ModelCache;
 use super::runtime::{build_session, tensor_i64, OnnxError, OnnxResult};
+use crate::embed::models::{EmbedKind, OnnxEmbedderConfig, Pooling};
 
-/// A sentence-embedding model the app knows how to run.
-#[derive(Debug, Clone)]
-pub struct OnnxEmbedderConfig {
-    /// HF Hub id, e.g. `sentence-transformers/all-MiniLM-L6-v2`.
-    pub model_id: String,
-    /// The id written alongside vectors, e.g. `onnx:minilm-l6`.
-    pub id: String,
-    pub dim: usize,
-    pub max_length: usize,
-    pub num_threads: usize,
-}
-
-impl OnnxEmbedderConfig {
-    /// MiniLM-L6: small, fast, 384-dim — the design's suggested default.
-    pub fn minilm_l6() -> Self {
-        Self {
-            model_id: "sentence-transformers/all-MiniLM-L6-v2".to_string(),
-            id: "onnx:minilm-l6".to_string(),
-            dim: 384,
-            max_length: 256,
-            num_threads: 2,
-        }
-    }
-}
-
-/// Mean-pooled ONNX sentence embedder. `&mut self` for inference, as the ONNX
-/// session requires; callers wrap it in a `Mutex`.
+/// Mean- or CLS-pooled ONNX sentence embedder. `&mut self` for inference, as the
+/// ONNX session requires; callers wrap it in a `Mutex`.
 pub struct OnnxEmbedder {
     config: OnnxEmbedderConfig,
     session: ort::session::Session,
@@ -47,7 +26,7 @@ pub struct OnnxEmbedder {
 impl OnnxEmbedder {
     /// Loads or downloads the model, then opens a session.
     pub fn load(config: OnnxEmbedderConfig, cache: &ModelCache) -> OnnxResult<Self> {
-        let cached = cache.get_or_download(&config.model_id, |_, _, _| {})?;
+        let cached = cache.get_or_download(config.model_id, config.hf_file, |_, _, _| {})?;
 
         let mut tokenizer = tokenizers::Tokenizer::from_file(&cached.tokenizer_path)
             .map_err(|error| OnnxError::Tokenizer(error.to_string()))?;
@@ -62,7 +41,7 @@ impl OnnxEmbedder {
             }))
             .map_err(|error| OnnxError::Tokenizer(error.to_string()))?;
 
-        let session = build_session(&config.id, &cached.model_path, config.num_threads)?;
+        let session = build_session(config.id, &cached.model_path, config.num_threads)?;
         let use_token_type_ids = session
             .inputs()
             .iter()
@@ -76,12 +55,26 @@ impl OnnxEmbedder {
         })
     }
 
-    /// Embeds one batch, mean-pooling over real tokens (masked positions only,
-    /// so padding never dilutes the vector).
-    pub fn embed(&mut self, texts: &[String]) -> OnnxResult<Vec<Vec<f32>>> {
+    /// Embeds texts as a query or a document, applying the model's prefixes.
+    ///
+    /// The distinction is caller-visible because it changes the vector for E5:
+    /// a query embedded as a document is a different point in the space, so the
+    /// asymmetric `query:`/`passage:` recipe has to be preserved on both sides
+    /// of a comparison. Documents are the index; queries are lookup keys.
+    pub fn embed_as(&mut self, texts: &[String], kind: EmbedKind) -> OnnxResult<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
+        let prefix = match kind {
+            EmbedKind::Query => self.config.query_prefix,
+            EmbedKind::Document => self.config.document_prefix,
+        };
+        let prefixed: Vec<String> = texts.iter().map(|text| format!("{prefix}{text}")).collect();
+        self.embed_prefixed(&prefixed)
+    }
+
+    /// Tokenizes, runs the session and pools. No prefixing happens here.
+    fn embed_prefixed(&mut self, texts: &[String]) -> OnnxResult<Vec<Vec<f32>>> {
         let encodings = self
             .tokenizer
             .encode_batch(texts.to_vec(), true)
@@ -126,7 +119,7 @@ impl OnnxEmbedder {
                     "token_type_ids" => types
                 ])
                 .map_err(|error| OnnxError::Inference {
-                    label: self.config.id.clone(),
+                    label: self.config.id.to_string(),
                     detail: error.to_string(),
                 })?
         } else {
@@ -136,7 +129,7 @@ impl OnnxEmbedder {
                     "attention_mask" => mask
                 ])
                 .map_err(|error| OnnxError::Inference {
-                    label: self.config.id.clone(),
+                    label: self.config.id.to_string(),
                     detail: error.to_string(),
                 })?
         };
@@ -145,36 +138,48 @@ impl OnnxEmbedder {
             .keys()
             .next()
             .ok_or_else(|| OnnxError::OutputMissing {
-                label: self.config.id.clone(),
+                label: self.config.id.to_string(),
             })?
             .to_string();
         let tensor = &outputs[output_name.as_str()];
         let array = tensor
             .try_extract_array::<f32>()
             .map_err(|error| OnnxError::Inference {
-                label: self.config.id.clone(),
+                label: self.config.id.to_string(),
                 detail: error.to_string(),
             })?;
 
         // Shape is [batch, seq_len, dim]; pool over the token axis.
         let values: Vec<f32> = array.iter().copied().collect();
+        let dim = self.config.dim;
+        let pooling = self.config.pooling;
         let mut out = Vec::with_capacity(batch);
         for row in 0..batch {
-            let mut pooled = vec![0.0_f32; self.config.dim];
-            let mut count = 0.0_f32;
-            for token in 0..seq_len {
-                if attention_mask[row * seq_len + token] == 0 {
-                    continue;
+            let mut pooled = vec![0.0_f32; dim];
+            match pooling {
+                Pooling::Cls => {
+                    let offset = row * seq_len * dim;
+                    for (slot, value) in pooled.iter_mut().enumerate() {
+                        *value = values.get(offset + slot).copied().unwrap_or(0.0);
+                    }
                 }
-                let offset = (row * seq_len + token) * self.config.dim;
-                for (slot, value) in pooled.iter_mut().enumerate() {
-                    *value += values.get(offset + slot).copied().unwrap_or(0.0);
-                }
-                count += 1.0;
-            }
-            if count > 0.0 {
-                for value in pooled.iter_mut() {
-                    *value /= count;
+                Pooling::Mean => {
+                    let mut count = 0.0_f32;
+                    for token in 0..seq_len {
+                        if attention_mask[row * seq_len + token] == 0 {
+                            continue;
+                        }
+                        let offset = (row * seq_len + token) * dim;
+                        for (slot, value) in pooled.iter_mut().enumerate() {
+                            *value += values.get(offset + slot).copied().unwrap_or(0.0);
+                        }
+                        count += 1.0;
+                    }
+                    if count > 0.0 {
+                        for value in pooled.iter_mut() {
+                            *value /= count;
+                        }
+                    }
                 }
             }
             crate::embed::normalize(&mut pooled);
@@ -192,10 +197,11 @@ pub fn models_dir(app_data_dir: &std::path::Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embed::models;
 
     #[test]
     fn default_config_is_minilm_384() {
-        let config = OnnxEmbedderConfig::minilm_l6();
+        let config = models::default_model();
         assert_eq!(config.dim, 384);
         assert_eq!(config.id, "onnx:minilm-l6");
     }
@@ -206,10 +212,11 @@ mod tests {
         assert!(dir.ends_with("models"));
     }
 
-    /// End-to-end proof that the local model actually runs: loads the real
-    /// model (downloading it first) and embeds a batch.
+    /// End-to-end proof that the local models actually run: loads a real model
+    /// (downloading it first) and embeds a batch. Runs against the recommended
+    /// model, so a broken recommendation is caught here rather than in the UI.
     ///
-    /// Ignored by default because it needs the ONNX Runtime dylib and a ~23 MB
+    /// Ignored by default because it needs the ONNX Runtime dylib and a model
     /// download, neither of which belongs in an ordinary test run. Run it with:
     /// `cargo test --features local-embed -- --ignored onnx_embeds_for_real`.
     #[test]
@@ -217,7 +224,11 @@ mod tests {
     fn onnx_embeds_for_real() {
         let cache_dir = std::env::temp_dir().join("stylenotes-onnx-test-models");
         let cache = ModelCache::new(&cache_dir);
-        let config = OnnxEmbedderConfig::minilm_l6();
+        let config = models::all()
+            .iter()
+            .copied()
+            .find(|model| model.recommended)
+            .expect("a recommended model");
         let mut embedder = OnnxEmbedder::load(config, &cache).expect("model loads");
 
         let texts = vec![
@@ -225,9 +236,11 @@ mod tests {
             "Retrieval by meaning using embeddings and cosine similarity.".to_string(),
             "A recipe for banana bread with walnuts.".to_string(),
         ];
-        let vectors = embedder.embed(&texts).expect("embedding runs");
+        let vectors = embedder
+            .embed_as(&texts, EmbedKind::Document)
+            .expect("embedding runs");
         assert_eq!(vectors.len(), 3);
-        assert_eq!(vectors[0].len(), 384);
+        assert_eq!(vectors[0].len(), config.dim);
 
         // The two related sentences must be closer than the unrelated one. This
         // is the property the whole feature rests on; if it fails, the model is

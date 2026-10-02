@@ -11,6 +11,7 @@
 
 pub mod commands;
 pub mod hashing;
+pub mod models;
 pub mod provider;
 pub mod vector;
 
@@ -39,6 +40,12 @@ pub struct EmbedderDescriptor {
     pub offline: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_bytes: Option<u64>,
+    /// Pre-selected as the best default for its size. Only meaningful for `onnx`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub recommended: bool,
+    /// Covers many languages. Only meaningful for `onnx`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub multilingual: bool,
 }
 
 /// Errors surfaced across the IPC boundary as strings.

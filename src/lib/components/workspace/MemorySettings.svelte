@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button, Field, Select, Slider, type SelectOption } from '$lib/components/base';
+	import { Button, Field, Select, Slider, Switch, type SelectOption } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
-	import { MEMORY_DEFAULT_THRESHOLD } from '$lib/content/memory-types';
+	import { MEMORY_DEFAULT_THRESHOLD, type EmbedderDescriptor } from '$lib/content/memory-types';
 	import {
 		buildClusters,
 		buildIndex,
@@ -9,7 +9,9 @@
 		findContradictions,
 		memoryStore,
 		memoryStatus,
+		modelDownloaded,
 		selectedEmbedder,
+		setAutoIndex,
 		setEmbedder,
 		setThreshold,
 		stopIndexing
@@ -24,6 +26,10 @@
 	 * The offline baseline is labelled as what it is (#D2): a lexical baseline,
 	 * not meaning retrieval. Presenting it as "semantic" would set the wrong
 	 * expectation and cost the feature its trust.
+	 *
+	 * The local model is a choice, not a single default: the dropdown offers the
+	 * whole catalogue with each model's size, so the user trades download size
+	 * and language coverage knowingly. The recommended one is marked, not forced.
 	 */
 	let busy = $state(false);
 	let reindexConfirmOpen = $state(false);
@@ -31,13 +37,30 @@
 	const embedderOptions = $derived<SelectOption[]>(
 		memoryStore.embedders.map((embedder) => ({
 			value: embedder.id,
-			label: `${embedder.label} (${embedder.dim})`
+			label: optionLabel(embedder)
 		}))
 	);
 
 	const status = $derived(memoryStatus());
 	const current = $derived(selectedEmbedder());
 	const isBaseline = $derived(current?.kind === 'hashing');
+	const isOnnx = $derived(current?.kind === 'onnx');
+	const currentDownloaded = $derived(current ? modelDownloaded(current.id) : false);
+	const needsModel = $derived(isOnnx && !currentDownloaded);
+
+	/** A concise option line: name, vector length, download size, and flags. */
+	function optionLabel(embedder: EmbedderDescriptor): string {
+		const parts = [embedder.label];
+		if (embedder.dim) parts.push(`${embedder.dim}d`);
+		if (embedder.downloadBytes) parts.push(formatBytes(embedder.downloadBytes));
+		const flags: string[] = [];
+		if (embedder.recommended) flags.push(t('settings.memory.recommended'));
+		if (embedder.multilingual) flags.push(t('settings.memory.multilingual'));
+		if (embedder.kind === 'onnx' && modelDownloaded(embedder.id)) {
+			flags.push(t('settings.memory.downloaded'));
+		}
+		return flags.length ? `${parts.join(' · ')} — ${flags.join(', ')}` : parts.join(' · ');
+	}
 
 	async function chooseEmbedder(id: string) {
 		if (busy) return;
@@ -79,7 +102,14 @@
 	async function getModel() {
 		if (busy || memoryStore.downloading) return;
 		busy = true;
-		await downloadModel();
+		await downloadModel(current?.id);
+		busy = false;
+	}
+
+	async function toggleAutoIndex(checked: boolean) {
+		if (busy) return;
+		busy = true;
+		await setAutoIndex(checked);
 		busy = false;
 	}
 
@@ -91,9 +121,6 @@
 		const value = bytes / 1024 ** exponent;
 		return `${value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${units[exponent]}`;
 	}
-
-	const isOnnx = $derived(memoryStore.selected?.startsWith('onnx:') ?? false);
-	const needsModel = $derived(isOnnx && !memoryStore.modelDownloaded);
 </script>
 
 <div class="flex min-w-0 flex-col gap-6">
@@ -123,7 +150,7 @@
 				class="flex flex-col gap-2 rounded-2xl bg-surface-container-lowest/40 p-3 ring-1 ring-inset ring-outline-variant/40"
 			>
 				<span class="text-label-sm font-label text-outline">
-					{t('settings.memory.modelMissing')}
+					{t('settings.memory.modelMissing', { model: current?.label ?? '' })}
 				</span>
 				<Button
 					variant="primary"
@@ -194,6 +221,25 @@
 			{/if}
 		</div>
 
+		<div
+			class="flex items-center justify-between gap-3 rounded-2xl bg-surface-container-lowest/40 p-3 ring-1 ring-inset ring-outline-variant/40"
+		>
+			<span class="flex min-w-0 flex-col">
+				<span class="text-body-md font-body text-on-surface">
+					{t('settings.memory.autoIndex')}
+				</span>
+				<span class="text-label-sm font-label text-outline">
+					{t('settings.memory.autoIndexHint')}
+				</span>
+			</span>
+			<Switch
+				checked={memoryStore.autoIndex}
+				disabled={busy}
+				label={t('settings.memory.autoIndex')}
+				onchange={toggleAutoIndex}
+			/>
+		</div>
+
 		<div class="flex flex-wrap items-center gap-2">
 			<Button
 				variant="primary"
@@ -225,7 +271,6 @@
 				{t('settings.memory.reindex')}
 			</Button>
 		</div>
-
 		{#if reindexConfirmOpen}
 			<div class="flex flex-col gap-2 rounded-2xl bg-error-container/20 p-3">
 				<span class="text-label-sm font-label text-error">

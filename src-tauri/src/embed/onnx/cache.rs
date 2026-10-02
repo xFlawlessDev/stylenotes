@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use super::runtime::{OnnxError, OnnxResult};
+use crate::embed::models::OnnxEmbedderConfig;
 
 const HF_BASE_URL: &str = "https://huggingface.co";
 /// A real model is tens of MB; anything under 1 KiB is an error page, not a model.
@@ -66,10 +67,19 @@ impl ModelCache {
 
     /// Returns the cached model, downloading it first when absent.
     ///
+    /// `hf_file` is the repo-relative ONNX path from the model config, so the
+    /// cache can hold different exports (a quantized file for one model, fp32
+    /// for another) without a second layout.
+    ///
     /// `on_progress` receives `(file_label, bytes_written, total_bytes)` as the
     /// body streams, so a caller can drive a progress bar. `total_bytes` is
     /// `None` when the server does not send a `Content-Length`.
-    pub fn get_or_download<F>(&self, model_id: &str, on_progress: F) -> OnnxResult<CachedModel>
+    pub fn get_or_download<F>(
+        &self,
+        model_id: &str,
+        hf_file: &str,
+        on_progress: F,
+    ) -> OnnxResult<CachedModel>
     where
         F: Fn(&str, u64, Option<u64>),
     {
@@ -82,11 +92,9 @@ impl ModelCache {
             detail: error.to_string(),
         })?;
 
-        // `onnx/model.onnx` is the conventional export path for
-        // sentence-transformers repos on the Hub.
         self.download_file(
             model_id,
-            "onnx/model.onnx",
+            hf_file,
             &dir.join("model.onnx"),
             MIN_MODEL_BYTES,
             &on_progress,
@@ -104,6 +112,14 @@ impl ModelCache {
             detail: "download completed but files are missing".to_string(),
         })?;
         Ok(cached)
+    }
+
+    /// Whether the tokenizer is `tokenizer.json`; only the model file varies by
+    /// config, so this reads that config's local name rather than assuming any
+    /// one export. Kept as a named helper so callers pass a config, not a
+    /// stringly-typed id, and can never check a different model than they use.
+    pub fn is_cached(&self, config: &OnnxEmbedderConfig) -> bool {
+        self.get_cached(config.model_id).is_some()
     }
 
     /// Streams one file to a temp path then renames it into place, so a partial

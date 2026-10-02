@@ -6,27 +6,28 @@
 //! text, computes `content_hash`, and writes rows through the repo.
 //!
 //! The local model is cached in app state: loading a session is expensive and
-//! must not happen once per batch.
+//! must not happen once per batch. Which model is loaded is keyed by its id, so
+//! switching models in Settings swaps the session rather than returning the
+//! wrong model's vectors.
 
 use serde::{Deserialize, Serialize};
 
 use crate::embed::hashing::{HashingEmbedder, HASHING_DIM, HASHING_EMBEDDER_ID};
+use crate::embed::models;
 use crate::embed::provider::{ProviderEmbedder, PROVIDER_PREFIX};
 use crate::embed::vector;
 use crate::embed::{Embedder, EmbedderDescriptor, EmbedderKind};
 
 #[cfg(feature = "local-embed")]
-use crate::embed::onnx::{ModelCache, OnnxEmbedder, OnnxEmbedderConfig};
+use crate::embed::models::EmbedKind;
+#[cfg(feature = "local-embed")]
+use crate::embed::onnx::{ModelCache, OnnxEmbedder};
 #[cfg(feature = "local-embed")]
 use std::path::PathBuf;
 #[cfg(feature = "local-embed")]
 use tauri::Manager;
 
-/// The local ONNX model the app offers, when `local-embed` is compiled in.
-pub const ONNX_EMBEDDER_ID: &str = "onnx:minilm-l6";
-pub const ONNX_EMBEDDER_DIM: usize = 384;
-
-/// A loaded ONNX session, kept warm between calls.
+/// A loaded ONNX session, kept warm between calls, tagged with the model id.
 ///
 /// Empty without the `local-embed` feature: managed state must exist either
 /// way so the command signature is identical in both builds.
@@ -43,6 +44,10 @@ pub struct EmbedRequest {
     /// Embedder id: `hashing:…`, `provider:<model>`, or `onnx:…`.
     pub embedder: String,
     pub texts: Vec<String>,
+    /// Embed as a search query rather than a document. Only E5 distinguishes the
+    /// two; for the other models this is inert. The index is always documents.
+    #[serde(default)]
+    pub as_query: bool,
     /// Optional endpoint for a provider embedder.
     #[serde(default)]
     pub base_url: Option<String>,
@@ -64,51 +69,64 @@ pub struct EmbedResponse {
 
 /// Every embedder the app can offer right now, so Settings reflects the build.
 ///
-/// `onnx:…` is always listed so the UI is stable, but its label states whether
-/// it can actually run: the feature must be compiled in, the ONNX Runtime dylib
-/// must be found, and the model must be downloaded. `memory_model_status` reports
-/// the last two so Settings can offer the right action.
+/// The local models are listed even when the `local-embed` feature is absent or
+/// the ONNX Runtime dylib is missing: the dropdown must be stable, and
+/// `memory_model_status` reports what is actually runnable. The label states
+/// when the local path is not in this build.
 #[tauri::command]
 pub fn memory_embedders() -> Vec<EmbedderDescriptor> {
-    vec![
-        EmbedderDescriptor {
-            id: ONNX_EMBEDDER_ID.to_string(),
-            kind: EmbedderKind::Onnx,
-            label: onnx_label(),
-            dim: ONNX_EMBEDDER_DIM,
-            offline: true,
-            download_bytes: Some(onnx_model_bytes()),
-        },
-        EmbedderDescriptor {
-            id: HASHING_EMBEDDER_ID.to_string(),
-            kind: EmbedderKind::Hashing,
-            label: "Offline baseline".to_string(),
-            dim: HASHING_DIM,
-            offline: true,
-            download_bytes: None,
-        },
-    ]
+    let mut embedders = local_descriptors();
+    embedders.push(EmbedderDescriptor {
+        id: HASHING_EMBEDDER_ID.to_string(),
+        kind: EmbedderKind::Hashing,
+        label: "Offline baseline".to_string(),
+        dim: HASHING_DIM,
+        offline: true,
+        download_bytes: None,
+        recommended: false,
+        multilingual: false,
+    });
+    embedders
 }
 
-/// A label that says whether the local model can run in *this* build.
-fn onnx_label() -> String {
+/// One descriptor per local model, so the UI can present the whole catalogue.
+fn local_descriptors() -> Vec<EmbedderDescriptor> {
+    models::all()
+        .iter()
+        .map(|config| EmbedderDescriptor {
+            id: config.id.to_string(),
+            kind: EmbedderKind::Onnx,
+            label: onnx_label(config),
+            dim: config.dim,
+            offline: true,
+            download_bytes: Some(config.download_bytes),
+            recommended: config.recommended,
+            multilingual: config.multilingual,
+        })
+        .collect()
+}
+
+/// The model's label, marked when the local path is not in this build.
+fn onnx_label(config: &models::OnnxEmbedderConfig) -> String {
     #[cfg(feature = "local-embed")]
     {
-        "Local model (MiniLM-L6)".to_string()
+        config.label.to_string()
     }
     #[cfg(not(feature = "local-embed"))]
     {
-        "Local model (not in this build)".to_string()
+        format!("{} (not in this build)", config.label)
     }
 }
 
-/// Approximate size of the model download, for the Settings copy.
-fn onnx_model_bytes() -> u64 {
-    // MiniLM-L6 quantized is ~23 MB; the number is a UI hint, not a guarantee.
-    23 * 1024 * 1024
+/// Resolves a requested `onnx:…` id, falling back to the default model when the
+/// caller names none (or names a model this build no longer knows).
+fn resolve_config(embedder: Option<&str>) -> models::OnnxEmbedderConfig {
+    embedder
+        .and_then(models::config_for)
+        .unwrap_or_else(models::default_model)
 }
 
-/// Readiness of the local model, so Settings can show the right action.
+/// Readiness of the selected local model, so Settings can show the right action.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
@@ -116,7 +134,7 @@ pub struct ModelStatus {
     pub available: bool,
     /// The ONNX Runtime dylib was found next to the executable.
     pub runtime_found: bool,
-    /// The model files are already on disk.
+    /// This model's files are already on disk.
     pub model_downloaded: bool,
     /// Approximate download size in bytes.
     pub download_bytes: u64,
@@ -124,25 +142,29 @@ pub struct ModelStatus {
     pub detail: String,
 }
 
-/// Reports whether the local embedder can run, and what is missing.
+/// Reports whether one local embedder can run, and what is missing.
+///
+/// Defaults to the catalogue's first model when the caller names none, so a
+/// Settings page that has not picked a model yet still gets a useful answer.
 #[tauri::command]
-pub fn memory_model_status(app: tauri::AppHandle) -> ModelStatus {
+pub fn memory_model_status(app: tauri::AppHandle, embedder: Option<String>) -> ModelStatus {
+    let config = resolve_config(embedder.as_deref());
     #[cfg(feature = "local-embed")]
     {
         use crate::embed::onnx::RuntimeProbe;
         let runtime_found = RuntimeProbe::runtime_found();
         // Pass the resolved cache root (`…/models`), which is what
         // `model_is_cached` expects; it does not append `models` itself.
-        let model_downloaded = crate::embed::onnx::model_is_cached(&models_dir(&app));
+        let model_downloaded = crate::embed::onnx::model_is_cached(&models_dir(&app), &config);
         ModelStatus {
             available: true,
             runtime_found,
             model_downloaded,
-            download_bytes: onnx_model_bytes(),
+            download_bytes: config.download_bytes,
             detail: if !runtime_found {
                 "The ONNX Runtime library was not found next to the app.".to_string()
             } else if !model_downloaded {
-                "The embedding model has not been downloaded yet.".to_string()
+                format!("{} has not been downloaded yet.", config.label)
             } else {
                 "Ready.".to_string()
             },
@@ -155,32 +177,35 @@ pub fn memory_model_status(app: tauri::AppHandle) -> ModelStatus {
             available: false,
             runtime_found: false,
             model_downloaded: false,
-            download_bytes: onnx_model_bytes(),
+            download_bytes: config.download_bytes,
             detail: "This build was compiled without the local model.".to_string(),
         }
     }
 }
 
-/// Downloads the local model, if it is not already cached.
+/// Downloads one local model, if it is not already cached.
 ///
 /// Long-running and network-bound, so it is `async` and callable from the UI
 /// with a spinner. Emits `memory:download-progress` while it streams so the UI
 /// can show a real progress bar. Returns the model's on-disk directory.
 #[tauri::command]
-pub async fn memory_download_model(app: tauri::AppHandle) -> Result<String, String> {
+pub async fn memory_download_model(
+    app: tauri::AppHandle,
+    embedder: Option<String>,
+) -> Result<String, String> {
+    let config = resolve_config(embedder.as_deref());
     #[cfg(feature = "local-embed")]
     {
         use tauri::Emitter;
 
         let dir = models_dir(&app);
-        let config = OnnxEmbedderConfig::minilm_l6();
         // The download itself is blocking; keep it off the async runtime's
         // worker so the app stays responsive.
         let emit_app = app.clone();
         let result = tauri::async_runtime::spawn_blocking(move || {
             let cache = ModelCache::new(&dir);
             cache
-                .get_or_download(&config.model_id, |label, written, total| {
+                .get_or_download(config.model_id, config.hf_file, |label, written, total| {
                     // One event per chunk would flood the IPC channel on a fast
                     // connection; the UI only needs a smooth bar.
                     let percent = total
@@ -259,12 +284,12 @@ pub async fn ai_embed(
 
     #[cfg(feature = "local-embed")]
     {
-        if id == ONNX_EMBEDDER_ID {
+        if let Some(config) = models::config_for(&id) {
             let cache = ModelCache::new(models_dir(&app));
-            let vectors = embed_local(&state, &cache, &id, request.texts)?;
+            let vectors = embed_local(&state, &cache, config, request.texts, request.as_query)?;
             return Ok(EmbedResponse {
                 id,
-                dim: ONNX_EMBEDDER_DIM,
+                dim: config.dim,
                 vectors,
             });
         }
@@ -296,24 +321,34 @@ fn models_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
 }
 
 /// Runs the local model, loading it once and keeping it warm.
+///
+/// The warm session is keyed by id, so a model change reloads rather than
+/// reusing the previous model's session against the new model's dim.
 #[cfg(feature = "local-embed")]
 fn embed_local(
     state: &tauri::State<'_, LocalModelState>,
     cache: &ModelCache,
-    id: &str,
+    config: models::OnnxEmbedderConfig,
     texts: Vec<String>,
+    as_query: bool,
 ) -> Result<Vec<Vec<f32>>, String> {
     let mut guard = state
         .loaded
         .lock()
         .map_err(|_| "the local model lock is poisoned".to_string())?;
-    if guard.as_ref().map(|(loaded, _)| loaded.as_str()) != Some(id) {
-        let embedder = OnnxEmbedder::load(OnnxEmbedderConfig::minilm_l6(), cache)
-            .map_err(|error| error.to_string())?;
-        *guard = Some((id.to_string(), embedder));
+    if guard.as_ref().map(|(loaded, _)| loaded.as_str()) != Some(config.id) {
+        let embedder = OnnxEmbedder::load(config, cache).map_err(|error| error.to_string())?;
+        *guard = Some((config.id.to_string(), embedder));
     }
     let (_, embedder) = guard.as_mut().expect("model was just loaded");
-    embedder.embed(&texts).map_err(|error| error.to_string())
+    let kind = if as_query {
+        EmbedKind::Query
+    } else {
+        EmbedKind::Document
+    };
+    embedder
+        .embed_as(&texts, kind)
+        .map_err(|error| error.to_string())
 }
 
 /// Cosine similarity between two encoded vectors. The frontend has its own copy

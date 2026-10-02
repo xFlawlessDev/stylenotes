@@ -261,7 +261,10 @@ export const settings: SettingsMessages = {
 		embedderHint:
 			'Bagaimana catatan dan tugas diubah menjadi vektor. Model lokal atau kunci provider milikmu sendiri menjaga semuanya di perangkat ini.',
 		runtimeMissing: 'Pustaka ONNX Runtime tidak ditemukan di samping aplikasi; model lokal tidak bisa jalan. Pasang ulang StyleNotes, atau pakai baseline offline.',
-		modelMissing: 'Unduh model embedding untuk memakai model lokal. Setelah terunduh, ia berjalan sepenuhnya offline.',
+		modelMissing: 'Unduh {model} untuk memakai model lokal. Setelah terunduh, ia berjalan sepenuhnya offline.',
+		recommended: 'disarankan',
+		multilingual: 'multibahasa',
+		downloaded: 'terunduh',
 		downloadModel: 'Unduh model',
 		downloading: 'Mengunduh…',
 		downloadPercent: '{percent}% · {done} dari {total}',
@@ -282,6 +285,9 @@ export const settings: SettingsMessages = {
 		threshold: 'Ambang usulan',
 		thresholdHint:
 			'Kemiripan di atas {value} mengusulkan tautan (bawaan {default}). Lebih tinggi lebih ketat.',
+		autoIndex: 'Indeks ulang otomatis',
+		autoIndexHint:
+			'Menjaga indeks tetap mutakhir sendiri: embed ulang catatan saat berubah, membangun indeks vault baru, dan memeriksa perubahan yang terlewat tiap beberapa menit.',
 	},	mcp: {
 		title: 'MCP Lokal',
 		on: 'MCP aktif',

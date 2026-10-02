@@ -4,7 +4,10 @@
 fn probe_status_against_real_dir() {
     let models_root = std::path::PathBuf::from(std::env::var("APPDATA_MODELS").expect("env"));
     let app_data = models_root.parent().expect("parent").to_path_buf();
-    let downloaded = crate::embed::onnx::model_is_cached(&app_data);
+    let downloaded = crate::embed::onnx::model_is_cached(
+        &app_data,
+        &crate::embed::models::default_model(),
+    );
     eprintln!("app_data = {}", app_data.display());
     eprintln!("model_is_cached = {downloaded}");
     assert!(downloaded, "expected model to be reported as cached");

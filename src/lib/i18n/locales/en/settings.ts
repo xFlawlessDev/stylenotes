@@ -262,7 +262,10 @@ export const settings = {
 		embedderHint:
 			'How notes and tasks are turned into vectors. A local model or your own provider key keeps everything on this device.',
 		runtimeMissing: 'The ONNX Runtime library was not found next to the app; the local model cannot run. Reinstall StyleNotes, or use the offline baseline.',
-		modelMissing: 'Download the embedding model to use the local model. It runs fully offline once downloaded.',
+		modelMissing: 'Download {model} to use the local model. It runs fully offline once downloaded.',
+		recommended: 'recommended',
+		multilingual: 'multilingual',
+		downloaded: 'downloaded',
 		downloadModel: 'Download model',
 		downloading: 'Downloading…',
 		downloadPercent: '{percent}% · {done} of {total}',
@@ -283,6 +286,9 @@ export const settings = {
 		threshold: 'Suggestion threshold',
 		thresholdHint:
 			'Similarity above {value} proposes a link (default {default}). Higher is stricter.',
+		autoIndex: 'Auto re-index',
+		autoIndexHint:
+			'Keep the index current on its own: re-embed a note when it changes, backfill a new vault, and recheck for missed changes every few minutes.',
 	},	mcp: {
 		title: 'Local MCP',
 		on: 'MCP is on',
