@@ -48,17 +48,11 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Tauri's build script requires the `bundle.externalBin` file to exist
-      # (`stylenotes-mcp-<triple>`) or it aborts. But that shim lives in the same
-      # crate, so its first build would trigger the very build script that needs
-      # the file — a chicken-and-egg on a clean checkout. Seed an empty
-      # placeholder to satisfy the existence check, then build the real shim
-      # (which overwrites it), exactly as `beforeBuildCommand` does.
+      # The shim (`bundle.externalBin`) lives in the same crate as the app, so
+      # `scripts/mcp-sidecar.cjs` seeds an empty placeholder before building to
+      # break the chicken-and-egg (see its `seedPlaceholder`).
       - name: Build the MCP sidecar
-        run: |
-          triple=$(rustc -vV | sed -n 's/^host: //p')
-          touch "src-tauri/stylenotes-mcp-$triple"
-          bun run mcp:sidecar
+        run: bun run mcp:sidecar
 
       - name: Rust format
         run: bun run fmt:check
