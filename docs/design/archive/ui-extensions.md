@@ -1,8 +1,11 @@
 # System Design — UI Extensions: Dari CSS ke Permukaan (tanpa eksekusi kode)
 
-> Status: **Design draft — 18 keputusan (#X1–#X18), 2 pertanyaan terbuka (#X-Q1, #X-Q2)** (lihat §9–§11).
+> Status: **Tidak dilanjutkan (shelved)** — dipindahkan ke `docs/design/archive/` (2026-10-02). Isi dokumen adalah draft desain (#X1–#X18); **tidak ada** bagian yang diimplementasikan.
 > Tanggal: 2026-09-30
 > Scope: membuka **permukaan UI** yang bisa diperluas komunitas — bukan hanya warna/CSS — **tanpa** memuat JavaScript pihak ketiga ke dalam app.
+
+> **Keputusan: tidak dilanjutkan.** Setelah ditelusuri, permukaan UI pihak ketiga yang benar-benar berguna menuntut user membawa UI mereka sendiri — dan itu membatalkan premis X2 ("extension = data, tanpa kode"). Bentuk yang jujur (sandbox `iframe` + CSP + custom protocol + host API + versioning manifest) adalah runtime plugin penuh: biaya perawatan dan dukungan keamanannya tidak proporsional untuk solo dev. Nilai "rasa Obsidian" sebagian besar sudah ditutup jalur yang **sudah ada**: tema (`ui_plugins`), MCP (`mcp-local-free.md`), dan AI + tools. Dokumen ini disimpan sebagai catatan keputusan, bukan rencana kerja.
+
 > Dokumen terkait:
 > - the business model (dikelola bersama layanan cloud) — temuan §1 #2 ("`ui_plugins` = tulang belakang marketplace tema"), keputusan **B4** (theme marketplace berbayar) dan **B3** (seluruh app desktop OSS). Dokumen ini **mengunci** arti "marketplace" (X3, X10, X12).
 > - `docs/design/archive/mcp-local-free.md` — pola tabel → repo(`boolean`) → store `.svelte.ts` → komponen Settings (temuan 11) yang dipakai ulang di sini; §13a tentang backup & hard delete (dipakai X13).
