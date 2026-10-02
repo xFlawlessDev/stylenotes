@@ -16,8 +16,8 @@ Desain di folder ini diarsipkan dari `docs/design/` (2026-10-01). Isinya tetap b
 folder ini sudah diimplementasikan.
 
 Desain yang **belum** diimplementasikan tetap di `docs/design/`: `mobile.md` dan
-`vault-mirror.md` (export mirror, impor folder, dan auto-sync dua-arah berbasis poll sudah ada
-di kode; watcher `notify` dan dialog konflik masih desain).
+`vault-mirror.md` (export mirror, impor folder, auto-sync dua-arah, watcher, dan dialog konflik
+sudah ada di kode; proyeksi task masih desain).
 
 Dokumen desain untuk **layanan cloud** (sync, kolaborasi, model bisnis) dikelola
 bersama layanan itu, di luar repo ini. Dokumentasi publik menyebutnya lewat

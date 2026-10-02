@@ -21,6 +21,7 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 pub mod commands;
+pub mod watch;
 
 /// Folders that belong to tooling, never to the user's notes.
 pub const SKIP_DIRS: [&str; 4] = [".git", ".obsidian", "node_modules", ".trash"];

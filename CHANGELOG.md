@@ -72,3 +72,8 @@ All notable changes to StyleNotes are documented in this file. Versions follow S
   Vault. `VaultConflictDialog` shows both versions side by side with **Keep
   StyleNotes / Keep folder / Keep both**; the losing app version is kept in Record
   History (`reason: 'vault'`). Nothing is overwritten while a conflict is open.
+- **Vault folder watcher.** A workspace in Two-way mode now reacts the moment a
+  file changes: `src-tauri/src/vault/watch.rs` installs a recursive `notify`
+  watcher and `vault_wait_change` parks one wait on a worker thread (answered over
+  a Tauri channel, so the main thread never blocks). The 20-second poll stays as a
+  backstop, because the folder scan — not the watcher — is the source of truth.

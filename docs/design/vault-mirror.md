@@ -992,13 +992,15 @@ Settings → Vault → “Read from folder”
 
 ### 11.5 Auto-sync (mode `vault`)
 
-Mode `vault` kini hidup di UI dan menjalankan siklus otomatis:
+Mode `vault` menjalankan siklus otomatis lewat **dua jalur**:
 
 ```
 startVaultSync()  (workspace window, dari workspace-session)
-  → tiap VAULT_SYNC_INTERVAL_MS (20 s), kalau mode='vault' dan folder ada
-  → reconcileVault()   // baca dulu
-  → exportVault()      // baru tulis; berkas tak berubah di-skip oleh hash
+  ├─ poll  : setInterval tiap 20 s
+  └─ watch : vault_watch_start(root) + loop vault_wait_change (Channel)
+             → event di bawah folder membangunkan wait dalam ~ms
+
+runVaultCycle() = reconcileVault() dulu, lalu exportVault()
 ```
 
 Alasan **baca-dulu-baru-tulis**, dan alasan loop berhenti:
@@ -1006,12 +1008,16 @@ Alasan **baca-dulu-baru-tulis**, dan alasan loop berhenti:
 1. `reconcileVault` mengimpor editan luar (tulis ke DB) dan menulis `content_hash`
    baru ke `vault_links`.
 2. `exportVault` merender ulang dari DB; berkas yang sudah sama persis di-skip di
-   Rust, jadi `mtime` tidak berubah.
+   Rust, jadi `mtime` tidak berubah → watcher tidak ikut terpicu.
 3. Kalau urutannya dibalik, export akan menimpa editan luar sebelum sempat dibaca.
 
-**Ini poll, bukan watcher.** `notify` (#V19) belum ada; poll sudah menutup kasus
-#V18 (berkas dibuat saat app tertutup) karena sweep memang membaca keadaan nyata.
-Saat watcher ditambahkan, ia memanggil `runVaultCycle` yang sama.
+**Watcher hanyalah petunjuk (#V19).** `src-tauri/src/vault/watch.rs` memasang
+`notify` **rekursif** di root folder; `vault_wait_change` memarkir satu wait di
+worker thread dan menjawabnya lewat `Channel` (pola sama dengan `mcp_watch.rs` /
+`mcp-host.svelte.ts`), sehingga thread utama tidak pernah diblokir. Event yang
+hilang hanya menunda; **sweep tetap sumber kebenaran** (#V18) dan poll 20 detik
+adalah jaring pengaman. `stopVaultSync` menaikkan `watchGeneration`, yang
+menghentikan loop dengan bersih saat mode berganti.
 
 ### 11.6 Konflik (F2, #V8)
 
@@ -1047,11 +1053,11 @@ Antrean & pilihan:
 
 ### 11.7 Yang belum
 
-- **Watcher `notify`.** Auto-sync masih poll 20 detik; watcher akan memanggil
-  `runVaultCycle` yang sama.
 - **Task** belum diproyeksikan; hanya note.
 - **Diff baris `+`/`-`.** Dialog menampilkan dua versi berdampingan, belum diff
   berwarna per baris.
+- **Mode `both` belum menyimpan tautan dua arah.** "Simpan keduanya" membuat note
+  kedua dari varian berkas, tetapi tautan antar keduanya belum dibuat otomatis.
 
 ### 11.8 Mode `folder` benar-benar read-only
 

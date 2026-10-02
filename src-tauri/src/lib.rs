@@ -913,7 +913,9 @@ pub fn run() {
             vault::commands::vault_read_files,
             vault::commands::vault_scan,
             vault::commands::vault_validate_root,
-            vault::commands::vault_import_attachment
+            vault::commands::vault_import_attachment,
+            vault::commands::vault_watch_start,
+            vault::commands::vault_wait_change
         ])
         .setup(|app| {
             // Lays down `mcp/`, clears stale jobs, and writes the first
@@ -933,6 +935,8 @@ pub fn run() {
             app.manage(embed::commands::LocalModelState::default());
             // Owns the optional remote MCP listener; off until started (#D12).
             app.manage(remote_mcp::commands::RemoteState::default());
+            // Owns the vault folder watcher; installed on demand per workspace.
+            app.manage(vault::commands::VaultWatchState::default());
             // The atomic note-write pool must exist before any window can call
             // `note_upsert_tx`. A failed open is not fatal: the frontend falls
             // back to the non-transactional path (see `db/index.ts`).

@@ -7,9 +7,12 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
-use tauri::Manager;
+use tauri::ipc::Channel;
+use tauri::{Manager, State};
 
+use super::watch;
 use super::{
     hash_bytes, is_skipped_rel, modified_millis, rel_key, safe_rel_path, write_atomic, VaultFile,
     VaultWrite, VaultWriteResult, MAX_VAULT_FILES, MAX_VAULT_FILE_BYTES,
@@ -246,6 +249,63 @@ pub fn vault_validate_root(
         }
     }
     Ok(canonical.to_string_lossy().to_string())
+}
+
+/// App state holding the vault folder watcher.
+///
+/// One watcher serves the active workspace; switching folders reinstalls it. It
+/// lives outside the command so a parked wait on a worker thread can reach it.
+pub struct VaultWatchState(pub Mutex<Option<std::sync::Arc<watch::VaultWatch>>>);
+
+impl Default for VaultWatchState {
+    fn default() -> Self {
+        Self(Mutex::new(None))
+    }
+}
+
+/// Installs (or reuses) a recursive watcher on a vault folder.
+#[tauri::command]
+pub fn vault_watch_start(state: State<'_, VaultWatchState>, root: String) -> Result<bool, String> {
+    let path = PathBuf::from(&root);
+    if !path.is_dir() {
+        return Err(format!("vault folder is not readable: {root}"));
+    }
+    let mut guard = state.0.lock().map_err(|error| error.to_string())?;
+    if let Some(existing) = guard.as_ref() {
+        if existing.watches(&path) {
+            return Ok(true);
+        }
+    }
+    *guard = Some(watch::shared(watch::install(path)));
+    Ok(true)
+}
+
+/// Parks a wait for the next change under the watched folder.
+///
+/// The answer goes out over a `Channel` because a multi-second `invoke` reply
+/// would block the main thread. The wait is always bounded, so a watcher that
+/// never fires costs latency, not a hang.
+#[tauri::command]
+pub async fn vault_wait_change(
+    state: State<'_, VaultWatchState>,
+    channel: Channel<bool>,
+    wait_ms: Option<u64>,
+) -> Result<(), String> {
+    let watch = {
+        let guard = state.0.lock().map_err(|error| error.to_string())?;
+        guard.as_ref().cloned()
+    };
+    let Some(watch) = watch else {
+        // No watcher installed: answer immediately so the frontend loop retries.
+        let _ = channel.send(false);
+        return Ok(());
+    };
+    let budget = watch::wait_budget(wait_ms);
+    let parked = watch::parked(watch, budget, move || {
+        let _ = channel.send(true);
+    });
+    parked.spawn();
+    Ok(())
 }
 
 #[cfg(test)]

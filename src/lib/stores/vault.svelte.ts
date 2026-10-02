@@ -12,7 +12,7 @@
  */
 
 import { browser } from '$app/environment';
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import { isTauri } from '$lib/windows';
 import { listNotes, persistNote } from '$lib/stores/notes';
 import { createNote } from '$lib/content/content';
@@ -393,13 +393,52 @@ async function runVaultCycle(): Promise<void> {
 	}
 }
 
+/** How long the frontend parks one watcher wait before re-arming. */
+export const VAULT_WATCH_WAIT_MS = 2_000;
+
+let watchLoopRunning = false;
+let watchGeneration = 0;
+
+/**
+ * Installs the recursive watcher and loops parked waits (#V19).
+ *
+ * A change under the folder wakes the parked wait almost immediately, so the app
+ * reacts in well under the poll interval. The poll stays as a backstop: a watcher
+ * can miss events (FSEvents coalesces, a folder can be replaced), and the sweep
+ * is the source of truth (#V18).
+ */
+async function runWatchLoop(): Promise<void> {
+	if (watchLoopRunning || !vaultStore.path) return;
+	watchLoopRunning = true;
+	const generation = ++watchGeneration;
+	try {
+		await invoke('vault_watch_start', { root: vaultStore.path }).catch(() => undefined);
+		while (watchLoopRunning && generation === watchGeneration && vaultStore.mode === 'vault') {
+			let woke = false;
+			await new Promise<void>((resolve) => {
+				const channel = new Channel<boolean>();
+				channel.onmessage = (changed) => {
+					woke = changed;
+					resolve();
+				};
+				invoke('vault_wait_change', { channel, waitMs: VAULT_WATCH_WAIT_MS }).catch(() =>
+					resolve()
+				);
+			});
+			if (generation !== watchGeneration) break;
+			// Any change (or a deadline) runs one cycle; unchanged files cost a scan.
+			if (woke && vaultStore.mode === 'vault') await runVaultCycle();
+		}
+	} finally {
+		if (generation === watchGeneration) watchLoopRunning = false;
+	}
+}
+
 /**
  * Starts automatic two-way sync for a workspace in `vault` mode.
  *
- * A poll rather than a filesystem watcher: `notify` (the recursive watcher of
- * #V19) is still to come, and the sweep already handles files made while the app
- * was closed (#V18). It runs only in the always-alive `workspace` window (#V5),
- * only when the mode is `vault`, and does nothing while an export is in flight.
+ * A poll (a safety net) plus the recursive watcher (#V19). Runs only in the
+ * always-alive `workspace` window (#V5), only when the mode is `vault`.
  */
 export function startVaultSync(): void {
 	if (!browser || !isTauri) return;
@@ -409,11 +448,14 @@ export function startVaultSync(): void {
 		syncTimer = setInterval(() => {
 			if (vaultStore.mode === 'vault' && vaultStore.path) void runVaultCycle();
 		}, VAULT_SYNC_INTERVAL_MS);
+		void runWatchLoop();
 	});
 }
 
-/** Stops the automatic sync, e.g. when the window tears down. */
+/** Stops the automatic sync and the watcher loop. */
 export function stopVaultSync(): void {
+	watchGeneration += 1;
+	watchLoopRunning = false;
 	if (syncTimer) {
 		clearInterval(syncTimer);
 		syncTimer = null;
