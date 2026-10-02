@@ -3,7 +3,10 @@
 //! Pure data, deliberately **not** behind the `local-embed` feature: the UI must
 //! be able to list the models a build *would* offer even when the ONNX runtime
 //! is not compiled in, exactly as `memory_embedders` did for a single hardcoded
-//! model before. Only the session/runtime code is feature-gated.
+//! model before. Only the session/runtime code is feature-gated, so a
+//! `--no-default-features` build still has the catalogue but never reads the
+//! fields that only matter to inference.
+#![cfg_attr(not(feature = "local-embed"), allow(dead_code))]
 //!
 //! Every entry points at a **quantized** ONNX export so the download matches the
 //! size the UI advertises. Each model differs in pooling and (for E5) the

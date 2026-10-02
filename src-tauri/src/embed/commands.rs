@@ -46,6 +46,7 @@ pub struct EmbedRequest {
     pub texts: Vec<String>,
     /// Embed as a search query rather than a document. Only E5 distinguishes the
     /// two; for the other models this is inert. The index is always documents.
+    #[cfg_attr(not(feature = "local-embed"), allow(dead_code))]
     #[serde(default)]
     pub as_query: bool,
     /// Optional endpoint for a provider embedder.
@@ -235,7 +236,7 @@ pub async fn memory_download_model(
     }
     #[cfg(not(feature = "local-embed"))]
     {
-        let _ = app;
+        let _ = (&app, &config);
         Err("This build was compiled without the local model.".to_string())
     }
 }

@@ -41,11 +41,17 @@ pub struct EmbedderDescriptor {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_bytes: Option<u64>,
     /// Pre-selected as the best default for its size. Only meaningful for `onnx`.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "is_false")]
     pub recommended: bool,
     /// Covers many languages. Only meaningful for `onnx`.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "is_false")]
     pub multilingual: bool,
+}
+
+/// Omit a `false` flag from the wire, so the baseline descriptor keeps the same
+/// shape it had before the flags existed.
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Errors surfaced across the IPC boundary as strings.
@@ -78,5 +84,61 @@ pub fn normalize(vec: &mut [f32]) {
         for value in vec.iter_mut() {
             *value /= magnitude;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn baseline() -> EmbedderDescriptor {
+        EmbedderDescriptor {
+            id: "hashing:trigram-v1".to_string(),
+            kind: EmbedderKind::Hashing,
+            label: "Offline baseline".to_string(),
+            dim: 384,
+            offline: true,
+            download_bytes: None,
+            recommended: false,
+            multilingual: false,
+        }
+    }
+
+    /// The frontend reads `kind` as a lowercase tag; a rename here would fail
+    /// silently at runtime, so it is pinned.
+    #[test]
+    fn kind_serialises_lowercase() {
+        let json = serde_json::to_string(&baseline()).expect("serialise");
+        assert!(json.contains("\"kind\":\"hashing\""));
+    }
+
+    /// A `false` flag is omitted, and a `None` size too, so the baseline
+    /// descriptor keeps the pre-flags shape rather than gaining dead keys.
+    #[test]
+    fn false_flags_and_absent_size_are_omitted() {
+        let json = serde_json::to_string(&baseline()).expect("serialise");
+        assert!(!json.contains("recommended"), "false flag must be omitted");
+        assert!(!json.contains("multilingual"), "false flag must be omitted");
+        assert!(!json.contains("downloadBytes"), "null size must be omitted");
+        assert!(json.contains("\"dim\":384"));
+    }
+
+    /// An ONNX descriptor carries the size and the recommendation the UI depends
+    /// on to render the option line and mark a default.
+    #[test]
+    fn a_recommended_model_carries_its_flags() {
+        let descriptor = EmbedderDescriptor {
+            id: "onnx:bge-small-en-v1.5".to_string(),
+            kind: EmbedderKind::Onnx,
+            label: "BGE small v1.5".to_string(),
+            dim: 384,
+            offline: true,
+            download_bytes: Some(35 * 1024 * 1024),
+            recommended: true,
+            multilingual: false,
+        };
+        let json = serde_json::to_string(&descriptor).expect("serialise");
+        assert!(json.contains("\"recommended\":true"));
+        assert!(json.contains("\"downloadBytes\":36700160"));
     }
 }
