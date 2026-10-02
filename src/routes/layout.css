@@ -802,6 +802,25 @@ html[data-motion='reduced'] *::after {
 }
 
 /*
+	Opt-in thin scrollbar for content surfaces (note editor body, preview, note
+	window). The global `::-webkit-scrollbar { display: none }` hides every
+	scrollbar, so a surface that can overflow has to ask for the bar back;
+	without it the overflow is unreachable (a Tauri window itself never scrolls).
+*/
+@utility scrollbar-thin {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-outline-variant) transparent;
+	&::-webkit-scrollbar {
+		display: block;
+		width: 6px;
+	}
+	&::-webkit-scrollbar-thumb {
+		border-radius: 9999px;
+		background-color: var(--color-outline-variant);
+	}
+}
+
+/*
 	Side rails (`RailShell.svelte`, `NotesFeed`, `TaskBoard`).
 	A rail that overflows has to be scrollable rather than clipped, but the global
 	`::-webkit-scrollbar { display: none }` above hides the only affordance that

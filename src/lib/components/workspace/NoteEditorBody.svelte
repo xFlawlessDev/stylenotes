@@ -75,7 +75,7 @@
 			variant="bare"
 			size="lg"
 			placeholder={t('notes.editor.writePlaceholder')}
-			class="scrollbar-none h-full w-full px-6 py-4 text-on-surface-variant"
+			class="scrollbar-thin h-full w-full px-6 py-4 text-on-surface-variant"
 		></Textarea>
 	{:else if view === 'split'}
 		<div class="grid min-h-0 grid-cols-2 divide-x divide-hairline">
@@ -91,7 +91,7 @@
 				variant="bare"
 				size="md"
 				placeholder={t('notes.editor.splitPlaceholder')}
-				class="scrollbar-none h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
+				class="scrollbar-thin h-full w-full overflow-y-auto px-4 py-4 text-on-surface-variant"
 				onscroll={oneditorscroll}
 			></Textarea>
 			<PreviewSurface
@@ -100,6 +100,7 @@
 				active={tocActive}
 				placeholder={t('notes.editor.previewHere')}
 				paneClass="px-5 py-4"
+				scrollClass="scrollbar-thin"
 				bind:previewEl
 				onscroll={onpreviewscroll}
 				onclick={onpreviewclick}
@@ -113,6 +114,7 @@
 			active={tocActive}
 			bodyClass="mx-auto max-w-2xl"
 			paneClass="px-6 py-4"
+			scrollClass="scrollbar-thin"
 			placeholder={t('notes.editor.emptyPreview')}
 			bind:previewEl
 			onclick={onpreviewclick}

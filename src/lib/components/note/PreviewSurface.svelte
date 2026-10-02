@@ -16,6 +16,7 @@
 		active = -1,
 		bodyClass = '',
 		paneClass = 'px-5 py-4',
+		scrollClass = 'scrollbar-none',
 		placeholder,
 		previewEl = $bindable(),
 		onscroll,
@@ -27,6 +28,8 @@
 		active?: number;
 		bodyClass?: string;
 		paneClass?: string;
+		/** Scrollbar treatment for the preview pane; defaults to hidden. */
+		scrollClass?: string;
 		placeholder: string;
 		previewEl?: HTMLDivElement | undefined;
 		onscroll?: () => void;
@@ -43,7 +46,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div
 		bind:this={previewEl}
-		class="scrollbar-none h-full overflow-y-auto {paneClass}"
+		class="{scrollClass} h-full overflow-y-auto {paneClass}"
 		{onscroll}
 		onclick={onclick}
 	>

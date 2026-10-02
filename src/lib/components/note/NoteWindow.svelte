@@ -310,48 +310,50 @@
 	</DetailWindowHeader>
 
 	{#if note}
-		<div class="flex min-h-0 flex-1 flex-col gap-1.5 p-2.5 pt-2">
-			<Input
-				variant="bare"
-				size="sm"
-				class="shrink-0 px-1.5 font-headline text-headline-sm font-bold tracking-tight placeholder:text-outline/60"
-				placeholder={t('notes.editor.titlePlaceholder')}
-				aria-label={t('notes.editor.titleLabel')}
-				bind:value={title}
-				oninput={() => update({ title })}
-			/>
-			<div class="flex shrink-0 items-center gap-2 px-1.5">
-				<WorkspaceBadge
-					name={noteWorkspace.name}
-					color={noteWorkspace.color}
-					foreign={foreignWorkspace}
-				/>
-				<Select
+		<div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+			<div class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-1.5 p-2.5 pt-2">
+				<Input
+					variant="bare"
 					size="sm"
-					label={t('notes.editor.noteFolder')}
-					class="w-[136px] px-2 font-code text-code-sm"
-					options={folderOptions}
-					bind:value={folder}
-					onchange={(next) => update({ folder: next })}
+					class="shrink-0 px-1.5 font-headline text-headline-sm font-bold tracking-tight placeholder:text-outline/60"
+					placeholder={t('notes.editor.titlePlaceholder')}
+					aria-label={t('notes.editor.titleLabel')}
+					bind:value={title}
+					oninput={() => update({ title })}
 				/>
+				<div class="flex shrink-0 items-center gap-2 px-1.5">
+					<WorkspaceBadge
+						name={noteWorkspace.name}
+						color={noteWorkspace.color}
+						foreign={foreignWorkspace}
+					/>
+					<Select
+						size="sm"
+						label={t('notes.editor.noteFolder')}
+						class="w-[136px] px-2 font-code text-code-sm"
+						options={folderOptions}
+						bind:value={folder}
+						onchange={(next) => update({ folder: next })}
+					/>
+				</div>
+				<div class="shrink-0 px-1.5">
+					<NoteTags tags={note.tags} onchange={(tags) => update({ tags })} />
+				</div>
+				<NoteBodyEditor
+					body={note.body}
+					{view}
+					{note}
+					{notes}
+					{tasks}
+					folders={customFolders}
+					autofocus={revealed}
+					onwikilink={handleWikiClick}
+					onchange={(body) => update({ body })}
+				/>
+				<footer class="shrink-0 px-1.5 text-code-sm font-code text-outline">
+					<span>{t('editor.status.wordsChars', { words: note.words, chars: note.chars })}</span>
+				</footer>
 			</div>
-			<div class="shrink-0 px-1.5">
-				<NoteTags tags={note.tags} onchange={(tags) => update({ tags })} />
-			</div>
-			<NoteBodyEditor
-				body={note.body}
-				{view}
-				{note}
-				{notes}
-				{tasks}
-				folders={customFolders}
-				autofocus={revealed}
-				onwikilink={handleWikiClick}
-				onchange={(body) => update({ body })}
-			/>
-			<footer class="shrink-0 px-1.5 text-code-sm font-code text-outline">
-				<span>{t('editor.status.wordsChars', { words: note.words, chars: note.chars })}</span>
-			</footer>
 		</div>
 	{:else}
 		<EmptyState
