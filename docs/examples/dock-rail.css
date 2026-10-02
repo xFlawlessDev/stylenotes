@@ -1,0 +1,36 @@
+/* ==========================================================================
+   Example — Dock rail
+   Target: [data-ui="dock-rail"] (DockRailItems.svelte)
+   Item dock & tombol + memakai [data-slot="base-button"].
+   ========================================================================== */
+
+/* Item dock jadi chip yang sedikit lebih hidup */
+[data-ui="dock-rail"] [data-slot="base-button"] {
+	border-radius: var(--radius-xl);
+	transition:
+		transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 140ms ease;
+}
+[data-ui="dock-rail"] [data-slot="base-button"]:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 22px -12px var(--glass-shadow);
+}
+
+/* Tombol + (tonal) dapat cincin aksen saat hover */
+[data-ui="dock-rail"] [data-slot="base-button"].emphasis-container:hover {
+	transform: translateY(-3px) scale(1.04);
+	box-shadow:
+		0 12px 26px -12px color-mix(in oklab, var(--color-primary) 55%, transparent),
+		inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Pemisah antar blok lebih lembut */
+[data-ui="dock-rail"] ~ div {
+	background-image: linear-gradient(
+		to bottom,
+		transparent,
+		var(--glass-stroke) 30%,
+		var(--glass-stroke) 70%,
+		transparent
+	);
+}

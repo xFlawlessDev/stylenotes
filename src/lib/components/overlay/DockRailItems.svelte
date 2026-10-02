@@ -60,6 +60,7 @@
 
 <!-- Scrollable items: docked notes first, then tasks, then the rail divider. -->
 <div
+	data-ui="dock-rail"
 	class="scrollbar-none flex items-center gap-2.5 {edge === 'top'
 		? 'max-w-[168px] flex-row overflow-x-auto'
 		: 'max-h-[168px] w-full flex-col overflow-y-auto'}"

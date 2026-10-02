@@ -1,0 +1,33 @@
+/* ==========================================================================
+   Example — Title bar
+   Target: [data-ui="titlebar"] (TitleBar.svelte)
+   ========================================================================== */
+
+/* Header lebih tinggi dengan gradient brand halus */
+[data-ui="titlebar"] {
+	height: 3.25rem;
+	background-image: linear-gradient(
+		90deg,
+		color-mix(in oklab, var(--color-primary) 10%, transparent),
+		transparent 55%
+	);
+}
+
+/* Tombol ikon di kanan jadi pil yang lebih menonjol saat hover */
+[data-ui="titlebar"] > div:last-child [data-slot="base-button"] {
+	border-radius: 9999px;
+}
+[data-ui="titlebar"] > div:last-child [data-slot="base-button"]:hover {
+	box-shadow: 0 8px 20px -12px color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* Tombol Settings (tonal) dapat glow tetap */
+[data-ui="titlebar"] [data-slot="base-button"].emphasis-container {
+	box-shadow: 0 0 0 1px var(--emphasis-container-ring);
+}
+
+/* "Lampu" jendela sedikit lebih besar */
+[data-ui="titlebar"] button.rounded-full.size-3 {
+	width: 0.8rem;
+	height: 0.8rem;
+}

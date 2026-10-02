@@ -1,0 +1,47 @@
+/* ==========================================================================
+   Example — Notes feed
+   Target: [data-ui="notes-feed"] (panel) dan [data-ui="note-card"] (kartu).
+   ========================================================================== */
+
+/* Panel: lebih lebar + gradient tipis dari aksen */
+[data-ui="notes-feed"] {
+	width: 340px; /* timpa w-[300px] */
+	background-image: linear-gradient(
+		180deg,
+		color-mix(in oklab, var(--color-primary) 7%, transparent),
+		transparent 42%
+	);
+}
+@media (max-width: 1280px) {
+	[data-ui="notes-feed"] {
+		width: 288px;
+	}
+}
+
+/* Kartu: sudut lebih besar, hover naik halus */
+[data-ui="note-card"] {
+	border-radius: var(--radius-xl);
+	transition:
+		background-color 130ms ease,
+		transform 130ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 130ms ease;
+}
+[data-ui="note-card"]:hover {
+	transform: translateX(2px);
+	box-shadow: 0 14px 30px -22px var(--glass-shadow);
+}
+
+/* Indikator terpilih: bar aksen lebih tinggi + glow */
+[data-ui="note-card"] > span.emphasis-primary {
+	top: 0.6rem;
+	bottom: 0.6rem;
+	width: 3px;
+	background: var(--color-primary);
+	box-shadow: 0 0 12px color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* Judul kartu sedikit lebih besar */
+[data-ui="note-card"] h2 {
+	font-size: 16px;
+	line-height: 1.35;
+}

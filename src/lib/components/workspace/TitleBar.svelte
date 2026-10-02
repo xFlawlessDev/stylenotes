@@ -95,6 +95,7 @@
 
 <header
 	data-tauri-drag-region
+	data-ui="titlebar"
 	class="glass-panel relative z-30 m-2.5 mb-0 flex h-12 shrink-0 items-center justify-between gap-2 rounded-2xl px-3"
 >
 	<!-- Brand -->

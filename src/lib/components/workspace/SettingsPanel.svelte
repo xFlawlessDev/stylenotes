@@ -125,6 +125,7 @@
 		></button>
 
 		<aside
+			data-ui="settings-panel"
 			class="glass-solid relative flex h-full w-full max-w-[520px] flex-col overflow-hidden rounded-l-2xl max-sm:max-w-full max-sm:rounded-l-none"
 		>
 			<div class="flex items-center justify-between px-5 py-4">

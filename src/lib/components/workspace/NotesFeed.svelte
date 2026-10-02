@@ -100,6 +100,7 @@
 </script>
 
 <section
+	data-ui="notes-feed"
 	class="rail-panel glass-panel flex w-[300px] shrink-0 flex-col gap-2.5 overflow-hidden rounded-2xl p-2.5 max-lg:w-[256px] max-md:fixed max-md:inset-y-2.5 max-md:left-2.5 max-md:z-40 max-md:max-h-[calc(100vh-1.25rem)] max-md:shadow-2xl max-md:transition-transform {open
 		? 'max-md:translate-x-0'
 		: 'max-md:-translate-x-[120%]'}"
@@ -205,6 +206,7 @@
 		{#each filtered as note (note.id)}
 			{#snippet card()}
 				<div
+					data-ui="note-card"
 					class="group relative w-full cursor-pointer rounded-2xl p-3 text-left transition-all {selectedId === note.id
 						? 'glass-chip'
 						: 'bg-surface-container-lowest/30 hover:bg-surface-container/50'}"

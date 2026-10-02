@@ -1,0 +1,31 @@
+/* ==========================================================================
+   Example — Note editor header
+   Target: [data-ui="note-header"] (NoteHeader.svelte)
+   ========================================================================== */
+
+/* Beri ruang napas lebih dan garis pemisah lembut ke body */
+[data-ui="note-header"] {
+	padding: 0.75rem 1.75rem 1rem;
+	border-bottom: 1px solid color-mix(in oklab, var(--glass-stroke) 70%, transparent);
+	background-image: linear-gradient(
+		180deg,
+		color-mix(in oklab, var(--color-surface-container) 24%, transparent),
+		transparent
+	);
+}
+
+/* Baris chip folder/tag: chip lebih bulat dan rapat */
+[data-ui="note-header"] [data-slot="base-button"] {
+	border-radius: var(--radius-lg);
+}
+
+/* Judul: sedikit lebih besar dan lebih tegas */
+[data-ui="note-header"] input[data-slot="base-input"] {
+	font-size: 34px;
+	letter-spacing: -0.03em;
+}
+
+/* Baris status/tag di bawah: huruf kecil semua spasi lebih lega */
+[data-ui="note-header"] .text-outline {
+	letter-spacing: 0.01em;
+}

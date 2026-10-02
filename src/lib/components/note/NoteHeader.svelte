@@ -48,7 +48,7 @@
 	} = $props();
 </script>
 
-<div class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
+<div data-ui="note-header" class="@container flex shrink-0 flex-col gap-2 px-6 pt-1 pb-3">
 	<div class="flex flex-wrap items-center gap-2">
 		<Button
 			bare
