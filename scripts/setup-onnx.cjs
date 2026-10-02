@@ -15,35 +15,48 @@
  *   4. A sibling build directory that happens to bundle one.
  *   5. A downloaded release archive from the onnxruntime GitHub releases.
  *
+ * The asset differs per platform: Windows ships `.zip`, Linux and macOS ship
+ * `.tgz`, and the macOS filename is `osx-x86_64`/`osx-arm64`. The download is
+ * skipped with a clear message when the vendor publishes no build for this
+ * platform/arch (Intel macOS after 1.23, for instance).
+ *
  * Failure is not fatal: the app still starts and reports the model as
  * unavailable. It only means the local embedder cannot run until the library is
  * present, which is exactly the degradation the design asks for.
  */
 
 const { execFileSync } = require('node:child_process');
-const { copyFileSync, existsSync, readdirSync, statSync, writeFileSync } = require('node:fs');
+const {
+	copyFileSync,
+	existsSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 const { platform, arch } = require('node:process');
+const {
+	ORT_VERSION,
+	libraryName,
+	providerLibraryName,
+	releaseAsset: releaseAssetFor,
+	releaseUrl,
+} = require('./onnx-runtime.cjs');
 
 const repoRoot = resolve(__dirname, '..');
 const target = join(repoRoot, 'src-tauri');
 
-/** The filename `runtime.rs` looks for, per platform. */
-function libraryName() {
-	if (platform === 'win32') return 'onnxruntime.dll';
-	if (platform === 'darwin') return 'libonnxruntime.dylib';
-	return 'libonnxruntime.so';
-}
-
-/** The release asset matching this platform/arch, for the download fallback. */
+/** This host's release asset, or `null` when the vendor publishes none. */
 function releaseAsset() {
-	const os = platform === 'win32' ? 'win' : platform === 'darwin' ? 'osx' : 'linux';
-	const cpu = arch === 'arm64' ? 'arm64' : 'x64';
-	return `onnxruntime-${os}-${cpu}-1.20.1.zip`;
+	return releaseAssetFor(platform, arch);
 }
 
-const LIB = libraryName();
+const LIB = libraryName(platform);
+const PROVIDER_LIB = providerLibraryName(platform);
 const DEST = join(target, LIB);
+const PROVIDER_DEST = join(target, PROVIDER_LIB);
 
 function log(message) {
 	process.stdout.write(`[setup:onnx] ${message}\n`);
@@ -60,15 +73,78 @@ function skip(reason) {
 	process.exit(0);
 }
 
+/** Copies a found runtime into place, bringing its shared provider if present. */
+function place(source) {
+	copyFileSync(source, DEST);
+	const provider = join(dirname(source), PROVIDER_LIB);
+	if (existsSync(provider)) copyFileSync(provider, PROVIDER_DEST);
+}
+
+/**
+ * Whether a library is the revision we pin.
+ *
+ * A local source (a Python install, a sibling build, a leftover copy) is only
+ * accepted when it carries the pinned version string. A looser `>= 1.24` test
+ * looked safer but scans arbitrary binary bytes, where an unrelated `1.NN.PP`
+ * match can pass a too-old runtime through — and a too-old runtime does not
+ * error, it hangs `ort` on a null API pointer. Exactness is the safe choice.
+ */
+function isPinnedVersion(path) {
+	try {
+		// The version string (e.g. "1.30.0") is embedded as plain text in both
+		// the PE and ELF/Mach-O builds; a substring scan avoids a per-platform
+		// version-info reader.
+		return readFileSync(path).toString('latin1').includes(ORT_VERSION);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * The first library file at or under `dir`, preferring an exact `LIB` match and
+ * falling back to a versioned Linux name (`libonnxruntime.so.1.30.0`).
+ *
+ * Symlinks are accepted because the release archives ship `libonnxruntime.so`
+ * as a symlink to the real, versioned file.
+ */
+function findLibrary(dir, depth = 0) {
+	if (depth > 6 || !existsSync(dir)) return null;
+	let entries;
+	try {
+		entries = readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return null;
+	}
+	let versioned = null;
+	for (const entry of entries) {
+		const full = join(dir, entry.name);
+		if ((entry.isFile() || entry.isSymbolicLink()) && entry.name === LIB) return full;
+		if (entry.isFile() && entry.name.startsWith(`${LIB}.`)) versioned ??= full;
+		if (entry.isDirectory() && !entry.name.startsWith('.')) {
+			const found = findLibrary(full, depth + 1);
+			if (found) return found;
+		}
+	}
+	return versioned;
+}
+
 // 1. Explicit override.
 if (process.env.ORT_DYLIB_PATH && existsSync(process.env.ORT_DYLIB_PATH)) {
-	copyFileSync(process.env.ORT_DYLIB_PATH, DEST);
+	place(process.env.ORT_DYLIB_PATH);
 	done('ORT_DYLIB_PATH');
 }
 
-// 2. Already placed (a no-op re-run, or a CI-provided copy).
+// 2. Already placed and current (a no-op re-run, or a CI-provided copy). A copy
+// from an older pin is removed so the download below can replace it.
 if (existsSync(DEST) && statSync(DEST).size > 1_000_000) {
-	done('an existing copy');
+	if (isPinnedVersion(DEST)) {
+		done('an existing copy');
+	}
+	log(`existing copy is not ${ORT_VERSION}; refreshing`);
+	rmSync(DEST, { force: true });
+	rmSync(PROVIDER_DEST, { force: true });
+	// A stale extraction would otherwise be found again in step 5's search.
+	rmSync(join(target, 'ort-extract'), { recursive: true, force: true });
 }
 
 // 3. A Python onnxruntime install. Its `capi/` directory holds the shared lib.
@@ -96,70 +172,69 @@ function pythonCandidates() {
 }
 
 for (const candidate of pythonCandidates()) {
-	if (existsSync(candidate)) {
-		copyFileSync(candidate, DEST);
-		done(candidate);
+	if (!existsSync(candidate)) continue;
+	if (!isPinnedVersion(candidate)) {
+		log(`ignoring ${candidate}: not ONNX Runtime ${ORT_VERSION}; will try the release`);
+		continue;
 	}
+	place(candidate);
+	done(candidate);
 }
 
 // 4. Known sibling builds (the reference `alnair-onnx` project bundles one).
-function searchDir(dir, depth) {
-	if (depth > 4 || !existsSync(dir)) return null;
-	let entries;
-	try {
-		entries = readdirSync(dir, { withFileTypes: true });
-	} catch {
-		return null;
-	}
-	for (const entry of entries) {
-		const full = join(dir, entry.name);
-		if (entry.isFile() && entry.name === LIB) return full;
-		if (entry.isDirectory()) {
-			const found = searchDir(full, depth + 1);
-			if (found) return found;
-		}
-	}
-	return null;
-}
-
 const siblingRoots = [
 	resolve(repoRoot, '..', 'Alnair_Project', 'alnair-ai', 'dist', 'release'),
 ];
 for (const root of siblingRoots) {
-	const found = searchDir(root, 0);
-	if (found) {
-		copyFileSync(found, DEST);
-		done(found);
+	const found = findLibrary(root, 0);
+	if (!found) continue;
+	if (!isPinnedVersion(found)) {
+		log(`ignoring ${found}: not ONNX Runtime ${ORT_VERSION}; will try the release`);
+		continue;
 	}
+	place(found);
+	done(found);
 }
 
 // 5. Download from the onnxruntime release when the network is reachable.
 async function download() {
-	const version = '1.20.1';
 	const asset = releaseAsset();
-	const url = `https://github.com/microsoft/onnxruntime/releases/download/v${version}/${asset}`;
-	log(`downloading ${asset} …`);
+	if (!asset) {
+		skip(`no ONNX Runtime ${ORT_VERSION} build for ${platform}-${arch}`);
+		return;
+	}
+	const url = releaseUrl(asset.name);
+	log(`downloading ${asset.name} …`);
 	const response = await fetch(url);
 	if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 	const archive = Buffer.from(await response.arrayBuffer());
-	const tmp = join(target, `${asset}.tmp`);
+	const tmp = join(target, `${asset.name}.tmp`);
 	writeFileSync(tmp, archive);
 	log(`downloaded ${(archive.length / 1_048_576).toFixed(1)} MB; extracting …`);
-	// Extraction uses the platform's own unzip: adding a zip dependency to a
-	// build script is not worth it.
+	// Extraction uses the platform's own tooling: adding a zip/tar dependency to
+	// a build script is not worth it. Windows archives are `.zip`; the rest are
+	// `.tgz`, which the system `tar` handles everywhere.
 	const extractDir = join(target, 'ort-extract');
-	if (platform === 'win32') {
+	// Clear any earlier extraction so a previous pin cannot be found here.
+	rmSync(extractDir, { recursive: true, force: true });
+	if (asset.kind === 'zip') {
 		execFileSync('powershell', [
 			'-NoProfile',
 			'-Command',
 			`Expand-Archive -LiteralPath '${tmp}' -DestinationPath '${extractDir}' -Force`,
 		]);
 	} else {
-		execFileSync('unzip', ['-o', tmp, '-d', extractDir]);
+		execFileSync('tar', ['-xzf', tmp, '-C', extractDir]);
 	}
-	const found = searchDir(extractDir, 0);
+	const found = findLibrary(extractDir, 0);
 	if (!found) throw new Error('the archive did not contain the library');
-	copyFileSync(found, DEST);
+	if (!isPinnedVersion(found)) {
+		throw new Error(`the archive did not contain ONNX Runtime ${ORT_VERSION}`);
+	}
+	place(found);
+	// The archive is ~80 MB; keep it only while it is needed.
+	rmSync(tmp, { force: true });
+	rmSync(extractDir, { recursive: true, force: true });
 	done('the onnxruntime release');
 }
 

@@ -7,6 +7,20 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+/// Extra roots to search before the exe-relative walk.
+///
+/// Set once at startup from Tauri's resource directory. On macOS and Linux a
+/// bundled app keeps its resources *away* from the executable
+/// (`Contents/Resources` and `/usr/lib/<app>` respectively), so the exe walk
+/// alone would miss the dylib in a real bundle even though `tauri dev` finds it.
+static RESOURCE_ROOTS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+/// Records the app resource directory for discovery. Idempotent; a no-op when
+/// the platform has no resource dir (dev on macOS) — the exe walk still applies.
+pub fn set_resource_dir(dir: Option<PathBuf>) {
+    let _ = RESOURCE_ROOTS.set(dir.into_iter().collect());
+}
+
 /// Errors from the local ONNX path, surfaced to the UI as strings.
 #[derive(Debug, thiserror::Error)]
 pub enum OnnxError {
@@ -142,8 +156,15 @@ pub fn discover_dylib() -> Option<PathBuf> {
     candidates().into_iter().find(|path| path.is_file())
 }
 
-/// Search order: `resources/lib/<file>` and `<dir>/<file>`, for the current
-/// directory, the exe directory, and up to three parents of the exe directory.
+/// Search order, shared by the bundled and dev layouts:
+///
+/// 1. `<resource_dir>/<file>` — the Tauri resource dir, where a bundle keeps the
+///    runtime on every platform. This is the only root that works for a macOS
+///    `.app` (`Contents/Resources`) and a Linux package (`/usr/lib/<app>`),
+///    where the file is *not* next to the executable.
+/// 2. `<root>/resources/lib/<file>` and `<root>/<file>` for the current
+///    directory, the exe directory, and up to three ancestors of the exe
+///    directory.
 ///
 /// In a `tauri dev` run the executable sits in `src-tauri/target/debug`, and
 /// `scripts/setup-onnx.cjs` places the library in `src-tauri/`, which is the
@@ -152,6 +173,9 @@ pub fn discover_dylib() -> Option<PathBuf> {
 pub fn candidates() -> Vec<PathBuf> {
     let file = onnxruntime_library_file_name();
     let mut roots = Vec::new();
+    if let Some(resources) = RESOURCE_ROOTS.get() {
+        roots.extend(resources.iter().cloned());
+    }
     if let Ok(dir) = std::env::current_dir() {
         roots.push(dir);
     }

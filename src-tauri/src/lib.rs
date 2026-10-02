@@ -16,11 +16,10 @@ mod quit;
 mod remote_mcp;
 mod vault;
 
-// The stdio shim's read side, compiled into the app as well so the remote HTTP
-// listener can answer reads from the snapshot exactly like the shim does (#D2,
-// #D3). These resolve `crate::bridge`/`crate::read`/`crate::protocol`, so they
-// must sit at the crate root. Only the read dispatch is used here; the rest of
-// each file exists for the shim binary, hence the shared-source allowance.
+// The MCP read side, compiled into the app so the remote HTTP listener can
+// answer reads from the snapshot exactly like an in-process MCP
+// server (#D2, #D3). These resolve `crate::bridge`/`crate::read`/
+// `crate::protocol`, so they must sit at the crate root.
 #[allow(dead_code)]
 #[path = "mcp/bridge.rs"]
 mod bridge;
@@ -145,13 +144,13 @@ fn db_path(app: tauri::AppHandle) -> Option<String> {
     mcp_host::database_path(&app).map(|path| path.to_string_lossy().to_string())
 }
 
-/// Directories and files of the MCP bridge, plus the installed shim binary.
+/// Directories and files of the MCP bridge.
 #[tauri::command]
 fn mcp_paths(app: tauri::AppHandle) -> Option<mcp_host::McpPaths> {
     mcp_host::ensure_dirs(&app)
 }
 
-/// Current supervisor status, read by the Settings page.
+/// Current bridge status, read by the Settings page.
 ///
 /// Serialised camelCase to match the `McpAppInfo` type the frontend reads.
 #[derive(serde::Serialize)]
@@ -165,7 +164,6 @@ struct McpAppInfo {
     enabled: bool,
     snapshot_rev: u64,
     generated_at: Option<String>,
-    binary_path: Option<String>,
 }
 
 #[tauri::command]
@@ -183,7 +181,6 @@ fn mcp_app_info(app: tauri::AppHandle) -> McpAppInfo {
         enabled: existing.as_ref().map(|info| info.enabled).unwrap_or(false),
         snapshot_rev: base.snapshot_rev,
         generated_at: base.generated_at,
-        binary_path: mcp_host::shim_binary(),
     }
 }
 
@@ -933,6 +930,11 @@ pub fn run() {
             app.manage(quit::QuitState::default());
             // Keeps a loaded local embedder warm between i_embed batches.
             app.manage(embed::commands::LocalModelState::default());
+            // Tell ONNX discovery where a bundle keeps its resources. On macOS
+            // and Linux the dylib is not next to the executable, so without
+            // this a packaged build would report the model unavailable.
+            #[cfg(feature = "local-embed")]
+            embed::onnx::set_resource_dir(app.path().resource_dir().ok());
             // Owns the optional remote MCP listener; off until started (#D12).
             app.manage(remote_mcp::commands::RemoteState::default());
             // Owns the vault folder watcher; installed on demand per workspace.

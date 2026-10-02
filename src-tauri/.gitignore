@@ -6,15 +6,15 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# The MCP shim is built and copied here by scripts/mcp-sidecar.cjs; Tauri only
-# needs it as a resource at bundle time, never committed.
-/stylenotes-mcp-*
-!/stylenotes-mcp-*/.keep
-
 # ONNX Runtime is placed here by scripts/setup-onnx.cjs (a local Python install
 # or a downloaded release). It is a ~17 MB binary and must never be committed.
+# The `*_providers_shared` library travels with it on every platform.
 /onnxruntime.dll
 /libonnxruntime.so
+/libonnxruntime.so.*
 /libonnxruntime.dylib
+/onnxruntime_providers_shared.dll
+/libonnxruntime_providers_shared.so
+/libonnxruntime_providers_shared.dylib
 /ort-extract/
-/*.zip.tmp
+/*.tmp

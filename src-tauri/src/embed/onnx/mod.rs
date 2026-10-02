@@ -13,7 +13,7 @@ mod runtime;
 
 pub use cache::ModelCache;
 pub use embedder::{models_dir, OnnxEmbedder};
-pub use runtime::RuntimeProbe;
+pub use runtime::{set_resource_dir, RuntimeProbe};
 
 /// The model catalogue lives outside the feature gate so `memory_embedders` can
 /// list models even in a build without the ONNX runtime; re-exported here so

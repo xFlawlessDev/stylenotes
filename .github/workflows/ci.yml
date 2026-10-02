@@ -48,11 +48,13 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # The shim (`bundle.externalBin`) lives in the same crate as the app, so
-      # `scripts/mcp-sidecar.cjs` seeds an empty placeholder before building to
-      # break the chicken-and-egg (see its `seedPlaceholder`).
-      - name: Build the MCP sidecar
-        run: bun run mcp:sidecar
+      # `tauri.<os>.conf.json` lists the ONNX Runtime library under
+      # `bundle.resources`, and `tauri-build` aborts when a listed resource is
+      # absent. Fetch it exactly as `beforeBuildCommand` does. Failure is
+      # non-fatal here; a later clippy would report the missing resource if it
+      # could not be fetched.
+      - name: Install the ONNX Runtime library
+        run: bun run setup:onnx
 
       - name: Rust format
         run: bun run fmt:check
