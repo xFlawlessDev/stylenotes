@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FolderOpen, Download, TriangleAlert, FileText, FolderCog, RefreshCw } from '@lucide/svelte';
+	import { FolderOpen, Download, TriangleAlert, FileText, FolderCog, RefreshCw, GitMerge } from '@lucide/svelte';
 	import { Button, Field, SegmentedControl, type SegmentItem } from '$lib/components/base';
 	import { t } from '$lib/i18n/index.svelte';
 	import { isTauri } from '$lib/windows';
@@ -8,12 +8,15 @@
 		exportVault,
 		hydrateVault,
 		reconcileVault,
+		resolveVaultConflict,
 		setVaultMode,
 		startVaultSync,
 		stopVaultSync,
 		vaultStore,
+		type VaultResolveChoice,
 		type VaultSyncResult
 	} from '$lib/stores/vault.svelte';
+	import VaultConflictDialog from '$lib/components/workspace/VaultConflictDialog.svelte';
 
 	/**
 	 * Vault folder settings (docs/design/vault-mirror.md).
@@ -25,6 +28,13 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let sync = $state<VaultSyncResult | null>(null);
+	let showConflicts = $state(false);
+
+	async function resolve(relPath: string, choice: VaultResolveChoice): Promise<boolean> {
+		const ok = await resolveVaultConflict(relPath, choice);
+		if (vaultStore.conflicts.length === 0) showConflicts = false;
+		return ok;
+	}
 
 	$effect(() => {
 		void hydrateVault();
@@ -213,6 +223,13 @@
 					{/if}
 				</div>
 			{/if}
+
+			{#if vaultStore.conflicts.length}
+				<Button variant="outline" size="md" disabled={busy} onclick={() => (showConflicts = true)}>
+					<GitMerge size={14} />
+					{t('settings.vault.conflictLede', { count: vaultStore.conflicts.length })}
+				</Button>
+			{/if}
 		</Field>
 
 		<div
@@ -239,3 +256,9 @@
 		</div>
 	{/if}
 </div>
+
+<VaultConflictDialog
+	conflicts={showConflicts ? vaultStore.conflicts : []}
+	onresolve={resolve}
+	onclose={() => (showConflicts = false)}
+/>

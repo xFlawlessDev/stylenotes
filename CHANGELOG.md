@@ -66,3 +66,9 @@ All notable changes to StyleNotes are documented in this file. Versions follow S
   workspace session). Read-then-write, with unchanged files skipped by hash, so the
   cycle terminates. A note is stored in Record History before the folder overwrites
   it. This is a poll; the `notify` watcher and the conflict dialog are still to come.
+- **Vault conflict resolution.** When a note changes in both the app and the folder
+  since the last sync (`updated_at > synced_at` and a changed file hash — never
+  `updated_at` alone, since device clocks differ), the conflict waits in Settings →
+  Vault. `VaultConflictDialog` shows both versions side by side with **Keep
+  StyleNotes / Keep folder / Keep both**; the losing app version is kept in Record
+  History (`reason: 'vault'`). Nothing is overwritten while a conflict is open.

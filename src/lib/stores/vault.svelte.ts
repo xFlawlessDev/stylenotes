@@ -20,7 +20,7 @@ import { captureVersion } from '$lib/stores/versioning';
 import { workspaceStore } from '$lib/stores/workspaces.svelte';
 import { vaultRepo, type VaultBinding, type VaultLink, type VaultMode, type VaultWorkspaceType } from '$lib/db/vault';
 import { planExport, attachmentRelPath } from '$lib/content/vault-plan';
-import { planSync } from '$lib/content/vault-reconcile';
+import { planSync, type VaultConflict } from '$lib/content/vault-reconcile';
 import { renderVaultNote } from '$lib/content/vault-format';
 
 export type VaultStatus = 'idle' | 'exporting' | 'error' | 'missing';
@@ -47,6 +47,8 @@ export const vaultStore = $state<{
 	status: VaultStatus;
 	lastExport: VaultStats | null;
 	error: string | null;
+	/** Unresolved conflicts, waiting for the user (F2). */
+	conflicts: VaultConflict[];
 }>({
 	loaded: false,
 	mode: 'off',
@@ -54,7 +56,8 @@ export const vaultStore = $state<{
 	type: 'app',
 	status: 'idle',
 	lastExport: null,
-	error: null
+	error: null,
+	conflicts: []
 });
 
 function currentBinding(): VaultBinding {
@@ -257,12 +260,24 @@ export async function reconcileVault(): Promise<VaultSyncResult | null> {
 		const links = await vaultRepo.links(workspaceId);
 		const plan = planSync(files, notes, links, { orphanTolerant: vaultStore.type === 'folder' });
 
+		// Conflicts wait for the user. Append rather than replace, and do not
+		// re-add a conflict already queued at the same path.
+		const fresh = plan.actions.filter(
+			(action): action is VaultConflict =>
+				action.kind === 'conflict' && !vaultStore.conflicts.some((c) => c.relPath === action.relPath)
+		);
+		if (fresh.length) vaultStore.conflicts = [...vaultStore.conflicts, ...fresh];
+
 		// The note a link points at, for the conflict check on updates.
 		const byId = new Map(notes.map((note) => [note.id, note]));
 		const now = Date.now();
 		const linkWrites: VaultLink[] = [];
 
 		for (const action of plan.actions) {
+			if (action.kind === 'conflict') {
+				// Already queued above; waiting for the user, not applied here.
+				continue;
+			}
 			if (action.kind === 'skip') {
 				result.skipped.push({ relPath: action.relPath, reason: action.reason });
 				continue;
@@ -403,6 +418,90 @@ export function stopVaultSync(): void {
 		clearInterval(syncTimer);
 		syncTimer = null;
 	}
+}
+
+/** How the user chooses to settle one conflict. */
+export type VaultResolveChoice = 'app' | 'file' | 'both';
+
+/**
+ * Settles one queued conflict (F2, #V8).
+ *
+ * - `app` — keep the app's note and overwrite the file with it.
+ * - `file` — take the file's version; the app's note is kept in Record History.
+ * - `both` — keep the app's note and add the file as a second, distinct note.
+ *
+ * Every branch writes the new `content_hash` back to `vault_links`, so the same
+ * file is not re-flagged on the next cycle. Returns false when the write fails.
+ */
+export async function resolveVaultConflict(
+	relPath: string,
+	choice: VaultResolveChoice
+): Promise<boolean> {
+	const conflict = vaultStore.conflicts.find((item) => item.relPath === relPath);
+	if (!conflict || !vaultStore.path) return false;
+	const root = vaultStore.path;
+	const workspaceId = workspaceStore.activeId;
+	const now = Date.now();
+
+	try {
+		const local = (await listNotes(workspaceId)).find((note) => note.id === conflict.noteId);
+
+		if (choice === 'app') {
+			// Keep the app's note; the next export writes it over the file.
+			await exportVault();
+			finishConflict(relPath);
+			return true;
+		}
+
+		if (choice === 'file') {
+			if (local) {
+				await captureVersion(
+					'note',
+					local.id,
+					{ title: local.title, body: local.body, tags: [...local.tags], folder: local.folder },
+					'vault',
+					now
+				).catch(() => false);
+				const next = {
+					...local,
+					title: conflict.fileTitle,
+					folder: conflict.fileFolder,
+					tags: conflict.fileTags,
+					body: conflict.fileBody,
+					updatedAt: now
+				};
+				if (!(await persistNote(next))) return false;
+			}
+			await vaultRepo.put(
+				vaultLink(workspaceId, relPath, conflict.noteId, conflict.contentHash, now)
+			);
+			finishConflict(relPath);
+			// Write the (possibly reformatted) note back so the file matches.
+			await exportVault();
+			return true;
+		}
+
+		// both: keep the app's note and add the file's version as a new note.
+		const created = createNote({
+			workspaceId,
+			title: `${conflict.fileTitle} (folder)`,
+			folder: conflict.fileFolder,
+			tags: conflict.fileTags,
+			body: conflict.fileBody,
+			updatedAt: now
+		});
+		if (!(await persistNote(created))) return false;
+		finishConflict(relPath);
+		await exportVault();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Removes a settled conflict from the queue. */
+function finishConflict(relPath: string): void {
+	vaultStore.conflicts = vaultStore.conflicts.filter((item) => item.relPath !== relPath);
 }
 
 /** Builds a `vault_links` row for a synced file. */

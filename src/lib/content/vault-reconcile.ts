@@ -49,6 +49,32 @@ export type VaultSkip = {
 	reason: 'conflict' | 'conflictedCopy' | 'empty';
 };
 
+/**
+ * Both sides changed since the last sync.
+ *
+ * Detected by comparing the note's `updatedAt` against the link's `syncedAt`
+ * (a local edit after we last wrote) **and** the file's hash against the link's
+ * `contentHash` (an outside edit). `updated_at` alone is never used as the test:
+ * two devices' clocks can differ, so only "after the last shared sync" counts.
+ */
+export type VaultConflict = {
+	kind: 'conflict';
+	relPath: string;
+	noteId: string;
+	/** The app's current note. */
+	localTitle: string;
+	localFolder: string;
+	localBody: string;
+	localTags: string[];
+	/** The folder file's version of the same note. */
+	fileTitle: string;
+	fileFolder: string;
+	fileBody: string;
+	fileTags: string[];
+	/** The file's hash, recorded once the conflict is resolved. */
+	contentHash: string;
+};
+
 /** A link whose note no longer exists in this workspace. */
 export type VaultOrphanLink = {
 	kind: 'orphanLink';
@@ -60,11 +86,12 @@ export type VaultSyncAction =
 	| VaultImport
 	| VaultAttachmentImport
 	| VaultSkip
-	| VaultOrphanLink;
+	| VaultOrphanLink
+	| VaultConflict;
 
 export type VaultSyncPlan = {
 	actions: VaultSyncAction[];
-	stats: { create: number; update: number; attachments: number; skipped: number; orphans: number };
+	stats: { create: number; update: number; attachments: number; skipped: number; orphans: number; conflicts: number };
 };
 
 /** Git/merge markers that must never be swallowed into a note body (#V9). */
@@ -129,8 +156,28 @@ export function planSync(
 
 		const existing = parsed.id ? byId.get(parsed.id) : undefined;
 		if (existing) {
-			// An edit made outside the app. The caller decides whether it
-			// conflicts with a local edit (#V8); here it is a plain update.
+			// Both sides changed since the last shared sync: the note was edited
+			// in the app after we last wrote the file, and the file's bytes differ
+			// from what we wrote. `updated_at` alone is never the test — only
+			// "after the last sync" (#V8).
+			if (link && existing.updatedAt != null && existing.updatedAt > link.syncedAt) {
+				actions.push({
+					kind: 'conflict',
+					relPath: file.relPath,
+					noteId: existing.id,
+					localTitle: existing.title,
+					localFolder: existing.folder,
+					localBody: existing.body,
+					localTags: [...existing.tags],
+					fileTitle: parsed.title,
+					fileFolder: parsed.folder,
+					fileBody: parsed.body,
+					fileTags: parsed.tags,
+					contentHash: file.contentHash
+				});
+				continue;
+			}
+			// An edit made outside the app, with no local change: a plain update.
 			actions.push({
 				kind: 'update',
 				relPath: file.relPath,
@@ -193,7 +240,8 @@ export function planSync(
 			update: actions.filter((action) => action.kind === 'update').length,
 			attachments: actions.filter((action) => action.kind === 'attachment').length,
 			skipped: actions.filter((action) => action.kind === 'skip').length,
-			orphans: actions.filter((action) => action.kind === 'orphanLink').length
+			orphans: actions.filter((action) => action.kind === 'orphanLink').length,
+			conflicts: actions.filter((action) => action.kind === 'conflict').length
 		}
 	};
 }

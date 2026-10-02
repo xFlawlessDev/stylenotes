@@ -129,6 +129,50 @@ describe('planSync', () => {
 		expect(tolerant.actions).toEqual([]);
 	});
 
+	it('reports a conflict when both sides changed since the last sync', () => {
+		// The link was written at `syncedAt`; the note has since been edited
+		// (updatedAt is later), and the file's bytes differ from the stored hash.
+		const links = new Map([
+			[
+				'ideas/Roadmap.md',
+				{
+					...link('ideas/Roadmap.md', 'note-1', 'old-hash'),
+					syncedAt: 500,
+					contentHash: 'old-hash'
+				}
+			]
+		]);
+		const local: Note = { ...note, body: 'edited in app', updatedAt: 1000 };
+		const content = renderVaultNote({ ...note, body: 'edited outside' });
+		const plan = planSync([file('ideas/Roadmap.md', content)], [local], links);
+		const conflict = plan.actions.find((action) => action.kind === 'conflict');
+		expect(conflict).toMatchObject({
+			relPath: 'ideas/Roadmap.md',
+			noteId: 'note-1',
+			localBody: 'edited in app',
+			fileBody: 'edited outside'
+		});
+		expect(plan.stats.conflicts).toBe(1);
+	});
+
+	it('does not call it a conflict when the note was not edited since the sync', () => {
+		// updatedAt (1000) is older than the last sync (2000): only the file moved.
+		const links = new Map([
+			[
+				'ideas/Roadmap.md',
+				{
+					...link('ideas/Roadmap.md', 'note-1', 'old-hash'),
+					syncedAt: 2000,
+					contentHash: 'old-hash'
+				}
+			]
+		]);
+		const content = renderVaultNote({ ...note, body: 'edited outside' });
+		const plan = planSync([file('ideas/Roadmap.md', content)], [note], links);
+		expect(plan.actions.find((action) => action.kind === 'update')).toBeDefined();
+		expect(plan.stats.conflicts).toBe(0);
+	});
+
 	it('counts every action kind', () => {
 		const plan = planSync(
 			[

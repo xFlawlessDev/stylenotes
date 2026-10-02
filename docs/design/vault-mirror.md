@@ -1,9 +1,9 @@
 # System Design — Vault Folder (file-over-app, SQLite tetap sumber kebenaran)
 
-> Status: **F0 + impor folder + auto-sync (mode `vault`) diimplementasikan** (2026-10-02). Keputusan #V1–#V22 tetap berlaku;
+> Status: **F0 + impor folder + auto-sync + dialog konflik diimplementasikan** (2026-10-02). Keputusan #V1–#V22 tetap berlaku;
 > yang sudah ada di kode: migrasi 25, `src-tauri/src/vault/`, `content/vault-format.ts`,
 > `content/vault-plan.ts`, `content/vault-reconcile.ts`, `db/vault.ts`, `stores/vault.svelte.ts`,
-> `VaultSettings.svelte`. Watcher `notify` & dialog konflik (F2) masih desain. Lihat §10–§11.
+> `VaultSettings.svelte`, `VaultConflictDialog.svelte`. Watcher `notify` masih desain. Lihat §10–§11.
 > Tanggal: 2026-10-02
 > Scope: user bisa memilih sebuah **folder workspace** sebagai cermin (mirror) data —
 > note, folder, tag, task — dalam bentuk `.md` + `attachments/`, dan memilih apakah
@@ -1013,17 +1013,47 @@ Alasan **baca-dulu-baru-tulis**, dan alasan loop berhenti:
 #V18 (berkas dibuat saat app tertutup) karena sweep memang membaca keadaan nyata.
 Saat watcher ditambahkan, ia memanggil `runVaultCycle` yang sama.
 
-### 11.6 Yang belum benar-benar F2
+### 11.6 Konflik (F2, #V8)
 
-- **Belum ada dialog konflik.** `updated_at` tidak lagi dianggap bukti konflik
-  (klok perangkat bisa berbeda); aturan F2 yang dipilih adalah membandingkan base
-  `vault_links.content_hash` dengan editan app. Selama itu belum ada, menimpa dari
-  berkas selalu menyimpan versi app (`reason: 'vault'`), jadi tidak ada kehilangan
-  data — hanya belum ada pratinjau diff dan tombol Keep app / Keep file / Keep both.
-- **Watcher otomatis** masih digantikan poll.
+Konflik hanya muncul saat **kedua sisi berubah sejak sinkron terakhir**, dan itu
+diuji dari dua fakta, bukan satu:
+
+| Sisi | Bukti |
+|---|---|
+| App berubah | `notes.updated_at` **>** `vault_links.synced_at` |
+| Berkas berubah | `content_hash` berkas **≠** `vault_links.content_hash` |
+
+`updated_at` saja sengaja **tidak** dipakai: dua perangkat bisa punya klok berbeda,
+jadi yang dihitung hanya "setelah sinkron bersama terakhir". Kalau hanya berkas yang
+berubah → update biasa; kalau hanya app yang berubah → export biasa; kalau hash berkas
+sama dengan yang kita tulis → abaikan (#V7).
+
+Antrean & pilihan:
+
+- Konflik masuk `vaultStore.conflicts` (bukan menggantikan yang sudah ada; jalur
+  yang sama tidak diantre dua kali).
+- `VaultConflictDialog` menampilkan **dua panel berdampingan** (isi app vs isi
+  berkas) dan tiga pilihan: **Pakai StyleNotes**, **Pakai folder**, **Simpan
+  keduanya**, plus **Putuskan nanti**.
+- `resolveVaultConflict(relPath, choice)`:
+  - `app` → export dari DB menimpa berkas.
+  - `file` → versi app disimpan ke `entity_versions` (`reason: 'vault'`), note
+    diperbarui dari berkas, lalu ditulis balik agar format seragam.
+  - `both` → note app dipertahankan, versi berkas jadi note kedua (`… (folder)`).
+- Tiap cabang menulis `content_hash` baru ke `vault_links` supaya berkas yang sama
+  tidak ditandai lagi pada siklus berikutnya.
+- Selama belum diputuskan, note **tidak** ditimpa otomatis — jadi tidak ada
+  kehilangan data walau user tidak membuka dialog.
+
+### 11.7 Yang belum
+
+- **Watcher `notify`.** Auto-sync masih poll 20 detik; watcher akan memanggil
+  `runVaultCycle` yang sama.
 - **Task** belum diproyeksikan; hanya note.
+- **Diff baris `+`/`-`.** Dialog menampilkan dua versi berdampingan, belum diff
+  berwarna per baris.
 
-### 11.7 Mode `folder` benar-benar read-only
+### 11.8 Mode `folder` benar-benar read-only
 
 #V21 menjanjikan app tidak menempelkan metadata ke folder yang sudah ada. Itu
 ditegakkan di kode, bukan hanya di UI:
