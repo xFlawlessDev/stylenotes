@@ -29,6 +29,7 @@ const { execFileSync } = require('node:child_process');
 const {
 	copyFileSync,
 	existsSync,
+	mkdirSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
@@ -215,8 +216,12 @@ async function download() {
 	// a build script is not worth it. Windows archives are `.zip`; the rest are
 	// `.tgz`, which the system `tar` handles everywhere.
 	const extractDir = join(target, 'ort-extract');
-	// Clear any earlier extraction so a previous pin cannot be found here.
+	// Clear any earlier extraction so a previous pin cannot be found here, then
+	// recreate it: GNU tar (Linux) and bsdtar (macOS) abort when `-C` names a
+	// directory that does not exist, while `Expand-Archive` creates its own — so
+	// without this the download only worked on Windows.
 	rmSync(extractDir, { recursive: true, force: true });
+	mkdirSync(extractDir, { recursive: true });
 	if (asset.kind === 'zip') {
 		execFileSync('powershell', [
 			'-NoProfile',
