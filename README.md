@@ -51,6 +51,9 @@ SQLite database, and ships as a static SPA.
   in a small, always-on-top window — without leaving what you were doing.
 - **Yours to make.** Light/dark, accent color, density, reduced motion, and the
   editor layout are all a setting away.
+- **Yours to connect.** A built-in MCP server lets Claude Desktop, Cursor, and other
+  assistants read and write your vault locally — off by default, read-only until you
+  allow writes.
 
 ## Built for the desktop
 
@@ -80,6 +83,53 @@ saves as you type and is waiting in the workspace next time.
 | <img src="docs/assets/screenshots/gantt.webp" alt="The Gantt view showing task bars and Blocked-by badges" width="100%"><br>**Gantt with dependencies** | <img src="docs/assets/screenshots/graph.webp" alt="The workspace graph showing notes, tasks, and the links between them" width="100%"><br>**The graph of your notes** |
 | <img src="docs/assets/screenshots/journal.webp" alt="A daily journal entry with a Focus list and notes" width="100%"><br>**A daily journal page** | <img src="docs/assets/screenshots/command-palette.webp" alt="The command palette searching notes and tasks" width="100%"><br>**Command palette (Ctrl K)** |
 
+## Connect an AI assistant (MCP)
+
+StyleNotes ships a **local MCP server** built into the desktop app. Any MCP client —
+Claude Desktop, Cursor, or your own — can search your notes, read them, and (with your
+permission) write back to them. Everything stays on your machine: there is no account
+and no cloud in the loop. It is **off by default**; you turn it on in **Settings →
+MCP**.
+
+The server speaks **MCP over Streamable HTTP**: one `POST /mcp` endpoint on port
+`7317`, guarded by a bearer token. Pick how far it reaches:
+
+| Exposure | Reachable from | Notes |
+| --- | --- | --- |
+| **This device** (default) | processes on your machine | loopback only |
+| **Local network** | another device you own on your LAN | explicit confirmation first; binds one private interface, never `0.0.0.0` |
+| **Tunnel** | through your own Cloudflare/Tailscale tunnel | the endpoint stays on loopback |
+
+### What an agent can do
+
+**19 read** tools and **15 write** tools, grouped into scopes you switch on
+individually:
+
+- **Reads are always allowed and never touch the database.** `search_notes`,
+  `search_tasks`, `search_all`, `get_note`, `get_task`, `context`, `graph_query`,
+  `task_board`, `daily_summary`, `critical_path`, `list_*`, and meaning-based
+  `semantic_search`, `related_notes`, and `list_themes`.
+- **Writes are opt-in, per scope.** Notes, tasks, dependencies, and workspaces. An
+  agent can create and edit a note, move and complete a task, wire up dependencies,
+  or manage workspaces — only after you grant *Allow writes* and the specific scope.
+
+Three things make this safe enough to leave on:
+
+- **Writes go through the app, never around it.** The server answers reads from a
+  read-only snapshot and hands every write to the running app, which runs it through
+  the same validation the UI uses. An agent cannot edit SQLite behind the app's back.
+- **Read-only until you say otherwise.** No grant means a write is refused, not
+  silently applied. The previous body of any rewritten note is kept as a backup.
+- **Guarded against the browser.** `Host`/`Origin` checks reject DNS-rebinding, and
+  only private/loopback addresses can ever be bound — even on LAN.
+
+Settings are **device-local** and the token is encrypted at rest. Writes are optional
+and can be turned back off at any time.
+
+Full details — every tool, its arguments, and the error contract — are in the
+[StyleNotes MCP skill](skills/stylenotes-mcp/) and the
+[design notes](docs/design/archive/mcp-local-free.md).
+
 ## Your notes, your device
 
 StyleNotes is **local-first by design**. Notes live in a SQLite file on your machine,
@@ -90,9 +140,11 @@ your writing is never trapped in the app either.
 
 ## Open core
 
-This repository is the **full, free desktop app**. Cloud sync, a hosted AI gateway,
-and remote MCP are optional capabilities served by a separate (proprietary) service
-— the desktop app is cloud-ready but works completely offline without it.
+This repository is the **full, free desktop app**. Every local capability is here —
+including the in-app MCP server. The optional extras that need a server (cloud sync,
+a hosted AI gateway, and remote MCP access from a network outside your own) are served
+by a separate (proprietary) service; the desktop app is cloud-ready but works
+completely offline without it.
 
 | Part | License |
 | --- | --- |
