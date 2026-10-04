@@ -40,6 +40,8 @@
     "fs:allow-mkdir",
     "sql:default",
     "sql:allow-execute",
-    "mcp-bridge:default"
+    "mcp-bridge:default",
+    "updater:default",
+    "process:default"
   ]
 }

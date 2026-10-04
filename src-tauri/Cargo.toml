@@ -34,9 +34,21 @@ default = ["local-embed"]
 local-embed = ["dep:ort", "dep:tokenizers"]
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+# `macos-private-api` is required for the transparent overlay window on macOS
+# (`app.macOSPrivateApi` in tauri.conf.json); `tauri-build` keeps this list and
+# that config flag in lockstep. The feature is a no-op off macOS.
+#
+# Held on the 2.11 line: tauri 2.12 pulls webview2-com 0.39, while the
+# debug-only `tauri-plugin-mcp-bridge` 0.13 still binds webview2-com 0.38, so
+# clippy/build fail on Windows with a type mismatch until the bridge updates.
+tauri = { version = "~2.11.6", features = ["protocol-asset", "tray-icon", "macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-prevent-default = "5"
+# In-app updates: signed manifest from GitHub Releases + relaunch after install.
+# 2.12 supports tauri ^2.10, so it stays compatible with the 2.11 pin above;
+# 2.13 would require tauri ^2.12 and reintroduce the webview2 conflict.
+tauri-plugin-updater = "=2.12.0"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }

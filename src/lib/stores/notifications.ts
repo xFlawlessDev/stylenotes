@@ -1,6 +1,6 @@
 import { notificationsRepo } from '$lib/db';
 
-export type NotificationKind = 'reminder' | 'sync' | 'tip' | 'mention';
+export type NotificationKind = 'reminder' | 'sync' | 'tip' | 'mention' | 'update';
 
 export type AppNotification = {
 	id: string;

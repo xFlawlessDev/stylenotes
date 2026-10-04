@@ -73,5 +73,11 @@ export const shell: ShellMessages = {
 			body: 'Buka Pengaturan → Memori dan pilih embedder agar asisten bisa mencari catatanmu berdasarkan makna.',
 			time: 'Baru saja',
 		},
+		/** Dibangkitkan oleh pemeriksaan pembaruan latar; lihat `stores/update.svelte.ts`. */
+		update: {
+			title: 'Versi {version} tersedia',
+			body: 'Versi StyleNotes baru sudah siap. Buka Pengaturan → Tentang untuk memasangnya.',
+			time: 'Baru saja',
+		},
 	},
 };

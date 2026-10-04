@@ -289,11 +289,13 @@
 			await load();
 			await applyAlwaysOnTop(settings.detailAlwaysOnTop);
 			if (disposed) return;
+			// Reveal directly: a hidden macOS WKWebView throttles
+			// `requestAnimationFrame`, so gating the reveal only on rAF can
+			// leave the window permanently hidden. Re-assert focus after paint.
+			await revealAndFocusCurrentWindow();
+			if (!disposed) revealed = true;
 			requestAnimationFrame(() => {
-				void (async () => {
-					await revealAndFocusCurrentWindow();
-					if (!disposed) revealed = true;
-				})();
+				void revealAndFocusCurrentWindow();
 			});
 		})();
 

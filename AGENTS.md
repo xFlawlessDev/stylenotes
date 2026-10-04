@@ -44,7 +44,7 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - **SSR is off** (`+layout.ts` exports `ssr = false`); adapter-static with `index.html` fallback. Do not add server-only code/load functions.
 - **Fixed dev port 1420** with `strictPort`; Vite ignores `src-tauri/**`.
 - **Windows start invisible** (`visible: false`) and are revealed client-side: `revealCurrentWindow()` for the declared windows, `revealAndFocusCurrentWindow()` for note/task windows (they reveal themselves once the record is loaded). Don't remove that.
-- **CI/CD is GitHub Actions.** `.github/workflows/ci.yml` runs the gate (`check`, `check:shared`, `test`, `fmt:check`, `clippy`) on every push to `main` and every PR. `.github/workflows/release.yml` runs on a `v*` tag: `tauri-action` builds installers on Windows, macOS (arm64 + Intel), and Linux and publishes the GitHub Release. The tag comes from `bun run release`; the workflow never edits the version. Builds are unsigned (no signing secrets configured).
+- **CI/CD is GitHub Actions.** `.github/workflows/ci.yml` runs the gate (`check`, `check:shared`, `test`, `fmt:check`, `clippy`) on every push to `main` and every PR. `.github/workflows/release.yml` runs on a `v*` tag: `tauri-action` builds installers on Windows, macOS (Apple silicon), and Linux and publishes the GitHub Release. The tag comes from `bun run release`; the workflow never edits the version. Builds are unsigned (no signing secrets configured).
 
 ## MCP (in-app server)
 
@@ -120,6 +120,16 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - **`vault_validate_root` refuses overlap**: canonicalises the chosen folder and rejects a drive root, the app-data dir, and any folder nested with another workspace's vault (one folder = one workspace, #V20).
 - **Lossy by design** and stated in the UI: graph, task dependencies, boards, embeddings, and version history are not projected to `.md`.
 - Pending: task projection (only notes are mirrored) and a line-level diff in the conflict dialog.
+
+## In-app updates & changelog
+
+- **Signed GitHub Releases, no server.** `tauri-plugin-updater` (pinned `=2.12.0`) reads `plugins.updater.endpoints` in `tauri.conf.json` — `https://github.com/xFlawlessDev/stylenotes/releases/latest/download/latest.json` — and verifies the minisign signature against the baked-in `plugins.updater.pubkey`. `bundle.createUpdaterArtifacts: true` plus `TAURI_SIGNING_PRIVATE_KEY`/`_PASSWORD` secrets in `release.yml` are what make `tauri-action` sign each installer and publish the manifest. The private key is never in the repo.
+- **The JS and Rust plugin versions must match.** `@tauri-apps/plugin-updater`/`plugin-process` are pinned to the same major.minor as their crates in `package.json` (`2.12.0`/`2.3.1`); the Tauri CLI aborts at build/dev on a mismatch.
+- **tauri is pinned to `~2.11.6`.** Updater 2.13 needs tauri ^2.12, which pulls webview2-com 0.39, while the debug-only `tauri-plugin-mcp-bridge` 0.13 still binds 0.38 — a Windows type mismatch that fails `clippy`. Bump both together (or drop the bridge) before moving off the 2.11 line.
+- **Rust owns the network + signature; the frontend owns the flow.** The plugins are registered in `lib.rs`; permissions are `updater:default` + `process:default` in `capabilities/default.json`. `content/updater.ts` is the thin, result-returning wrapper (`checkForUpdate`/`installUpdate`), pure contract in `content/update-types.ts` (semver compare, the daily window, the `meta:update/*` keys).
+- **Store:** `stores/update.svelte.ts` holds `updateStore` (checking/release/error/progress/installing) and is the only writer. `checkNow()` is the user-triggered About button; `startUpdateChecks(raise)` runs the launch + daily sweep from `workspace-session.svelte.ts` and returns a cleanup. A new version is announced **once per version** via `notifyOnce`, guarded by `meta:update/notified-version` (write in `metaRepo`), never the clearable notification list — the memory-nudge arrangement.
+- **Notification rows are localized by id.** The updater raises id `n-update:<version>`; `content/notification-text.ts` renders its copy from `shell.notification.update.*` via `versionFromUpdateId`, and `NotificationPanel.svelte` opens Settings → About when such a row is clicked.
+- **Changelog is bundled, not fetched.** `content/changelog.ts` imports `CHANGELOG.md?raw` (baked in at build) and parses it purely (`changelog.test.ts`); `ChangelogDialog.svelte` renders it. "Check for updates" lives in `UpdatePanel.svelte`, shown in Settings → About.
 
 ## Database / migrations
 

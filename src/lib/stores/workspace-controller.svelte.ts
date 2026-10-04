@@ -407,7 +407,7 @@ export function createWorkspaceController() {
 		}
 	}
 
-	startWorkspaceSession(state, reloadWorkspaceRecords, () => persistTimer !== null);
+	startWorkspaceSession(state, reloadWorkspaceRecords, () => persistTimer !== null, addNotification);
 
 	return {
 		state,

@@ -26,6 +26,7 @@
 		onread={controller.markRead}
 		onreadall={controller.markAllRead}
 		onclear={controller.clearNotifications}
+		onopenupdate={() => controller.openSettings('about')}
 		onclose={() => (state.notificationsOpen = false)}
 	/>
 {/snippet}

@@ -70,6 +70,12 @@ export const shell = {
 			body: 'Open Settings → Memory and pick an embedder so the assistant can search your notes by meaning.',
 			time: 'Just now',
 		},
+		/** Raised by the background update check; see `stores/update.svelte.ts`. */
+		update: {
+			title: 'Version {version} is available',
+			body: 'A new version of StyleNotes is ready. Open Settings → About to install it.',
+			time: 'Just now',
+		},
 	},
 } as const;
 

@@ -2,6 +2,7 @@
 	import {
 		Bell,
 		BellOff,
+		CircleArrowUp,
 		Clock,
 		CloudCheck,
 		Lightbulb,
@@ -12,6 +13,7 @@
 	import type { NotificationKind } from '$lib/stores/notifications';
 	import { t } from '$lib/i18n/index.svelte';
 	import { seedNotificationText } from '$lib/content/notification-text';
+	import { versionFromUpdateId } from '$lib/content/update-types';
 	import { Button, EmptyState } from '$lib/components/base';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
@@ -31,6 +33,7 @@
 		onread,
 		onreadall,
 		onclear,
+		onopenupdate,
 		onclose,
 	}: {
 		open?: boolean;
@@ -39,6 +42,8 @@
 		onread: (id: string) => void;
 		onreadall: () => void;
 		onclear: () => void;
+		/** Opens Settings on the About section for a version-update notification. */
+		onopenupdate?: () => void;
 		onclose: () => void;
 	} = $props();
 
@@ -47,6 +52,7 @@
 		sync: CloudCheck,
 		tip: Lightbulb,
 		mention: AtSign,
+		update: CircleArrowUp,
 	};
 
 	const kindTone: Record<NotificationKind, string> = {
@@ -54,6 +60,7 @@
 		sync: 'text-tertiary',
 		tip: 'text-primary',
 		mention: 'text-primary',
+		update: 'text-primary',
 	};
 
 	const unreadCount = $derived(notifications.filter((item) => !item.read).length);
@@ -65,6 +72,16 @@
 	 */
 	function rowText(item: Notification): { title: string; body: string; time: string } {
 		return seedNotificationText(item.id) ?? { title: item.title, body: item.body, time: item.time };
+	}
+
+	/**
+	 * Marks a row read and, for a version-update row, routes to the About
+	 * section where the changelog and the install button live. Every other kind
+	 * only marks read, exactly as before.
+	 */
+	function activate(item: Notification): void {
+		onread(item.id);
+		if (versionFromUpdateId(item.id)) onopenupdate?.();
 	}
 </script>
 
@@ -141,7 +158,7 @@
 					class="group relative w-full justify-start gap-3 rounded-xl p-2.5 text-left {item.read
 						? 'hover:bg-surface-container/40'
 						: 'bg-surface-container/55 hover:bg-surface-container/70'}"
-					onclick={() => onread(item.id)}
+					onclick={() => activate(item)}
 				>
 					{#if !item.read}
 						<span class="emphasis-primary absolute top-3.5 right-3 size-1.5 rounded-full"></span>

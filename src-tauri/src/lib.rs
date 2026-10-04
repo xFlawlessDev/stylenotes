@@ -94,6 +94,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_process::init())
+        // In-app updates. The endpoint and public key live in `tauri.conf.json`;
+        // the frontend drives check/download/install and the plugin verifies the
+        // signed manifest before anything runs.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             SqlBuilder::default()
                 .add_migrations(DB_URL, schema::migrations())

@@ -22,6 +22,19 @@
 
 	let role = $state<WindowRole>(detectRole());
 
+	/**
+	 * Shows the current window now, and again after the next paint.
+	 *
+	 * Calling `show()` directly is what makes this work on macOS: a hidden
+	 * WKWebView throttles `requestAnimationFrame`, so a reveal gated only on
+	 * rAF may never run and the window would never appear (the app looks hung).
+	 * The rAF pass just re-asserts the reveal once content has painted.
+	 */
+	function revealNow() {
+		void revealCurrentWindow();
+		requestAnimationFrame(() => revealCurrentWindow());
+	}
+
 	onMount(async () => {
 		document.documentElement.dataset.window = role;
 		await tick();
@@ -29,7 +42,7 @@
 			await refreshSettings();
 			await restoreKanbanLock();
 			// A locked board is a desktop widget: bring it back on launch.
-			if (settings.kanbanLocked) requestAnimationFrame(() => revealCurrentWindow());
+			if (settings.kanbanLocked) revealNow();
 			return;
 		}
 		// Note and task windows reveal themselves once their record is loaded.
@@ -39,7 +52,7 @@
 		// its click-through state, leaving it interactive-less until the user
 		// hides and re-shows it by hand.
 		if (role === 'overlay') return;
-		requestAnimationFrame(() => revealCurrentWindow());
+		revealNow();
 	});
 </script>
 

@@ -1,4 +1,5 @@
 import { t } from '$lib/i18n/index.svelte';
+import { versionFromUpdateId } from '$lib/content/update-types';
 
 /**
  * Text for a notification the *app* owns: the four seed rows written on first
@@ -42,7 +43,16 @@ export function seedNotificationText(id: string): { title: string; body: string;
 				body: t('shell.notification.seed.archiveBody'),
 				time: t('shell.notification.seed.time.yesterday'),
 			};
-		default:
+		default: {
+			const version = versionFromUpdateId(id);
+			if (version) {
+				return {
+					title: t('shell.notification.update.title', { version }),
+					body: t('shell.notification.update.body'),
+					time: t('shell.notification.update.time'),
+				};
+			}
 			return null;
+		}
 	}
 }

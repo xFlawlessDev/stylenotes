@@ -28,6 +28,7 @@ import { hydrateMemory, startMemorySync } from '$lib/stores/memory.svelte';
 import { startMemoryAutonomy, stopMemoryAutonomy } from '$lib/stores/memory-autonomy';
 import { resumeRemoteMcp } from '$lib/stores/remote-mcp.svelte';
 import { startVaultSync, stopVaultSync } from '$lib/stores/vault.svelte';
+import { startUpdateChecks } from '$lib/stores/update.svelte';
 
 /** The slice of workspace state the session hydration and listeners write to. */
 export type WorkspaceSessionState = {
@@ -50,7 +51,8 @@ export type WorkspaceSessionState = {
 export function startWorkspaceSession(
 	state: WorkspaceSessionState,
 	reloadWorkspaceRecords: () => Promise<void>,
-	isSavingLocally: () => boolean
+	isSavingLocally: () => boolean,
+	raiseNotification: (notification: AppNotification) => void
 ) {
 	onMount(() => {
 		void (async () => {
@@ -85,6 +87,10 @@ export function startWorkspaceSession(
 		// Bring back automatic two-way vault sync for a `vault` workspace; a no-op
 		// for any other mode (docs/design/vault-mirror.md).
 		startVaultSync();
+
+		// Update checks: once shortly after launch, then once a day. A new
+		// version is announced through the notification panel at most once.
+		const stopUpdateChecks = startUpdateChecks(raiseNotification);
 
 		let unlisten: (() => void) | undefined;
 		let unlistenNotes: (() => void) | undefined;
@@ -145,6 +151,7 @@ export function startWorkspaceSession(
 			disposed = true;
 			stopVaultSync();
 			stopMemoryAutonomy();
+			stopUpdateChecks();
 			unlisten?.();
 			unlistenNotes?.();
 			unlistenDependencies?.();

@@ -43,6 +43,7 @@
 	import MemorySettings from '$lib/components/workspace/MemorySettings.svelte';
 	import AttachmentSettings from '$lib/components/workspace/AttachmentSettings.svelte';
 	import VaultSettings from '$lib/components/workspace/VaultSettings.svelte';
+	import UpdatePanel from '$lib/components/workspace/UpdatePanel.svelte';
 	import ImportMarkdownDialog from '$lib/components/workspace/ImportMarkdownDialog.svelte';
 
 	let {
@@ -394,6 +395,8 @@
 								{t('settings.about.private')}
 							</div>
 						</div>
+
+						<UpdatePanel />
 					{/if}
 				</div>
 			</div>
