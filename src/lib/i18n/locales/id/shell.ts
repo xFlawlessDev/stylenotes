@@ -55,19 +55,44 @@ export const shell: ShellMessages = {
 		clearAll: 'Bersihkan semua',
 		savedLocally: 'Tersimpan lokal',
 		closeNotifications: 'Tutup notifikasi',
-		seed: {
-			weeklyTitle: 'Waktunya tinjauan mingguan',
-			weeklyBody: 'Jumat malam waktu yang tepat untuk menutup pekan ini.',
-			tipTitle: 'Coba palet perintah',
-			tipBody: 'Tekan Ctrl K untuk mencari catatan, berpindah folder, dan menjalankan aksi.',
-			syncTitle: 'Semua catatan tersimpan lokal',
-			syncBody: 'Edit terakhirmu tersimpan di perangkat ini. Semuanya sudah terbaru.',
-			archiveTitle: '3 catatan siap diarsipkan',
-			archiveBody:
-				'Catatan yang lama tidak disentuh bisa dipindah ke Arsip agar daftar tetap rapi.',
-			time: { minutes: '{count} mnt lalu', hours: '{count} jam lalu', yesterday: 'Kemarin' },
+		/** Menandai baris terhitung: mencerminkan state langsung, bukan event tersimpan. */
+		live: 'Langsung',
+		/** Menandai baris event tersimpan di bawah baris terhitung. */
+		recent: 'Terbaru',
+		/**
+		 * Dihitung dari state aplikasi langsung, tidak pernah disimpan; lihat
+		 * `content/notification-insights.ts`.
+		 */
+		insight: {
+			tasks: {
+				title: 'Ringkasan tugas harian',
+				body: '{overdue} terlambat · {today} jatuh tempo hari ini · {blocked} terblokir',
+			},
+			indexing: {
+				title: 'Mengindeks catatanmu',
+				progress: '{done} dari {total} item sudah diindeks.',
+				working: 'Membangun indeks pencarian. Ini butuh beberapa saat.',
+				behindTitle: 'Indeks pencarian tertinggal',
+				behindBody: '{count} item menunggu untuk diindeks.',
+			},
+			vault: {
+				title: 'Vault perlu keputusan',
+				body: '{count} file berubah di kedua sisi.',
+			},
+			suggestions: {
+				title: 'Saran tautan baru',
+				body: '{count} catatan tampak berkaitan. Tinjau di grafik.',
+			},
+			attachments: {
+				title: 'Lampiran tak terpakai',
+				body: '{count} file tersimpan tidak lagi dirujuk catatan mana pun.',
+			},
+			journal: {
+				title: 'Jurnal belum dimulai',
+				body: 'Catatan hari ini belum ditulis.',
+			},
 		},
-		/** Dibangkitkan oleh aplikasi (bukan baris seed); lihat `stores/memory-nudge.ts`. */
+		/** Dibangkitkan oleh aplikasi; lihat `stores/memory-nudge.ts`. */
 		memory: {
 			title: 'Memori semantik nonaktif',
 			body: 'Buka Pengaturan → Memori dan pilih embedder agar asisten bisa mencari catatanmu berdasarkan makna.',

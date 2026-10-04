@@ -24,12 +24,8 @@ beforeEach(() => {
 });
 
 describe('seedNotifications', () => {
-	it('returns fresh copies each call', () => {
-		const a = seedNotifications();
-		const b = seedNotifications();
-		expect(a).toEqual(b);
-		expect(a).not.toBe(b);
-		expect(a[0]).not.toBe(b[0]);
+	it('seeds nothing: the panel is computed, not canned', () => {
+		expect(seedNotifications()).toEqual([]);
 	});
 });
 
@@ -43,22 +39,39 @@ describe('loadNotifications', () => {
 		expect(notificationsRepo.replaceAll).not.toHaveBeenCalled();
 	});
 
-	it('seeds defaults when the table is empty', async () => {
-		vi.mocked(notificationsRepo.list).mockResolvedValue([]);
+	it('drops legacy static seed rows', async () => {
+		vi.mocked(notificationsRepo.list).mockResolvedValue([
+			{ id: 'n-weekly', kind: 'reminder' as const, title: 'T', body: 'B', time: 'now', read: false },
+			{ id: 'n-memory', kind: 'tip' as const, title: 'M', body: 'B', time: 'now', read: false },
+		]);
 		const result = await loadNotifications();
-		expect(result).toEqual(seedNotifications());
-		expect(notificationsRepo.replaceAll).toHaveBeenCalledWith(seedNotifications());
+		expect(result.map((item) => item.id)).toEqual(['n-memory']);
 	});
 
-	it('falls back to seed on error', async () => {
+	it('clears the table when only legacy rows remain', async () => {
+		vi.mocked(notificationsRepo.list).mockResolvedValue([
+			{ id: 'n-tip', kind: 'tip' as const, title: 'T', body: 'B', time: 'now', read: false },
+		]);
+		expect(await loadNotifications()).toEqual([]);
+		expect(notificationsRepo.replaceAll).toHaveBeenCalledWith([]);
+	});
+
+	it('returns empty on an empty table', async () => {
+		vi.mocked(notificationsRepo.list).mockResolvedValue([]);
+		expect(await loadNotifications()).toEqual([]);
+	});
+
+	it('falls back to empty on error', async () => {
 		vi.mocked(notificationsRepo.list).mockRejectedValue(new Error('nope'));
-		expect(await loadNotifications()).toEqual(seedNotifications());
+		expect(await loadNotifications()).toEqual([]);
 	});
 });
 
 describe('persistNotifications', () => {
 	it('replaces all rows', async () => {
-		const items = seedNotifications();
+		const items = [
+			{ id: 'x', kind: 'tip' as const, title: 'T', body: 'B', time: 'now', read: false },
+		];
 		await persistNotifications(items);
 		expect(notificationsRepo.replaceAll).toHaveBeenCalledWith(items);
 	});
@@ -70,9 +83,9 @@ describe('persistNotifications', () => {
 });
 
 describe('resetNotifications', () => {
-	it('persists and returns seed defaults', async () => {
+	it('persists and returns the (empty) defaults', async () => {
 		const result = await resetNotifications();
-		expect(result).toEqual(seedNotifications());
-		expect(notificationsRepo.replaceAll).toHaveBeenCalledWith(seedNotifications());
+		expect(result).toEqual([]);
+		expect(notificationsRepo.replaceAll).toHaveBeenCalledWith([]);
 	});
 });

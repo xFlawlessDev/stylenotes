@@ -52,19 +52,45 @@ export const shell = {
 		clearAll: 'Clear all',
 		savedLocally: 'Saved locally',
 		closeNotifications: 'Close notifications',
-		seed: {
-			weeklyTitle: 'Weekly review is due',
-			weeklyBody: 'Friday evening is a good moment to close the loop on this week.',
-			tipTitle: 'Try the command palette',
-			tipBody: 'Press Ctrl K to search notes, jump between folders, and run actions.',
-			syncTitle: 'All notes saved locally',
-			syncBody: 'Your last edit was written to this device. Everything is up to date.',
-			archiveTitle: '3 notes are ready to archive',
-			archiveBody:
-				'Notes untouched for a while can move to Archive to keep the list calm.',
-			time: { minutes: '{count}m ago', hours: '{count}h ago', yesterday: 'Yesterday' },
+		/** Marks a computed row: it reflects live state, not a stored event. */
+		live: 'Live',
+		/** Marks the stored event rows below the computed ones. */
+		recent: 'Recent',
+		/**
+		 * Computed from live app state, never stored; see
+		 * `content/notification-insights.ts`. They appear while a condition
+		 * holds and vanish when it clears.
+		 */
+		insight: {
+			tasks: {
+				title: 'Daily task summary',
+				body: '{overdue} overdue · {today} due today · {blocked} blocked',
+			},
+			indexing: {
+				title: 'Indexing your notes',
+				progress: 'Indexed {done} of {total} items.',
+				working: 'Building the search index. This can take a moment.',
+				behindTitle: 'Search index is behind',
+				behindBody: '{count} items are waiting to be indexed.',
+			},
+			vault: {
+				title: 'Vault needs a decision',
+				body: '{count} file(s) changed on both sides.',
+			},
+			suggestions: {
+				title: 'New link suggestions',
+				body: '{count} notes look related. Review them in the graph.',
+			},
+			attachments: {
+				title: 'Unused attachments',
+				body: '{count} stored file(s) are no longer referenced by any note.',
+			},
+			journal: {
+				title: 'Journal not started',
+				body: "Today's entry has not been written yet.",
+			},
 		},
-		/** Raised by the app itself (not a seed row); see `stores/memory-nudge.ts`. */
+		/** Raised by the app itself; see `stores/memory-nudge.ts`. */
 		memory: {
 			title: 'Semantic memory is off',
 			body: 'Open Settings → Memory and pick an embedder so the assistant can search your notes by meaning.',

@@ -7,9 +7,31 @@
 	import NotificationPanel from '$lib/components/workspace/NotificationPanel.svelte';
 	import { settings, toggleMode } from '$lib/stores/settings.svelte';
 	import { dependencyStore } from '$lib/stores/dependencies.svelte';
+	import { workspaceInsights } from '$lib/stores/workspace-insights';
+	import { primeAttachments } from '$lib/stores/attachments.svelte';
+	import type { InsightTarget } from '$lib/content/notification-insights';
 
 	const controller = createWorkspaceController();
 	const { state } = controller;
+
+	// The attachment catalog is primed lazily, so the "unused attachments"
+	// insight has nothing to count until something asks for it. Opening the
+	// panel is that ask; `primeAttachments` runs once per session, so this does
+	// not rescan on every open.
+	$effect(() => {
+		if (state.notificationsOpen) void primeAttachments();
+	});
+
+	/**
+	 * Routes a live insight row to where it can be acted on, closing the panel
+	 * first so the destination is not hidden behind it.
+	 */
+	function handleInsight(target: InsightTarget) {
+		state.notificationsOpen = false;
+		if (target.kind === 'settings') controller.openSettings(target.section);
+		else if (target.kind === 'journal') void controller.openTodayJournal();
+		else state.section = target.section;
+	}
 </script>
 
 <svelte:window onkeydown={controller.onGlobalKeydown} />
@@ -18,6 +40,7 @@
 	<NotificationPanel
 		open={state.notificationsOpen}
 		notifications={state.notifications}
+		insights={workspaceInsights(state.tasks, dependencyStore.items, state.items)}
 		ontoggle={() => {
 			const next = !state.notificationsOpen;
 			controller.closePanels();
@@ -27,6 +50,7 @@
 		onreadall={controller.markAllRead}
 		onclear={controller.clearNotifications}
 		onopenupdate={() => controller.openSettings('about')}
+		oninsight={handleInsight}
 		onclose={() => (state.notificationsOpen = false)}
 	/>
 {/snippet}

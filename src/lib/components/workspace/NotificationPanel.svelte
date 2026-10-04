@@ -9,8 +9,15 @@
 		AtSign,
 		Check,
 		Trash2,
+		ListTodo,
+		Database,
+		FolderSync,
+		Link2,
+		Paperclip,
+		NotebookPen,
 	} from '@lucide/svelte';
 	import type { NotificationKind } from '$lib/stores/notifications';
+	import type { NotificationInsight, InsightTarget } from '$lib/content/notification-insights';
 	import { t } from '$lib/i18n/index.svelte';
 	import { seedNotificationText } from '$lib/content/notification-text';
 	import { versionFromUpdateId } from '$lib/content/update-types';
@@ -29,21 +36,27 @@
 	let {
 		open = false,
 		notifications,
+		insights = [],
 		ontoggle,
 		onread,
 		onreadall,
 		onclear,
 		onopenupdate,
+		oninsight,
 		onclose,
 	}: {
 		open?: boolean;
 		notifications: Notification[];
+		/** Live, computed rows; see `content/notification-insights.ts`. */
+		insights?: NotificationInsight[];
 		ontoggle: () => void;
 		onread: (id: string) => void;
 		onreadall: () => void;
 		onclear: () => void;
 		/** Opens Settings on the About section for a version-update notification. */
 		onopenupdate?: () => void;
+		/** Routes a live insight row to its destination. */
+		oninsight?: (target: InsightTarget) => void;
 		onclose: () => void;
 	} = $props();
 
@@ -63,12 +76,29 @@
 		update: 'text-primary',
 	};
 
+	const insightIcon: Record<NotificationInsight['id'], typeof Bell> = {
+		tasks: ListTodo,
+		indexing: Database,
+		vault: FolderSync,
+		suggestions: Link2,
+		attachments: Paperclip,
+		journal: NotebookPen,
+	};
+
+	const insightTone: Record<NotificationInsight['tone'], string> = {
+		primary: 'text-primary',
+		secondary: 'text-secondary',
+		tertiary: 'text-tertiary',
+		error: 'text-error',
+	};
+
 	const unreadCount = $derived(notifications.filter((item) => !item.read).length);
+	const totalCount = $derived(insights.length + notifications.length);
 
 	/**
-	 * Renders a row's copy: seed rows are translated from the catalog (their
-	 * stored text is frozen at first-run language), everything else keeps the
-	 * stored title/body/time.
+	 * Renders a row's copy: app-owned rows are translated from the catalog
+	 * (their stored text is frozen at first-run language), everything else
+	 * keeps the stored title/body/time.
 	 */
 	function rowText(item: Notification): { title: string; body: string; time: string } {
 		return seedNotificationText(item.id) ?? { title: item.title, body: item.body, time: item.time };
@@ -146,8 +176,45 @@
 		<div class="glass-divider h-px"></div>
 
 		<div class="scrollbar-none flex max-h-[300px] flex-1 flex-col overflow-y-auto p-1.5">
-			{#if notifications.length === 0}
+			{#if totalCount === 0}
 				<EmptyState icon={BellOff} title={t('shell.notification.allCaughtUp')} class="flex-none" />
+			{/if}
+
+			{#if insights.length > 0}
+				<div class="flex items-center justify-between px-1.5 pt-1 pb-1.5">
+					<span class="text-label-sm font-label text-outline">{t('shell.notification.live')}</span>
+					<span class="flex items-center gap-1 text-label-sm font-label text-tertiary">
+						<span class="size-1.5 animate-pulse rounded-full bg-tertiary"></span>
+					</span>
+				</div>
+				{#each insights as insight (insight.id)}
+					{@const Icon = insightIcon[insight.id] ?? Bell}
+					<Button
+						bare
+						class="group relative w-full justify-start gap-3 rounded-xl p-2.5 text-left bg-surface-container/55 hover:bg-surface-container/70"
+						onclick={() => oninsight?.(insight.target)}
+					>
+						<span
+							class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface-container-high {insightTone[insight.tone]}"
+						>
+							<Icon size={16} />
+						</span>
+						<span class="flex min-w-0 flex-col gap-0.5 pr-3">
+							<span class="text-label-md font-label font-medium text-on-surface">
+								{t(insight.titleKey, insight.titleParams)}
+							</span>
+							<span class="text-body-sm font-body leading-snug text-on-surface-variant">
+								{t(insight.bodyKey, insight.bodyParams)}
+							</span>
+						</span>
+					</Button>
+				{/each}
+			{/if}
+
+			{#if insights.length > 0 && notifications.length > 0}
+				<div class="px-1.5 pt-2.5 pb-1.5">
+					<span class="text-label-sm font-label text-outline">{t('shell.notification.recent')}</span>
+				</div>
 			{/if}
 
 			{#each notifications as item (item.id)}
@@ -186,13 +253,17 @@
 			{/each}
 		</div>
 
-		{#if notifications.length > 0}
+		{#if totalCount > 0}
 			<div class="glass-divider h-px"></div>
 			<div class="flex items-center justify-between px-3.5 py-2">
-				<Button bare class="gap-1.5 text-label-sm text-outline" onclick={onclear}>
-					<Trash2 size={13} />
-					{t('shell.notification.clearAll')}
-				</Button>
+				{#if notifications.length > 0}
+					<Button bare class="gap-1.5 text-label-sm text-outline" onclick={onclear}>
+						<Trash2 size={13} />
+						{t('shell.notification.clearAll')}
+					</Button>
+				{:else}
+					<span></span>
+				{/if}
 				<span class="flex items-center gap-1.5 text-label-sm font-label text-tertiary">
 					<Check size={13} />
 					{t('shell.notification.savedLocally')}

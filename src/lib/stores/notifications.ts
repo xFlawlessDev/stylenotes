@@ -11,54 +11,33 @@ export type AppNotification = {
 	read: boolean;
 };
 
-const seed: AppNotification[] = [
-	{
-		id: 'n-weekly',
-		kind: 'reminder',
-		title: 'Weekly review is due',
-		body: 'Friday evening is a good moment to close the loop on this week.',
-		time: '12m ago',
-		read: false,
-	},
-	{
-		id: 'n-tip',
-		kind: 'tip',
-		title: 'Try the command palette',
-		body: 'Press Ctrl K to search notes, jump between folders, and run actions.',
-		time: '1h ago',
-		read: false,
-	},
-	{
-		id: 'n-sync',
-		kind: 'sync',
-		title: 'All notes saved locally',
-		body: 'Your last edit was written to this device. Everything is up to date.',
-		time: '3h ago',
-		read: true,
-	},
-	{
-		id: 'n-archive',
-		kind: 'reminder',
-		title: '3 notes are ready to archive',
-		body: 'Notes untouched for a while can move to Archive to keep the list calm.',
-		time: 'Yesterday',
-		read: true,
-	},
-];
+/**
+ * Ids of the four static rows older builds wrote on first run. They are kept
+ * only so a database that still holds them can be cleaned up: the panel is
+ * dynamic now (see `content/notification-insights.ts`), and the rows it shows
+ * are events the app raised, never a canned suggestion.
+ */
+const LEGACY_SEED_IDS = new Set(['n-weekly', 'n-tip', 'n-sync', 'n-archive']);
 
+/**
+ * No rows are seeded. Every notification is either raised by the app in
+ * response to something real — an available update, a semantic tool that could
+ * not run — or computed live from state by the panel.
+ */
 export function seedNotifications(): AppNotification[] {
-	return seed.map((item) => ({ ...item }));
+	return [];
 }
 
 export async function loadNotifications(): Promise<AppNotification[]> {
 	try {
-		const items = await notificationsRepo.list();
+		const items = (await notificationsRepo.list()).filter(
+			(item) => !LEGACY_SEED_IDS.has(item.id)
+		);
 		if (items.length) return items;
-		const defaults = seedNotifications();
-		await notificationsRepo.replaceAll(defaults);
-		return defaults;
+		await notificationsRepo.replaceAll([]);
+		return [];
 	} catch {
-		return seedNotifications();
+		return [];
 	}
 }
 
