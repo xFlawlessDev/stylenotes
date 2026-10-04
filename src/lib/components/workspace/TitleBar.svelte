@@ -99,7 +99,7 @@
 	class="glass-panel relative z-30 m-2.5 mb-0 flex h-12 shrink-0 items-center justify-between gap-2 rounded-2xl px-3"
 >
 	<!-- Brand -->
-	<div class="flex min-w-0 flex-1 items-center gap-3">
+	<div data-tauri-drag-region class="flex min-w-0 flex-1 items-center gap-3">
 		<div class="flex shrink-0 items-center gap-2 pr-1">
 			<button
 				class="group flex size-3 items-center justify-center rounded-full bg-window-close transition-transform hover:scale-110"
@@ -126,13 +126,16 @@
 
 		<div class="glass-divider h-5 w-px"></div>
 
-		<div class="flex min-w-0 items-center gap-2">
+		<div data-tauri-drag-region class="flex min-w-0 items-center gap-2">
 			<img
+				data-tauri-drag-region
 				src="/icon-128.png"
 				alt={t('shell.brand')}
 				class="size-6 shrink-0 object-cover"
 			/>
-			<span class="shrink-0 whitespace-nowrap text-headline-sm font-headline tracking-tight text-on-surface"
+			<span
+				data-tauri-drag-region
+				class="shrink-0 whitespace-nowrap text-headline-sm font-headline tracking-tight text-on-surface"
 				>{title}</span
 			>
 		</div>
@@ -160,7 +163,7 @@
 	</div>
 
 	<!-- Controls -->
-	<div class="flex shrink-0 items-center gap-1.5">
+	<div data-tauri-drag-region class="flex shrink-0 items-center gap-1.5">
 		{#if section === 'notes' && showpanelbuttons}
 			<div class="flex items-center gap-0.5">
 				<Button
