@@ -8,7 +8,7 @@
 	import McpHostWatch from '$lib/components/workspace/McpHostWatch.svelte';
 	import { refreshSettings, settings } from '$lib/stores/settings.svelte';
 	import { restoreKanbanLock } from '$lib/stores/kanban.svelte';
-	import { currentWindowRole, isTauri, revealCurrentWindow, type WindowRole } from '$lib/windows';
+	import { currentWindowRole, isTauri, revealAndFocusCurrentWindow, type WindowRole } from '$lib/windows';
 
 	/** Resolved before the first render so no window ever paints another role. */
 	function detectRole(): WindowRole {
@@ -23,16 +23,16 @@
 	let role = $state<WindowRole>(detectRole());
 
 	/**
-	 * Shows the current window now, and again after the next paint.
+	 * Shows and focuses the current window now, and again after the next paint.
 	 *
-	 * Calling `show()` directly is what makes this work on macOS: a hidden
-	 * WKWebView throttles `requestAnimationFrame`, so a reveal gated only on
-	 * rAF may never run and the window would never appear (the app looks hung).
-	 * The rAF pass just re-asserts the reveal once content has painted.
+	 * Calling `show()`/`setFocus()` directly is what makes this work on macOS: a
+	 * hidden WKWebView throttles `requestAnimationFrame`, so a reveal gated only
+	 * on rAF may never run and the window would never appear (the app looks
+	 * hung). The rAF pass just re-asserts the reveal once content has painted.
 	 */
 	function revealNow() {
-		void revealCurrentWindow();
-		requestAnimationFrame(() => revealCurrentWindow());
+		void revealAndFocusCurrentWindow();
+		requestAnimationFrame(() => revealAndFocusCurrentWindow());
 	}
 
 	onMount(async () => {
