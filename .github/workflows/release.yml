@@ -27,10 +27,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest # Apple silicon host; builds both Mac targets.
+          # macOS ships arm64 only. ONNX Runtime dropped its Intel macOS build
+          # after 1.23, and `ort` needs api-24, so an Intel bundle would have no
+          # local embedder (see `scripts/onnx-runtime.cjs`).
+          - platform: macos-latest # Apple silicon host; builds the arm64 Mac.
             args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
           # 22.04 (not `-latest`) for the wider glibc/webkit baseline a Linux
           # installer should target.
           - platform: ubuntu-22.04
@@ -62,8 +63,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # The macOS entries cross-compile; the others use the host target.
-          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          # macOS builds arm64 on the Apple-silicon host; the others use the host target.
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
@@ -78,9 +79,8 @@ jobs:
       # anyway, but doing it up front keeps a missing download visible as its
       # own failed step rather than a confusing bundling error.
       #
-      # Caveat: the script fetches the *host* build, so the Intel macOS bundle
-      # carries an arm64 dylib. The local embedder reports the model unavailable
-      # there (#D17) — a graceful, documented degradation, not a crash.
+      # The macOS build is arm64 and the runner is Apple silicon, so the script
+      # fetches a matching arm64 dylib.
       - name: Install the ONNX Runtime library
         run: bun run setup:onnx
 
@@ -88,6 +88,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The updater refuses an unsigned manifest. These sign each installer
+          # and let tauri-action emit `latest.json` on the release, which is the
+          # endpoint in `tauri.conf.json`.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'StyleNotes ${{ github.ref_name }}'

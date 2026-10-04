@@ -239,7 +239,7 @@ git push --follow-tags      # publish the commit and tag when ready
 ```
 
 Pushing the tag starts the **Release** workflow (`.github/workflows/release.yml`). It
-builds the installers on Windows, macOS (arm64 + Intel), and Linux with
+builds the installers on Windows, macOS (Apple silicon), and Linux with
 [`tauri-action`](https://github.com/tauri-apps/tauri-action) and publishes the GitHub
 Release for the tag:
 

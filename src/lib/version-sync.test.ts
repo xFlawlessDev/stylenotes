@@ -104,7 +104,7 @@ describe('cargo-toml-updater', () => {
 	it('leaves dependency version declarations untouched', () => {
 		const bumped = cargoUpdater.writeVersion(cargoToml, BUMPED);
 		expect(bumped).toContain(
-			'tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }'
+			'tauri = { version = "~2.11.6", features = ["protocol-asset", "tray-icon", "macos-private-api"] }'
 		);
 		expect(bumped).toContain('tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }');
 	});

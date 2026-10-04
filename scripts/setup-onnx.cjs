@@ -16,7 +16,7 @@
  *   5. A downloaded release archive from the onnxruntime GitHub releases.
  *
  * The asset differs per platform: Windows ships `.zip`, Linux and macOS ship
- * `.tgz`, and the macOS filename is `osx-x86_64`/`osx-arm64`. The download is
+ * `.tgz`, and the macOS filename is `osx-arm64` (Apple silicon). The download is
  * skipped with a clear message when the vendor publishes no build for this
  * platform/arch (Intel macOS after 1.23, for instance).
  *
