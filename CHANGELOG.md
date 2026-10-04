@@ -2,6 +2,20 @@
 
 All notable changes to StyleNotes are documented in this file. Versions follow Semantic Versioning and are derived from [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [0.1.1](https://github.com/xFlawlessDev/stylenotes/compare/v0.1.0...v0.1.1) (2026-10-04)
+
+### Features
+
+* add local MCP server details and AI assistant integration to README ([f9a56b4](https://github.com/xFlawlessDev/stylenotes/commit/f9a56b4476311fcbcc0c6095a93b26fb95c6670c))
+* enhance notification panel with live insights and dynamic updates ([a658fe2](https://github.com/xFlawlessDev/stylenotes/commit/a658fe22021b75e09041f20dca6db129243a11c0))
+* implement update notification system and settings panel integration ([bc2bad4](https://github.com/xFlawlessDev/stylenotes/commit/bc2bad44ed5bfc8c76d54690c8bf01319aaa3f7d))
+
+### Bug Fixes
+
+* add data-tauri-drag-region attributes to TitleBar elements for improved drag functionality ([fa6797f](https://github.com/xFlawlessDev/stylenotes/commit/fa6797f0df3b4ee6e4947be33eb4d8ff08cadcf6))
+* update macOS build targets and README for Apple silicon compatibility ([326bc30](https://github.com/xFlawlessDev/stylenotes/commit/326bc30a5ee4c6382d68e39d78d1efc7cf1280f8))
+* update window reveal function to ensure focus on macOS ([d85de04](https://github.com/xFlawlessDev/stylenotes/commit/d85de045a39ed8224ca00000641be1648f053100))
+
 ## 0.1.0 (2026-10-02)
 
 ### Features
