@@ -197,6 +197,34 @@ for (const root of siblingRoots) {
 	done(found);
 }
 
+/**
+ * Extracts a release archive into `dest`, which must already exist.
+ *
+ * `tar` is tried on every platform: Windows 10+ and macOS ship bsdtar and Linux
+ * ships GNU tar, and both detect the compression from the file itself, so one
+ * `-xf` covers the Windows `.zip` and the `.tgz` used elsewhere. This also
+ * avoids `Expand-Archive`, a PowerShell *module* cmdlet that fails to load on
+ * some clean Windows installs ("the module could not be loaded") and cannot be
+ * relied on. If `tar` cannot handle the archive, the .NET zip API is the
+ * fallback for a `.zip`: it is in-box, and the caller has already emptied
+ * `dest`, so the two-argument (no-overwrite) form is enough.
+ */
+function extractArchive(archive, dest, kind) {
+	try {
+		execFileSync('tar', ['-xf', archive, '-C', dest]);
+		return;
+	} catch (error) {
+		if (kind !== 'zip') throw error;
+	}
+	execFileSync('powershell', [
+		'-NoProfile',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-Command',
+		`Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${archive}', '${dest}')`,
+	]);
+}
+
 // 5. Download from the onnxruntime release when the network is reachable.
 async function download() {
 	const asset = releaseAsset();
@@ -213,24 +241,15 @@ async function download() {
 	writeFileSync(tmp, archive);
 	log(`downloaded ${(archive.length / 1_048_576).toFixed(1)} MB; extracting …`);
 	// Extraction uses the platform's own tooling: adding a zip/tar dependency to
-	// a build script is not worth it. Windows archives are `.zip`; the rest are
-	// `.tgz`, which the system `tar` handles everywhere.
+	// a build script is not worth it. `tar` handles both the Windows `.zip` and
+	// the `.tgz` used elsewhere; see `extractArchive`.
 	const extractDir = join(target, 'ort-extract');
 	// Clear any earlier extraction so a previous pin cannot be found here, then
-	// recreate it: GNU tar (Linux) and bsdtar (macOS) abort when `-C` names a
-	// directory that does not exist, while `Expand-Archive` creates its own — so
-	// without this the download only worked on Windows.
+	// recreate it: GNU tar (Linux) and bsdtar (macOS and Windows) abort when
+	// `-C` names a directory that does not exist.
 	rmSync(extractDir, { recursive: true, force: true });
 	mkdirSync(extractDir, { recursive: true });
-	if (asset.kind === 'zip') {
-		execFileSync('powershell', [
-			'-NoProfile',
-			'-Command',
-			`Expand-Archive -LiteralPath '${tmp}' -DestinationPath '${extractDir}' -Force`,
-		]);
-	} else {
-		execFileSync('tar', ['-xzf', tmp, '-C', extractDir]);
-	}
+	extractArchive(tmp, extractDir, asset.kind);
 	const found = findLibrary(extractDir, 0);
 	if (!found) throw new Error('the archive did not contain the library');
 	if (!isPinnedVersion(found)) {
