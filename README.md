@@ -4,10 +4,13 @@
 
 # StyleNotes
 
-**A calm, private notebook for your ideas, lists, and drafts.**
+**Your second brain and your task board — in one calm, private desktop app.**
 
-Markdown notes, tasks, and a graph that connects them — in a fast desktop app that
-works entirely offline. No account. No internet required.
+The connected, linkable note-taking of a second-brain tool like Obsidian, combined
+with the structured task management of Notion — Markdown notes, wiki links, a
+knowledge graph, and a real task system with boards, due dates, priorities, and
+dependencies. All in a fast desktop app that works entirely offline. No account.
+No internet required.
 
 [![CI](https://github.com/xFlawlessDev/stylenotes/actions/workflows/ci.yml/badge.svg)](https://github.com/xFlawlessDev/stylenotes/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/xFlawlessDev/stylenotes?sort=semver&label=release&color=3B82F6)](https://github.com/xFlawlessDev/stylenotes/releases/latest)
@@ -25,25 +28,46 @@ works entirely offline. No account. No internet required.
 
 </div>
 
-StyleNotes keeps everything you write down — and everything you mean to do — in one
-local place. Write in plain Markdown and see it rendered live; file notes into
-folders and tags; link them with `[[wiki links]]` so ideas connect themselves; and
-keep commitments as tasks with due dates, priorities, and dependencies. It is built
-with Tauri v2, SvelteKit (Svelte 5), and TypeScript, stores your notes in a local
-SQLite database, and ships as a static SPA.
+StyleNotes brings together the two halves of a good personal knowledge system: the
+**second brain** of a tool like Obsidian and the **task management** of a tool like
+Notion, without needing both apps open.
+
+Like Obsidian, your notes are **plain Markdown** you own forever — file them into
+folders and tags, connect them with `[[wiki links]]`, explore them as an interactive
+graph, and recall ideas with semantic search. Like Notion, your commitments live in a
+**real task system**: a Kanban board for status, a list for focus, a Gantt view for
+what is blocked by what, with due dates, priorities, and dependencies — and tasks can
+link back to the notes they came from, so thinking and doing stay in one place.
+
+It is built with Tauri v2, SvelteKit (Svelte 5), and TypeScript, stores your notes in
+a local SQLite database, and ships as a static SPA.
 
 ## What it does
+
+**Second brain, like Obsidian:**
 
 - **Notes that are just Markdown.** Write in plain text — headings, tables,
   checklists, blockquotes, code, math, and Mermaid diagrams all render in a live
   preview. Nothing is locked in a proprietary format, and export is plain `.md`.
-- **Tasks beside your thinking.** A board for status, a list for focus, a Gantt view
-  for what is blocked by what. Link a task to the notes it came from.
 - **A graph, not a filing cabinet.** `[[wiki links]]` turn your notes into a map you
-  can explore, hover, and search.
+  can explore, hover, and search — the same non-hierarchical linking that made
+  Obsidian popular.
 - **Search that finds the thought, not just the word.** A command palette (`Ctrl K`)
   jumps to any note, task, or action; full-text search covers titles, tags, and
   bodies. An optional local embedder adds meaning-based recall.
+- **A daily journal.** A page for each day, with a focus list and the notes you
+  touched — reflection built into the workspace.
+
+**Task management, like Notion:**
+
+- **Tasks beside your thinking.** A Kanban board for status, a list for focus, and a
+  Gantt view for what is blocked by what — with due dates, priorities, and
+  dependencies between tasks.
+- **Notes and tasks in one graph.** Link a task to the notes it came from; your
+  knowledge and your commitments are part of the same map.
+
+**And desktop-first in a way neither is:**
+
 - **Windows that fit how you work.** A full workspace for deep work, an always-on-top
   dock for capture, and a Kanban board that can sit *behind* your other windows as a
   desktop underlay.
@@ -51,9 +75,10 @@ SQLite database, and ships as a static SPA.
   in a small, always-on-top window — without leaving what you were doing.
 - **Yours to make.** Light/dark, accent color, density, reduced motion, and the
   editor layout are all a setting away.
-- **Yours to connect.** A built-in MCP server lets Claude Desktop, Cursor, and other
-  assistants read and write your vault locally — off by default, read-only until you
-  allow writes.
+- **Yours to connect.** A built-in MCP server means any agent harness — Claude
+  Desktop, Claude Code, Cursor, OpenCode, Codex, or your own tooling — can operate
+  your entire workspace: read, search, and (with your permission) create and edit
+  notes and tasks. Off by default, read-only until you allow writes.
 
 ## Built for the desktop
 
@@ -83,13 +108,16 @@ saves as you type and is waiting in the workspace next time.
 | <img src="docs/assets/screenshots/gantt.webp" alt="The Gantt view showing task bars and Blocked-by badges" width="100%"><br>**Gantt with dependencies** | <img src="docs/assets/screenshots/graph.webp" alt="The workspace graph showing notes, tasks, and the links between them" width="100%"><br>**The graph of your notes** |
 | <img src="docs/assets/screenshots/journal.webp" alt="A daily journal entry with a Focus list and notes" width="100%"><br>**A daily journal page** | <img src="docs/assets/screenshots/command-palette.webp" alt="The command palette searching notes and tasks" width="100%"><br>**Command palette (Ctrl K)** |
 
-## Connect an AI assistant (MCP)
+## Operate StyleNotes from any agent harness (MCP)
 
-StyleNotes ships a **local MCP server** built into the desktop app. Any MCP client —
-Claude Desktop, Cursor, or your own — can search your notes, read them, and (with your
-permission) write back to them. Everything stays on your machine: there is no account
-and no cloud in the loop. It is **off by default**; you turn it on in **Settings →
-MCP**.
+StyleNotes ships a **local MCP server** built into the desktop app. Because MCP is a
+standard protocol, **any MCP-capable agent harness** — Claude Desktop, Claude Code,
+Cursor, OpenCode, Codex CLI, or a client you write yourself — can connect and operate
+your workspace: search it, read it, and (with your permission) write back to it. Your
+agent becomes a hands-on operator of your second brain — drafting notes, updating task
+boards, wiring dependencies — while everything stays on your machine: there is no
+account and no cloud in the loop. The server is **off by default**; you turn it on in
+**Settings → MCP**.
 
 The server speaks **MCP over Streamable HTTP**: one `POST /mcp` endpoint on port
 `7317`, guarded by a bearer token. Pick how far it reaches:
@@ -102,8 +130,9 @@ The server speaks **MCP over Streamable HTTP**: one `POST /mcp` endpoint on port
 
 ### What an agent can do
 
-**19 read** tools and **15 write** tools, grouped into scopes you switch on
-individually:
+Once connected, the harness can run your whole workspace through its normal tool-calling
+loop — no custom integration needed. **19 read** tools and **15 write** tools, grouped
+into scopes you switch on individually:
 
 - **Reads are always allowed and never touch the database.** `search_notes`,
   `search_tasks`, `search_all`, `get_note`, `get_task`, `context`, `graph_query`,
@@ -112,6 +141,8 @@ individually:
 - **Writes are opt-in, per scope.** Notes, tasks, dependencies, and workspaces. An
   agent can create and edit a note, move and complete a task, wire up dependencies,
   or manage workspaces — only after you grant *Allow writes* and the specific scope.
+  Because writes go through the same path the UI uses, anything the agent does
+  respects your validation rules and appears live in the app.
 
 Three things make this safe enough to leave on:
 
