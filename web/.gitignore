@@ -1,0 +1,13 @@
+node_modules
+.svelte-kit
+.wrangler
+build
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Generated from ../docs/assets by scripts/sync-assets.mjs — never commit.
+static/screenshots
+static/logo.png
+static/favicon.png

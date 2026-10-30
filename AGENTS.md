@@ -46,6 +46,17 @@ This is the **public, OSS** repo (AGPL-3.0 for the app; MIT for `packages/shared
 - **Windows start invisible** (`visible: false`) and are revealed client-side: `revealCurrentWindow()` for the declared windows, `revealAndFocusCurrentWindow()` for note/task windows (they reveal themselves once the record is loaded). Don't remove that.
 - **CI/CD is GitHub Actions.** `.github/workflows/ci.yml` runs the gate (`check`, `check:shared`, `test`, `fmt:check`, `clippy`) on every push to `main` and every PR. `.github/workflows/release.yml` runs on a `v*` tag: `tauri-action` builds installers on Windows, macOS (Apple silicon), and Linux and publishes the GitHub Release. The tag comes from `bun run release`; the workflow never edits the version. Builds are unsigned (no signing secrets configured).
 
+## Landing site (`web/`)
+
+- **A separate project, not a workspace.** `web/` has its own `package.json` and `bun.lock`; the root `workspaces` field stays `packages/*`. It is on **SvelteKit 3** (which the app is not, yet) and the two versions must not be hoisted together.
+- **It is server-rendered on purpose.** The app is a SPA (`ssr = false`), but the site sets `prerender = true` in `web/src/routes/+layout.ts` so every marketing URL is real HTML for crawlers and link previews. Only `/download` and `/download/[platform]` opt out (they read the latest GitHub release per request).
+- **SvelteKit 3 differences:** there is **no `svelte.config.js`** (config goes to the `sveltekit()` plugin in `web/vite.config.ts`, and a stray config file fails the build), and `$lib` is replaced by `#lib` subpath imports declared in `web/package.json` `imports`.
+- **The palette is copied, not imported.** `web/src/app.css` mirrors `src/routes/layout.css`, and `web/src/lib/components/base/button.svelte` is the app's button. Change a token in the app and change it there too — the screenshots on the site are pictures of the app.
+- **Screenshots are not duplicated.** `web/scripts/sync-assets.mjs` copies them from `docs/assets` on `prepare`/`prebuild`; the copies are gitignored. Update a screenshot in `docs/assets` and the site picks it up.
+- **`robots.txt` and `sitemap.xml` are prerendered routes** generated from `sitemapRoutes` in `web/src/lib/site.ts`. Endpoints do not inherit page options from a layout, so each declares `prerender = true` itself.
+- **Deploy is `.github/workflows/website.yml`** (check → test → build → `deploy:dry`, then `wrangler deploy` on `main`), independent of the app's `v*` release tags. Needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
+- See `web/README.md` for the full rationale.
+
 ## MCP (in-app server)
 
 - **One transport, no sidecar.** The MCP server runs inside the app as a Streamable HTTP listener on `src-tauri/src/remote_mcp/` (fixed port 7317, `POST /mcp`). There is no `stylenotes-mcp` binary, no `bundle.externalBin`, and no `mcp:sidecar` build step.

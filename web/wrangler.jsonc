@@ -1,0 +1,41 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "stylenotes-web",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"workers_dev": false,
+	"preview_urls": false,
+
+	/*
+		stylenotes.evofast.net is a *subdomain* of the evofast.net zone, not the
+		zone apex. Two consequences:
+
+		1. `custom_domain` is wrong here. That flag claims a hostname and asks
+		   Cloudflare to create its DNS record; it refuses a name that already
+		   has records. A subdomain of a zone you already control uses
+		   `routes` with `zone_name`.
+
+		2. The pattern needs the `/*` path part. A bare hostname is parsed as
+		   a *path*, and wrangler then warns that it will look for assets in a
+		   directory named after the domain.
+
+		If the evofast.net zone lives in a *different* Cloudflare account than
+		the one deploying, delete this `routes` block and attach the domain in
+		the dashboard instead (Workers & Pages -> stylenotes-web -> Settings ->
+		Domains & Routes -> Add custom domain).
+	*/
+	"routes": [
+		{
+			"pattern": "stylenotes.evofast.net/*",
+			"zone_name": "evofast.net"
+		}
+	]
+}

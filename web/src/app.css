@@ -1,0 +1,368 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ *
+ * Palette                                                             *
+ *                                                                     *
+ * Copied from the desktop app (`src/routes/layout.css`) on purpose:   *
+ * the screenshots on this site are pictures of that app, so a         *
+ * drifting accent would make the product look like a different one.   *
+ * Keep these two files in step when the app's palette changes.        *
+ * ------------------------------------------------------------------ */
+:root,
+.dark {
+	color-scheme: dark;
+	--radius: 0.625rem;
+
+	--background: #0e1116;
+	--foreground: #dce3ee;
+	--card: #161b23;
+	--card-foreground: #dce3ee;
+	--popover: #161b23;
+	--popover-foreground: #dce3ee;
+	--primary: #a8c7e8;
+	--primary-foreground: #0f1b28;
+	--secondary: #8fa6bd;
+	--secondary-foreground: #101821;
+	--muted: #1a212b;
+	--muted-foreground: #a7b2c2;
+	--accent: #232c38;
+	--accent-foreground: #dce3ee;
+	--destructive: #e0a3a0;
+	--destructive-foreground: #2a1113;
+	--border: #333c49;
+	--input: #333c49;
+	--ring: #6f7f92;
+
+	/* Material Design 3 semantic tokens */
+	--color-primary: #a8c7e8;
+	--color-on-primary: #0f1b28;
+	--color-primary-container: #3a5570;
+	--color-on-primary-container: #d5e5f6;
+	--color-secondary: #8fa6bd;
+	--color-on-secondary: #101821;
+	--color-secondary-container: #33414f;
+	--color-on-secondary-container: #d3dde8;
+	--color-tertiary: #9ec9c4;
+	--color-on-tertiary: #0d1c1b;
+	--color-tertiary-container: #2f4a48;
+	--color-on-tertiary-container: #d2e7e4;
+	--color-error: #e0a3a0;
+	--color-on-error: #2a1113;
+	--color-error-container: #573233;
+	--color-on-error-container: #f0d0ce;
+	--color-surface: #0e1116;
+	--color-on-surface: #dce3ee;
+	--color-surface-variant: #232c38;
+	--color-on-surface-variant: #a7b2c2;
+	--color-surface-dim: #0e1116;
+	--color-surface-bright: #2a333f;
+	--color-surface-container-lowest: #0a0d12;
+	--color-surface-container-low: #131820;
+	--color-surface-container: #161b23;
+	--color-surface-container-high: #1e252f;
+	--color-surface-container-highest: #28313d;
+	--color-outline: #6f7f92;
+	--color-outline-variant: #333c49;
+	--color-inverse-surface: #dce3ee;
+	--color-inverse-on-surface: #232b36;
+	--color-inverse-primary: #4d6b89;
+	--color-surface-tint: #a8c7e8;
+
+	/* Liquid glass */
+	--glass-stroke: rgba(255, 255, 255, 0.07);
+	--glass-highlight: rgba(255, 255, 255, 0.1);
+	--glass-glow: rgba(168, 199, 232, 0.05);
+	--glass-shadow: rgba(4, 7, 12, 0.5);
+	--glass-hairline: rgba(255, 255, 255, 0.06);
+	--aurora-1: rgba(168, 199, 232, 0.07);
+	--aurora-2: rgba(143, 166, 189, 0.055);
+	--aurora-3: rgba(158, 201, 196, 0.04);
+
+	/* Emphasis gradients, derived from the active accent */
+	--emphasis-bg: color-mix(in oklab, var(--primary), black 6%);
+	--emphasis-ring: color-mix(in oklab, var(--primary), black 18%);
+	--emphasis-gradient-start: color-mix(in oklab, var(--primary), white 12%);
+	--emphasis-gradient-end: var(--primary);
+
+	--color-success: #7dd3a0;
+	--color-on-success: #0d1f16;
+}
+
+html.light {
+	color-scheme: light;
+
+	--background: #eef1f6;
+	--foreground: #1a222d;
+	--card: #ffffff;
+	--card-foreground: #1a222d;
+	--popover: #ffffff;
+	--popover-foreground: #1a222d;
+	--primary: #3f6386;
+	--primary-foreground: #ffffff;
+	--secondary: #56647a;
+	--secondary-foreground: #ffffff;
+	--muted: #e4e9f0;
+	--muted-foreground: #57637a;
+	--accent: #dfe6ef;
+	--accent-foreground: #1a222d;
+	--destructive: #a8443f;
+	--destructive-foreground: #ffffff;
+	--border: #ccd5e0;
+	--input: #ccd5e0;
+	--ring: #7a8a9e;
+
+	--color-primary: #3f6386;
+	--color-on-primary: #ffffff;
+	--color-primary-container: #d3e4f7;
+	--color-on-primary-container: #1d3a56;
+	--color-secondary: #56647a;
+	--color-on-secondary: #ffffff;
+	--color-secondary-container: #dbe3ec;
+	--color-on-secondary-container: #29374a;
+	--color-tertiary: #3f6f6b;
+	--color-on-tertiary: #ffffff;
+	--color-tertiary-container: #cfe7e4;
+	--color-on-tertiary-container: #143d3a;
+	--color-error: #a8443f;
+	--color-on-error: #ffffff;
+	--color-error-container: #f6d8d6;
+	--color-on-error-container: #43120f;
+	--color-surface: #eef1f6;
+	--color-on-surface: #1a222d;
+	--color-surface-variant: #dbe2ec;
+	--color-on-surface-variant: #57637a;
+	--color-surface-dim: #e2e7ef;
+	--color-surface-bright: #ffffff;
+	--color-surface-container-lowest: #ffffff;
+	--color-surface-container-low: #e9edf4;
+	--color-surface-container: #eef1f6;
+	--color-surface-container-high: #e2e8f1;
+	--color-surface-container-highest: #d6dee9;
+	--color-outline: #586577;
+	--color-outline-variant: #ccd5e0;
+	--color-inverse-surface: #1a222d;
+	--color-inverse-on-surface: #e9edf4;
+	--color-inverse-primary: #a8c7e8;
+	--color-surface-tint: #3f6386;
+
+	--glass-stroke: rgba(26, 34, 45, 0.09);
+	--glass-highlight: rgba(255, 255, 255, 0.9);
+	--glass-glow: rgba(63, 99, 134, 0.06);
+	--glass-shadow: rgba(62, 78, 100, 0.16);
+	--glass-hairline: rgba(26, 34, 45, 0.08);
+	--aurora-1: rgba(63, 99, 134, 0.1);
+	--aurora-2: rgba(95, 112, 133, 0.07);
+	--aurora-3: rgba(63, 111, 107, 0.06);
+
+	--emphasis-bg: color-mix(in oklab, var(--primary), black 4%);
+	--emphasis-ring: color-mix(in oklab, var(--primary), black 18%);
+	--emphasis-gradient-start: color-mix(in oklab, var(--primary), white 8%);
+	--emphasis-gradient-end: var(--primary);
+
+	--color-success: #2f7d52;
+	--color-on-success: #ffffff;
+}
+
+/* ------------------------------------------------------------------ *
+ * Tailwind theme bridge                                               *
+ * ------------------------------------------------------------------ */
+@theme inline {
+	--font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-headline: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-body: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-label: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+
+	--color-primary-container: var(--color-primary-container);
+	--color-on-primary: var(--color-on-primary);
+	--color-on-primary-container: var(--color-on-primary-container);
+	--color-secondary-container: var(--color-secondary-container);
+	--color-on-secondary: var(--color-on-secondary);
+	--color-on-secondary-container: var(--color-on-secondary-container);
+	--color-tertiary: var(--color-tertiary);
+	--color-on-tertiary: var(--color-on-tertiary);
+	--color-tertiary-container: var(--color-tertiary-container);
+	--color-on-tertiary-container: var(--color-on-tertiary-container);
+	--color-error: var(--color-error);
+	--color-on-error: var(--color-on-error);
+	--color-error-container: var(--color-error-container);
+	--color-on-error-container: var(--color-on-error-container);
+	--color-surface: var(--color-surface);
+	--color-on-surface: var(--color-on-surface);
+	--color-surface-variant: var(--color-surface-variant);
+	--color-on-surface-variant: var(--color-on-surface-variant);
+	--color-surface-dim: var(--color-surface-dim);
+	--color-surface-bright: var(--color-surface-bright);
+	--color-surface-container-lowest: var(--color-surface-container-lowest);
+	--color-surface-container-low: var(--color-surface-container-low);
+	--color-surface-container: var(--color-surface-container);
+	--color-surface-container-high: var(--color-surface-container-high);
+	--color-surface-container-highest: var(--color-surface-container-highest);
+	--color-outline: var(--color-outline);
+	--color-outline-variant: var(--color-outline-variant);
+	--color-inverse-surface: var(--color-inverse-surface);
+	--color-inverse-on-surface: var(--color-inverse-on-surface);
+	--color-inverse-primary: var(--color-inverse-primary);
+	--color-surface-tint: var(--color-surface-tint);
+
+	--color-hairline: var(--glass-hairline);
+	--color-success: var(--color-success);
+	--color-on-success: var(--color-on-success);
+	--color-emphasis-ring: var(--emphasis-ring);
+
+	/* Typography scale — the app's own tokens */
+	--text-headline-xl: 32px;
+	--text-headline-xl--line-height: 40px;
+	--text-headline-xl--letter-spacing: -0.025em;
+	--text-headline-xl--font-weight: 700;
+	--text-headline-lg: 24px;
+	--text-headline-lg--line-height: 32px;
+	--text-headline-lg--letter-spacing: -0.02em;
+	--text-headline-lg--font-weight: 600;
+	--text-headline-md: 18px;
+	--text-headline-md--line-height: 26px;
+	--text-headline-md--letter-spacing: -0.015em;
+	--text-headline-md--font-weight: 600;
+	--text-headline-sm: 15px;
+	--text-headline-sm--line-height: 22px;
+	--text-headline-sm--letter-spacing: -0.01em;
+	--text-headline-sm--font-weight: 600;
+	--text-body-lg: 15px;
+	--text-body-lg--line-height: 24px;
+	--text-body-md: 13px;
+	--text-body-md--line-height: 20px;
+	--text-body-sm: 12px;
+	--text-body-sm--line-height: 18px;
+	--text-label-md: 12px;
+	--text-label-md--line-height: 16px;
+	--text-label-md--letter-spacing: 0.02em;
+	--text-label-md--font-weight: 500;
+	--text-label-sm: 11px;
+	--text-label-sm--line-height: 14px;
+	--text-label-sm--letter-spacing: 0.03em;
+	--text-label-sm--font-weight: 500;
+	--text-code-sm: 12px;
+	--text-code-sm--line-height: 18px;
+
+	/* Display sizes: the app is a desktop UI, so its scale tops out at 32px.
+	   A landing page needs one step above that for the hero headline, and it
+	   must be fluid — a fixed 56px headline overflows a 320px viewport. */
+	--text-display-sm: clamp(1.875rem, 1.2rem + 2.9vw, 2.5rem);
+	--text-display-sm--line-height: 1.15;
+	--text-display-sm--letter-spacing: -0.03em;
+	--text-display-sm--font-weight: 700;
+	--text-display-lg: clamp(2.25rem, 1.3rem + 4vw, 3.5rem);
+	--text-display-lg--line-height: 1.06;
+	--text-display-lg--letter-spacing: -0.035em;
+	--text-display-lg--font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ *
+ * Base                                                               *
+ * ------------------------------------------------------------------ */
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
+	html {
+		scroll-behavior: smooth;
+		-webkit-text-size-adjust: 100%;
+	}
+
+	body {
+		@apply bg-background text-foreground font-sans antialiased;
+	}
+
+	/* Same focus treatment as the app, so keyboard users see one language. */
+	:focus-visible {
+		outline: 2px solid var(--primary);
+		outline-offset: 2px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html {
+			scroll-behavior: auto;
+		}
+
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.001ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.001ms !important;
+		}
+	}
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared surfaces                                                    *
+ * ------------------------------------------------------------------ */
+
+/** The app's floating-panel treatment. One surface only: the hero screenshot. */
+@utility glass-solid {
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 94%, transparent);
+	border: 1px solid color-mix(in oklab, var(--glass-highlight) 60%, transparent);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.08),
+		0 20px 50px -22px var(--glass-shadow);
+}
+
+@utility glass-chip {
+	background-color: color-mix(in oklab, var(--color-surface-container-high) 70%, transparent);
+	border: 1px solid var(--glass-stroke);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/** Keeps a fixed header from covering the heading a hash link jumps to. */
+@utility anchor-offset {
+	scroll-margin-top: 5rem;
+}
+
+/* A 44px minimum hit area for text links and icon-only controls. The visual
+   can stay small; the touch target cannot (R-03). */
+@utility tap-target {
+	min-height: 2.75rem;
+	min-width: 2.75rem;
+}
+
+/** The primary action's gradient, shared with `Button variant="primary"`. */
+@utility emphasis-primary {
+	background-color: var(--emphasis-bg);
+	background-image: linear-gradient(
+		180deg,
+		var(--emphasis-gradient-start),
+		var(--emphasis-gradient-end)
+	);
+}

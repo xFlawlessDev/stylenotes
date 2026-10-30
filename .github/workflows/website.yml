@@ -1,0 +1,106 @@
+name: Website
+
+# The site ships on its own cadence, separate from the desktop app's `v*`
+# release tags: a copy edit should deploy without cutting a version.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/website.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/website.yml'
+  # Let a release refresh the changelog/version surfaces without a code change.
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # `sync-assets.mjs` copies screenshots out of `docs/assets`, so a build
+      # proves those files still exist. The build also prerenders every page,
+      # which fails on a broken internal link (see `handleHttpError: 'fail'`).
+      - name: Typecheck
+        run: bun run check
+
+      - name: Unit tests
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      # Catches a wrangler.jsonc that would be rejected at deploy time, without
+      # needing any credentials.
+      - name: Validate the Worker bundle
+        run: bun run deploy:dry
+
+  deploy:
+    # Fork PRs never receive secrets, so they stop at `check`.
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://stylenotes.evofast.net
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+        env:
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL || 'https://stylenotes.evofast.net' }}
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web
+          # `wrangler deploy` is a no-op build here: `bun run build` already
+          # produced `.svelte-kit/cloudflare`, which `main`/`assets` point at.
+          command: deploy
+        env:
+          # Optional: raises the GitHub API rate limit for the release lookups
+          # on /download. Without it the site still works, but shares the
+          # unauthenticated 60/hour ceiling.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Purge the Cloudflare cache for HTML
+        if: ${{ vars.PURGE_CACHE == 'true' }}
+        run: |
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
